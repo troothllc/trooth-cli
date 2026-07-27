@@ -1,0 +1,51 @@
+{
+  "name": "@trooth/cli",
+  "version": "0.1.0",
+  "description": "Trooth CLI: run compliance scans, verify Trust Receipts, and check status from your terminal.",
+  "keywords": [
+    "trooth",
+    "compliance",
+    "cli",
+    "ai-compliance",
+    "soc2",
+    "iso27001",
+    "eu-ai-act",
+    "nist-ai-rmf",
+    "hipaa",
+    "audit"
+  ],
+  "license": "Apache-2.0",
+  "author": "Trooth, LLC (https://www.trooth.co)",
+  "homepage": "https://www.trooth.co",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troothllc/trooth-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/troothllc/trooth-cli/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "src/cli.js",
+  "bin": {
+    "trooth": "bin/trooth"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/",
+    "smoke": "node bin/trooth --help"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
