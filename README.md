@@ -76,7 +76,7 @@ trooth status --json
 The CLI reads configuration from the following sources, in this order:
 
 1. Command-line flags (highest priority)
-2. Environment variables — `TROOTH_API_KEY`, `TROOTH_HOST`
+2. Environment variables: `TROOTH_API_KEY`, `TROOTH_HOST`
 3. Defaults
 
 ## Use in CI
@@ -93,7 +93,7 @@ GitHub Actions users may also use the dedicated [`troothllc/trooth-action`](http
 
 ## Status during pre-launch
 
-The Trooth API begins production scans on **August 2, 2026**. Before that date, `scan` and `status` commands run in scaffold mode — they accept your inputs, validate configuration, and return placeholder responses so you can wire the CLI into your workflow now.
+The Trooth API begins production scans on **August 2, 2026**. Before that date, `scan` and `status` commands run in scaffold mode. They accept your inputs, validate configuration, and return placeholder responses so you can wire the CLI into your workflow now.
 
 ## Security
 
