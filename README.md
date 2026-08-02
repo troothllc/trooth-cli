@@ -1,24 +1,21 @@
 # @trooth/cli
 
-[![npm version](https://img.shields.io/npm/v/@trooth/cli.svg)](https://www.npmjs.com/package/@trooth/cli)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Node](https://img.shields.io/node/v/@trooth/cli.svg)](https://nodejs.org)
 
 Run compliance scans, verify Trust Receipts, and check your Trust Score from the terminal. Free at the Bronze tier.
 
 ## Install
 
-```bash
-npm install -g @trooth/cli
-```
-
-Or run without installing:
+The npm release is in progress. Until it lands, install from source:
 
 ```bash
-npx @trooth/cli scan
+git clone https://github.com/troothllc/trooth-cli.git
+cd trooth-cli
+npm install
+npm link
 ```
 
-Node 18 or later required.
+Node 18 or later required. When the package publishes, `npm install -g @trooth/cli` will be the one-line path.
 
 ## Quick start
 
@@ -81,7 +78,7 @@ The CLI reads configuration from the following sources, in this order:
 
 ## Use in CI
 
-Add a Trooth scan to any pipeline:
+The simplest CI integration today is the dedicated [`troothllc/trooth-action`](https://github.com/troothllc/trooth-action), which wraps this CLI with PR-comment integration. Once the npm release lands, any pipeline can also run the CLI directly:
 
 ```bash
 - run: npx @trooth/cli scan --fail-on critical
@@ -89,11 +86,9 @@ Add a Trooth scan to any pipeline:
     TROOTH_API_KEY: ${{ secrets.TROOTH_API_KEY }}
 ```
 
-GitHub Actions users may also use the dedicated [`troothllc/trooth-action`](https://github.com/troothllc/trooth-action), which wraps this CLI with PR-comment integration.
+## Status
 
-## Status during pre-launch
-
-The Trooth API begins production scans on **August 2, 2026**. Before that date, `scan` and `status` commands run in scaffold mode. They accept your inputs, validate configuration, and return placeholder responses so you can wire the CLI into your workflow now.
+The Trooth platform launched August 2, 2026. Until the npm release of this CLI lands, `scan` and `status` run in scaffold mode: they accept your inputs, validate configuration, and return placeholder responses so you can wire the CLI into your workflow now. This README will drop this section when the CLI runs fully against the production API.
 
 ## Security
 
@@ -105,6 +100,6 @@ Apache License 2.0. See [LICENSE](LICENSE).
 
 ## About Trooth
 
-Trooth provides cryptographic compliance infrastructure for AI products. Continuous monitoring against SOC 2, ISO 27001, EU AI Act, NIST AI RMF, and HIPAA. Free at Bronze.
+Trooth runs the Trooth Network: the witnessed trust network for software and AI companies. Posture is witnessed from live systems against SOC 2, ISO 27001, the EU AI Act, NIST AI RMF, and HIPAA, and published on a public trust profile buyers can read with no login. Free at Bronze.
 
-[trooth.co](https://www.trooth.co) · [Trust Center](https://www.trooth.co/security)
+[trooth.co](https://www.trooth.co) · [Browse the Network](https://www.trooth.co/network) · [Trust Center](https://www.trooth.co/security)
