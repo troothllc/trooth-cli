@@ -12,7 +12,7 @@ Trooth is the witnessed trust network for software and AI companies. A company g
 Published to npm as `trooth`. No install needed:
 
 ```bash
-npx trooth check stripe.com
+npx trooth check trooth.co
 ```
 
 Or install it once:
