@@ -1,105 +1,72 @@
-# @trooth/cli
+# trooth
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![npm](https://img.shields.io/npm/v/trooth?label=npm%20trooth&color=D5C884)](https://www.npmjs.com/package/trooth)
 
-Run compliance scans, verify Trust Receipts, and check your Trust Score from the terminal. Free at the Bronze tier.
+Run Trooth from your terminal. Check any company's witnessed standing on the Trooth Network, scan a Terraform plan before it merges, and check your infrastructure for drift. Public reads need no key and no account.
+
+Trooth is the witnessed trust network for software and AI companies. A company gets witnessed once, and buyers and their AI agents read a current, signed, dated record instead of chasing questionnaires and stale PDFs. This CLI is the read side and the build side in one command.
 
 ## Install
 
-The npm release is in progress. Until it lands, install from source:
+Published to npm as `trooth`. No install needed:
 
 ```bash
-git clone https://github.com/troothllc/trooth-cli.git
-cd trooth-cli
-npm install
-npm link
+npx trooth check stripe.com
 ```
 
-Node 18 or later required. When the package publishes, `npm install -g @trooth/cli` will be the one-line path.
-
-## Quick start
+Or install it once:
 
 ```bash
-# Get a free API key at https://www.trooth.co, then export it
-export TROOTH_API_KEY=your_key_here
-
-# Run a scan
-trooth scan
-
-# Scan against specific frameworks
-trooth scan --frameworks eu-ai-act,soc2 --fail-on high
-
-# Check current status
-trooth status
-
-# Verify a Trust Receipt locally
-trooth verify ./receipt.json
+npm i -g trooth
+trooth check trooth.co
 ```
 
-## Commands
+Node 18 or later.
 
-### `trooth scan`
+## Check any company
 
-Runs a compliance scan on the current project and exits non-zero if any finding meets the `--fail-on` threshold.
-
-| Option | Default | Description |
-|---|---|---|
-| `--api-key <key>`, `-k` | `$TROOTH_API_KEY` | API key. Use environment variable for security. |
-| `--frameworks <list>`, `-f` | all on tier | Comma-separated: `soc2,iso27001,eu-ai-act,nist-ai-rmf,hipaa`. |
-| `--fail-on <severity>` | `critical` | Severity that causes non-zero exit: `critical`, `high`, `medium`, `low`, `none`. |
-| `--host <url>` | `https://api.trooth.co` | API host. Override for staging environments. |
-| `--json` | off | Output machine-readable JSON. |
-
-### `trooth verify <receipt>`
-
-Verify a Trooth Trust Receipt structurally. Cryptographic signature verification ships with `@trooth/verifier` in v1.0.
+Read-only, no account. `check` reads only the public witness directory and sends nothing about you.
 
 ```bash
-trooth verify ./trust-receipt.json
-trooth verify ./trust-receipt.json --json
+trooth check trooth.co
 ```
 
-### `trooth status`
+You get the company's witnessed standing, the per-discipline breakdown, how many live probes passed, and the badge and scan IDs you can verify. When a company has no published standing yet, you get an honest "not listed", not a guess.
 
-Show your current Trust Score, tier, and last-scan time.
+Pipe the record into a script with `--json`:
 
 ```bash
-trooth status
-trooth status --json
+trooth check acme.com --json
 ```
 
-## Configuration
+## Scan a Terraform plan
 
-The CLI reads configuration from the following sources, in this order:
-
-1. Command-line flags (highest priority)
-2. Environment variables: `TROOTH_API_KEY`, `TROOTH_HOST`
-3. Defaults
-
-## Use in CI
-
-The simplest CI integration today is the dedicated [`troothllc/trooth-action`](https://github.com/troothllc/trooth-action), which wraps this CLI with PR-comment integration. Once the npm release lands, any pipeline can also run the CLI directly:
+`scan` sends a Terraform plan to Trooth Pre-Flight and reads it against SOC 2, ISO 27001, GDPR, HIPAA, NIST AI RMF, and the EU AI Act, before it merges. Advisory and report-only: Trooth reads your plan, never your environment, and never changes anything.
 
 ```bash
-- run: npx @trooth/cli scan --fail-on critical
-  env:
-    TROOTH_API_KEY: ${{ secrets.TROOTH_API_KEY }}
+terraform show -json plan.tfplan > plan.json
+trooth scan plan.json
 ```
 
-## Status
+By default `scan` is advisory and exits 0. Pass `--strict` to exit non-zero when findings exist, so you can gate a pull request on it.
 
-The Trooth platform launched August 2, 2026. Until the npm release of this CLI lands, `scan` and `status` run in scaffold mode: they accept your inputs, validate configuration, and return placeholder responses so you can wire the CLI into your workflow now. This README will drop this section when the CLI runs fully against the production API.
+## Check drift locally
 
-## Security
+```bash
+trooth lint
+```
 
-Pass your API key via environment variable, not via a flag in a shared shell. Never commit the key. See [SECURITY.md](https://github.com/troothllc/.github/blob/main/SECURITY.md) for the vulnerability disclosure policy.
+`lint` is a local, read-only infrastructure-as-code drift check. It never transmits your code.
+
+## Read Trooth from your AI assistant
+
+Everything `check` reads is also open to an AI agent over the public, read-only MCP server at `https://api.trooth.co/public/mcp`. Add it to Claude, ChatGPT, or Cursor and ask about any company in plain words. See [trooth-mcp](https://github.com/trooth-eng/trooth-mcp).
+
+## For companies
+
+The read side is open to everyone. The other half of the Network is the write side: claim your page and get witnessed, so buyers and their agents read a real, current standing instead of asking you for a PDF. Start at [trooth.co/signup](https://trooth.co/signup).
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
-
-## About Trooth
-
-Trooth runs the Trooth Network: the witnessed trust network for software and AI companies. Posture is witnessed from live systems against SOC 2, ISO 27001, the EU AI Act, NIST AI RMF, and HIPAA, and published on a public trust profile buyers can read with no login. Free at Bronze.
-
-[trooth.co](https://www.trooth.co) · [Browse the Network](https://www.trooth.co/network) · [Trust Center](https://www.trooth.co/security)
+Apache 2.0. Trooth automates. Trooth never signs.
