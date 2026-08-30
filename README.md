@@ -61,7 +61,7 @@ trooth lint
 
 ## Read Trooth from your AI assistant
 
-Everything `check` reads is also open to an AI agent over the public, read-only MCP server at `https://api.trooth.co/public/mcp`. Add it to Claude, ChatGPT, or Cursor and ask about any company in plain words. See [trooth-mcp](https://github.com/trooth-eng/trooth-mcp).
+Everything `check` reads is also open to an AI agent over the public, read-only MCP server at `https://api.trooth.co/public/mcp`. Add it to Claude, ChatGPT, or Cursor and ask about any company in plain words. See [trooth-mcp](https://github.com/troothllc/trooth-mcp).
 
 ## For companies
 
