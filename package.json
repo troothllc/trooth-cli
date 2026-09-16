@@ -1,51 +1,51 @@
 {
-  "name": "@trooth/cli",
-  "version": "0.1.0",
-  "description": "Trooth CLI: run compliance scans, verify Trust Receipts, and check status from your terminal.",
-  "keywords": [
-    "trooth",
-    "compliance",
-    "cli",
-    "ai-compliance",
-    "soc2",
-    "iso27001",
-    "eu-ai-act",
-    "nist-ai-rmf",
-    "hipaa",
-    "audit"
+  "name": "trooth",
+  "version": "0.4.2",
+  "description": "The Trooth Network from your terminal. Read any company's public, signed record with no key and no account: identity, products, terms, people, documents, security and AI posture. Also reads what your own repo declares, offline. No score, no verdict.",
+  "type": "module",
+  "bin": {
+    "trooth": "bin/trooth.mjs"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "check": "node ./bin/trooth.mjs check",
+    "lint": "node ./bin/trooth.mjs lint",
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version"
+  },
   "license": "Apache-2.0",
-  "author": "Trooth, LLC (https://www.trooth.co)",
-  "homepage": "https://www.trooth.co",
+  "author": "Trooth, LLC",
+  "homepage": "https://trooth.co",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/troothllc/trooth-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/troothllc/trooth-cli/issues"
+    "url": "https://trooth.co/contact"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "main": "src/cli.js",
-  "bin": {
-    "trooth": "bin/trooth"
-  },
-  "files": [
-    "bin/",
-    "src/",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "test": "node --test tests/",
-    "smoke": "node bin/trooth --help"
-  },
-  "dependencies": {
-    "commander": "^12.1.0"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  }
+  "keywords": [
+    "trooth",
+    "trooth-network",
+    "company-lookup",
+    "vendor-lookup",
+    "due-diligence",
+    "procurement",
+    "trust-network",
+    "company-directory",
+    "mcp",
+    "ai-agents",
+    "agent-tools",
+    "signed-records",
+    "provenance",
+    "infrastructure-as-code",
+    "terraform",
+    "kubernetes",
+    "cli"
+  ]
 }

@@ -1,5 +1,10 @@
 name: CI
 
+# The previous version of this file tested a package that is no longer here.
+# It ran `node bin/trooth --help` against a file that does not exist, and
+# `trooth scan`, a command removed in 0.4.0. Everything it asserted was about
+# @trooth/cli 0.1.0. This one tests what the repository actually ships.
+
 on:
   push:
     branches: [main]
@@ -11,32 +16,72 @@ permissions:
 
 jobs:
   smoke:
-    name: Smoke test on Node ${{ matrix.node }}
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [18, 20, 22]
+        node: [18, 20, 22, 24]
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
 
-      - name: Install dependencies
-        run: npm install
+      # Zero dependencies, on purpose. There is nothing to install, and an
+      # install step that installs nothing is a step that can fail for nothing.
+      - name: No dependencies
+        run: |
+          deps=$(node -p "Object.keys(require('./package.json').dependencies || {}).length")
+          [ "$deps" = "0" ] || { echo "expected zero dependencies, found $deps"; exit 1; }
 
-      - name: Smoke test (help)
-        run: node bin/trooth --help
+      - name: Version and help
+        run: |
+          node bin/trooth.mjs --version
+          node bin/trooth.mjs --help > /dev/null
 
-      - name: Smoke test (version)
-        run: node bin/trooth --version
+      - name: lint reads a declared tree and exits 0
+        run: node bin/trooth.mjs lint tests/fixtures/infra
 
-      - name: Smoke test (scan in scaffold mode)
-        env:
-          TROOTH_API_KEY: smoke-test-key
-        run: node bin/trooth scan --fail-on none --json --host http://localhost:9
+      - name: lint --json emits exactly one JSON document on stdout
+        run: |
+          node bin/trooth.mjs lint tests/fixtures/infra --json > out.json
+          node -e "const d=require('./out.json'); if(!d.digest) { throw new Error('no digest'); }"
+
+      - name: lint says so, rather than failing, when there is nothing to read
+        run: |
+          mkdir -p empty
+          set +e; node bin/trooth.mjs lint empty > /dev/null 2>&1; rc=$?; set -e
+          [ "$rc" = "1" ] || { echo "expected exit 1 (finding), got $rc"; exit 1; }
+
+      - name: a retired command explains itself instead of saying "unknown"
+        run: |
+          for cmd in scan eu; do
+            set +e; out=$(node bin/trooth.mjs "$cmd" 2>&1); rc=$?; set -e
+            [ "$rc" = "2" ] || { echo "$cmd: expected exit 2, got $rc"; exit 1; }
+            echo "$out" | grep -qi "retired" || { echo "$cmd: does not say it is retired"; exit 1; }
+          done
+
+      - name: an unknown flag is a usage error, not a crash
+        run: |
+          set +e; node bin/trooth.mjs --no-such-flag > /dev/null 2>&1; rc=$?; set -e
+          [ "$rc" = "2" ] || { echo "expected exit 2, got $rc"; exit 1; }
+
+  metadata:
+    name: One licence, one version, one description
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node tests/check-metadata.mjs
+
+      # What npm would actually ship, printed, so a file that should not be in
+      # the tarball is visible in the log before it is visible on the registry.
+      - name: The published tarball
+        run: npm pack --dry-run
