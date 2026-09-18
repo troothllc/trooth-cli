@@ -172,7 +172,9 @@ you opt in to one of two gates that are yours to choose.
 Outputs: `digest`, `declarations-read`, `inline-credential-literals`, and
 `report` (the JSON fact document, for `actions/upload-artifact` if you want to
 keep it). It needs no token and no write permission, so it runs on pull
-requests from forks. Nothing is transmitted: the step points the CLI at an
+requests from forks. The CLI is
+installed from npm at the pinned version into the runner's temporary
+directory and run by path. Nothing is transmitted: the step points the CLI at an
 unroutable address and `lint` never calls it anyway. A green step means the
 read happened. It is not a verdict on your infrastructure, and it is not
 evidence that Trooth has ingested anything; nothing is sent to Trooth.
