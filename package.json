@@ -17,7 +17,7 @@
   "scripts": {
     "check": "node ./bin/trooth.mjs check",
     "lint": "node ./bin/trooth.mjs lint",
-    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version"
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs"
   },
   "license": "Apache-2.0",
   "author": "Trooth, LLC",

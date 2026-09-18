@@ -1,0 +1,39 @@
+# The action, run against its own fixture on every push. A green run here is
+# the action reading two declaration files and writing the summary; it says
+# nothing about anybody's infrastructure, and that is the point of the action.
+name: action self-test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: lint
+        uses: ./
+        with:
+          path: tests/fixtures/infra
+      - name: The outputs are what the fixture declares
+        shell: bash
+        run: |
+          test "${{ steps.lint.outputs.declarations-read }}" = "2"
+          test "${{ steps.lint.outputs.inline-credential-literals }}" = "0"
+          case "${{ steps.lint.outputs.digest }}" in sha256:*) ;; *) echo "no digest"; exit 1;; esac
+      - name: An empty directory does not fail the step unless asked
+        id: empty
+        uses: ./
+        with:
+          path: .github
+      - name: And fails when asked
+        id: gated
+        continue-on-error: true
+        uses: ./
+        with:
+          path: .github
+          fail-if-nothing-read: "true"
+      - shell: bash
+        run: test "${{ steps.gated.outcome }}" = "failure"
