@@ -1,0 +1,102 @@
+# ============================================================================
+# Trooth lint, as a GitHub Action. ADVISORY BY DEFAULT.
+#
+# Runs `trooth lint` on a directory in the checkout and writes what it read to
+# the job summary: how many declaration files, from which sources, which
+# regions, how many storage declarations and how many of those declare
+# encryption, how many rules are open to any address, how many inline
+# credential literals - counts and type names, never a file name, a line, a
+# value or a snippet. Nothing is transmitted anywhere; lint is offline by
+# construction (the CLI's own test points it at an unreachable API and proves
+# zero requests leave).
+#
+# THERE IS NO VERDICT. lint reports what your infrastructure declares and does
+# not judge it; declaring public ingress is not a failing, because a load
+# balancer is supposed to be public. So this action cannot fail your workflow
+# unless you opt in, explicitly, to one of two gates that are yours to choose:
+#
+#   fail-on-inline-credentials   a credential literal in infrastructure code
+#                                is unambiguous, and the count is only a count
+#   fail-if-nothing-read         a directory that yields no declarations means
+#                                the action is pointed at the wrong place
+#
+# Everything else is a summary a person reads. A green run says the read
+# happened; it does not say your infrastructure is good, and a summary here is
+# not evidence that Trooth has ingested anything: nothing is sent to Trooth.
+#
+# PERMISSIONS: none are needed beyond `contents: read` for the checkout. The
+# action writes the job summary through the runner's own file, never through
+# the API, so it needs no token and works on pull requests from forks.
+# ============================================================================
+name: "Trooth lint (advisory)"
+description: "Read what your infrastructure declares - counts, sources, regions, encryption, open ingress, credential literals - into the job summary. Offline, no verdict, no score. Fails only on the two gates you opt into."
+author: "Trooth, LLC"
+branding:
+  icon: "eye"
+  color: "blue"
+
+inputs:
+  path:
+    description: "Directory to read. Relative to the workspace."
+    required: false
+    default: "."
+  version:
+    description: "Version of the `trooth` CLI to run from npm. Pinned on purpose; bump it deliberately."
+    required: false
+    default: "0.4.2"
+  fail-on-inline-credentials:
+    description: "Opt in: fail the step when lint counts one or more inline credential literals."
+    required: false
+    default: "false"
+  fail-if-nothing-read:
+    description: "Opt in: fail the step when the directory yields no infrastructure declarations."
+    required: false
+    default: "false"
+
+outputs:
+  digest:
+    description: "SHA-256 over the canonical fact document, timestamp excluded. The same tree always produces the same digest."
+    value: ${{ steps.lint.outputs.digest }}
+  declarations-read:
+    description: "How many declaration files were read."
+    value: ${{ steps.lint.outputs.declarations-read }}
+  inline-credential-literals:
+    description: "How many inline credential literals were counted. A count; the literals are never printed."
+    value: ${{ steps.lint.outputs.inline-credential-literals }}
+  report:
+    description: "Path to the JSON fact document, for `actions/upload-artifact` if you want to keep it."
+    value: ${{ steps.lint.outputs.report }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: lint
+      shell: bash
+      env:
+        TROOTH_LINT_PATH: ${{ inputs.path }}
+        TROOTH_CLI_VERSION: ${{ inputs.version }}
+        TROOTH_FAIL_ON_INLINE_CREDENTIALS: ${{ inputs.fail-on-inline-credentials }}
+        TROOTH_FAIL_IF_NOTHING_READ: ${{ inputs.fail-if-nothing-read }}
+        # lint never calls this, and the CLI's own test proves it; pointing it at
+        # an unroutable address makes that a property of this action too.
+        TROOTH_API: "http://127.0.0.1:9"
+      run: |
+        set -uo pipefail
+        REPORT="$RUNNER_TEMP/trooth-lint.json"
+        set +e
+        npx --yes "trooth@${TROOTH_CLI_VERSION}" lint "$TROOTH_LINT_PATH" --json > "$REPORT" 2> "$RUNNER_TEMP/trooth-lint.stderr"
+        CODE=$?
+        set -e
+        node "$GITHUB_ACTION_PATH/action/summary.mjs" "$REPORT" "$CODE" "$RUNNER_TEMP/trooth-lint.stderr" >> "$GITHUB_STEP_SUMMARY"
+        node "$GITHUB_ACTION_PATH/action/outputs.mjs" "$REPORT" "$CODE" >> "$GITHUB_OUTPUT"
+        echo "report=$REPORT" >> "$GITHUB_OUTPUT"
+        # The two gates, and only the two. Exit code 3 (upstream) cannot happen
+        # for lint; exit code 2 is a usage error and is always a failure because
+        # it means the action itself is misconfigured (a path that does not exist).
+        if [ "$CODE" = "2" ]; then echo "::error title=Trooth lint::usage error - $(head -c 300 "$RUNNER_TEMP/trooth-lint.stderr")"; exit 2; fi
+        if [ "$CODE" = "1" ] && [ "$TROOTH_FAIL_IF_NOTHING_READ" = "true" ]; then echo "::error title=Trooth lint::no infrastructure declarations were found under $TROOTH_LINT_PATH, and fail-if-nothing-read is on"; exit 1; fi
+        if [ "$CODE" = "0" ] && [ "$TROOTH_FAIL_ON_INLINE_CREDENTIALS" = "true" ]; then
+          N="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(j.facts.inline_credential_literals|0)' "$REPORT")"
+          if [ "$N" != "0" ]; then echo "::error title=Trooth lint::$N inline credential literal(s) counted, and fail-on-inline-credentials is on. The literals were not printed; find them with your own tooling."; exit 1; fi
+        fi
+        exit 0
