@@ -154,6 +154,29 @@ publishing the tree it came from.
 trooth lint --json > trooth-attestation.json
 ```
 
+## Use it in GitHub Actions
+
+The same `lint`, as a step. It writes what your infrastructure declares to the
+job summary and is **advisory by default**: it cannot fail your workflow unless
+you opt in to one of two gates that are yours to choose.
+
+```yaml
+- uses: troothllc/trooth-cli@v1
+  with:
+    path: ./infra
+    # Opt-in gates. Both default to false.
+    # fail-on-inline-credentials: "true"   # a credential literal in IaC is unambiguous
+    # fail-if-nothing-read: "true"         # the action is pointed at the wrong place
+```
+
+Outputs: `digest`, `declarations-read`, `inline-credential-literals`, and
+`report` (the JSON fact document, for `actions/upload-artifact` if you want to
+keep it). It needs no token and no write permission, so it runs on pull
+requests from forks. Nothing is transmitted: the step points the CLI at an
+unroutable address and `lint` never calls it anyway. A green step means the
+read happened. It is not a verdict on your infrastructure, and it is not
+evidence that Trooth has ingested anything; nothing is sent to Trooth.
+
 ## Use it from an AI assistant
 
 The same public network powers Trooth's read-only MCP server, so ChatGPT,
