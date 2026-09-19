@@ -1,65 +1,64 @@
 # trooth
 
-The Trooth Network from your terminal.
+The Trooth Network from your terminal. Published on npm as **`trooth`**.
 
-The Trooth Network gives every company one public, signed record: what it is,
-what it sells, who runs it, where its data lives, how it handles AI, and what a
-buyer needs before signing. DNS tells a machine where a company is. A TLS
-certificate tells it the connection is authentic. Neither says anything about
-the company itself. The Trooth Network is that layer, and this CLI reads it.
+Trooth operates the Trooth Network: one public, signed, machine-readable record per company, carrying its identity, products and demos, commercial terms, domain and marketing links, people, documents, security and privacy posture, AI practices, procurement terms and relationships. It is Trooth's only product and it is free.
 
-**`check` reads only public, already-published records. No key, no account.**
-**`lint` is entirely local: it opens files and opens no sockets.**
-**Trooth publishes facts and counts, never one number that sums a company up.**
+DNS says where a company is. A TLS certificate says the connection is authentic. The Trooth Network says who the company is and what it does with your data.
 
-## Install / run
+This CLI is the terminal interface to that record. It does two things:
+
+- `trooth check <domain>` reads a company's published record from the public Network. No key, no account, and nothing about you is sent.
+- `trooth lint [path]` reads what your own infrastructure declares and prints those declarations as facts. Entirely local: it opens files and opens no sockets.
+
+**Trooth witnesses and dates facts. It does not score, rate, rank or certify anyone.** The CLI prints counts, reported apart, and never adds them into one number.
+
+## Install
 
 ```bash
-# No install needed:
+# No install:
 npx trooth check stripe.com
 
-# or install it:
-npm i -g trooth
-trooth check trooth.co
+# Or install it:
+npm install -g trooth
+trooth --version
 ```
 
-Requires Node 18+ (uses built-in `fetch`). Zero dependencies.
+Node 18 or newer, because the binary uses the built-in `fetch`. Zero dependencies.
 
 ## Commands
 
 | Command | What it does |
-| --- | --- |
-| `trooth check <domain>` | Reads a company's record from the live Trooth Network (`GET https://api.trooth.co/directory/api/vendors`) and prints whether it is listed, when it was witnessed and first published, the live-probe and attestation counts, the badge id, and the signature and key id you can verify. Prints an honest "not listed yet" when a company has no published record. |
-| `trooth lint [path]` | Reads the infrastructure the given directory **declares** and prints those declarations as facts, plus a canonical SHA-256 digest of them. Entirely local and offline. |
-| `trooth --help` / `--version` | Help / version. |
+|---|---|
+| `trooth check <domain>` | Reads a company's record from the live Network and prints whether it is listed, when it was witnessed and first published, the live-probe and attestation counts, the badge id, and the signature and key id you can verify for yourself. |
+| `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations plus a canonical SHA-256 digest of them. Local and offline. `path` defaults to `.`. |
+| `trooth --help` | Help. Also `-h` and `help`. |
+| `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-- `--json`: stdout carries exactly one JSON document and nothing else; every
-  diagnostic goes to stderr. On an error the document is
-  `{"ok": false, "error": "...", "exit": N}`.
+`--json` is the only flag. With it, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`.
 
-Any other flag is a usage error (exit 2) that names the flag and lists the
-known ones.
+Any other flag is a usage error. The message names the flag and lists the ones that exist.
 
 ## Exit codes
 
 | Code | Meaning |
-| --- | --- |
-| 0 | ok: company listed; lint read at least one declaration; help / version |
-| 1 | finding: company not listed; lint found nothing to read |
-| 2 | usage error: missing argument, unknown flag or command, unreadable path |
-| 3 | Trooth unreachable, non-2xx response, or malformed response |
+|---|---|
+| 0 | The company is listed, or `lint` read at least one declaration, or you asked for help or the version. |
+| 1 | The company is not listed, or `lint` found nothing to read. |
+| 2 | Usage error: a missing argument, an unknown flag or command, or a path that does not exist. |
+| 3 | Trooth could not be read: unreachable, a non-2xx response, or a response that is not JSON. |
 
-A company that is not listed and a network that could not be read are different
-answers and they exit differently, so a pipeline never reads a Trooth outage as
-"this vendor is unverified".
+A company with no record and a Network that could not be read are different answers, so they exit differently. A pipeline can tell them apart without parsing prose, and a Trooth outage never reads as an unverified vendor.
 
 ## `trooth check`
 
 ```bash
 trooth check trooth.co
 ```
+
+Example output. The values are illustrative; the shape is what the binary prints.
 
 ```
 Trooth Network // witnessed · public · read-only //
@@ -78,8 +77,9 @@ A witnessed, point-in-time reading of public evidence. Not a certification. Not 
 Full record: https://trooth.co/network/trooth.co   ·   Signing keys: https://api.trooth.co/public/keys
 ```
 
+For scripting:
+
 ```bash
-# For scripting: one JSON document on stdout, exit 1 when a company is not listed.
 trooth check trooth.co --json
 ```
 
@@ -93,7 +93,9 @@ trooth check trooth.co --json
   "badge_id": "bronze_rw_...",
   "probes": { "passed": 64, "total": 65 },
   "attested": { "passed": 27, "total": 35 },
-  "events": [ { "type": "rewitnessed", "at": "2026-08-30T00:00:00Z", "detail": "64 of 65 live probes re-run" } ],
+  "events": [
+    { "type": "rewitnessed", "at": "2026-08-30T00:00:00Z", "detail": "64 of 65 live probes re-run" }
+  ],
   "receipt_signature": "...",
   "authority_key_id": "ed25519-2026-01",
   "verify_keys": "https://api.trooth.co/public/keys",
@@ -101,18 +103,15 @@ trooth check trooth.co --json
 }
 ```
 
-Those are the only fields `check --json` emits. Anything else the feed happens
-to carry is dropped on the way out, so a script written against this shape
-keeps working — and a field that would carry a score, tier, grade, rank or
-rating is dropped no matter what the feed sends.
+`category` and `description` are added when the record carries them. Those are the only fields `check --json` emits: anything else the feed happens to carry is dropped on the way out, so a script written against this shape keeps working. A field whose name would carry a score, grade, rank, rating or percentage is dropped no matter what the feed sends.
+
+A company with no record exits 1 and emits `{"domain": "...", "listed": false, "record_url": "..."}`. That is not a judgement. It means nothing has been published for that domain. A company gets a record at [trooth.co/get-started](https://trooth.co/get-started), free.
+
+Verify the signature yourself against the keys at [trooth.co/verify/keys](https://trooth.co/verify/keys), with [`trust-verifier-sdk`](https://github.com/troothllc/trust-verifier-sdk) or with your own Ed25519 code. You do not have to take Trooth's word for any of it.
 
 ## `trooth lint`
 
-`lint` reads what your infrastructure **declares** and reports it. It does not
-judge it. There is no verdict, no pass mark, no severity and no score, and
-nothing is checked against a named standard or regulation — declaring public
-ingress is not a failing, because a load balancer is supposed to be public.
-What the facts mean is your call.
+`lint` reads what your infrastructure **declares** and reports it. It does not judge it. There is no verdict, no pass mark, no severity and no score, and nothing is checked against a named standard or regulation. Declaring public ingress is not a failing: a load balancer is supposed to be public. What the facts mean is your call.
 
 ```bash
 trooth lint ./infra
@@ -133,99 +132,80 @@ Declared
   Marked public                            2
   Inline credential literals               0
 
-Digest  sha256:a963291330bce2ab…
+Digest  sha256:...
 ```
 
-It reads `.tf`, `.tf.json`, Kubernetes YAML (anything with `apiVersion` and
-`kind`), `terraform show -json` plan files and Dockerfiles. It is a declaration
-reader, not a full HCL parser, and it says so rather than pretending otherwise.
+It reads `.tf`, `.tf.json`, Kubernetes YAML (anything carrying both `apiVersion` and `kind`), `terraform show -json` plan files and Dockerfiles. It is a declaration reader, not a full HCL parser, and it says so in its own output rather than pretending otherwise.
 
-**Nothing leaves the machine.** No file name, no line, no code and no value is
-ever printed or transmitted — only counts, resource type names and region
-strings. The credential count is a count: it never shows the literal it found.
+Nothing leaves the machine. No file name, no line, no code and no value is printed or transmitted, only counts, resource type names and region strings. The credential count is a count: the literal it found is never shown.
 
-**The digest** is a SHA-256 over the canonical fact document with the timestamp
-excluded, so the same tree always produces the same digest. Record it in CI, or
-on your Trooth record, as evidence that a given state was observed — without
-publishing the tree it came from.
+The digest is a SHA-256 over the canonical fact document with the timestamp excluded, so the same tree always produces the same digest. Record it in CI, or on your own record, as evidence that a given state was observed, without publishing the tree it came from.
 
 ```bash
-# In CI: keep the fact document as a build artifact.
+# Keep the fact document as a build artifact.
 trooth lint --json > trooth-attestation.json
 ```
 
-## Use it in GitHub Actions
+## In GitHub Actions
 
-The same `lint`, as a step. It writes what your infrastructure declares to the
-job summary and is **advisory by default**: it cannot fail your workflow unless
-you opt in to one of two gates that are yours to choose.
+The same `lint`, as a step, is [`troothllc/trooth-action`](https://github.com/troothllc/trooth-action). It is advisory by default: it writes what your infrastructure declares to the job summary and cannot fail your workflow unless you opt in to one of two gates.
 
 ```yaml
-- uses: troothllc/trooth-cli@v1
+- uses: troothllc/trooth-action@v1
   with:
     path: ./infra
-    # Opt-in gates. Both default to false.
-    # fail-on-inline-credentials: "true"   # a credential literal in IaC is unambiguous
-    # fail-if-nothing-read: "true"         # the action is pointed at the wrong place
 ```
 
-Outputs: `digest`, `declarations-read`, `inline-credential-literals`, and
-`report` (the JSON fact document, for `actions/upload-artifact` if you want to
-keep it). It needs no token and no write permission, so it runs on pull
-requests from forks. The CLI is
-installed from npm at the pinned version into the runner's temporary
-directory and run by path. Nothing is transmitted: the step points the CLI at an
-unroutable address and `lint` never calls it anyway. A green step means the
-read happened. It is not a verdict on your infrastructure, and it is not
-evidence that Trooth has ingested anything; nothing is sent to Trooth.
+That repository's README documents the inputs and outputs.
 
-## Use it from an AI assistant
+## Environment
 
-The same public network powers Trooth's read-only MCP server, so ChatGPT,
-Claude, Cursor, or any MCP client can ask about a company in plain words:
+| Variable | Effect |
+|---|---|
+| `TROOTH_API` | Base URL for `check`. Defaults to `https://api.trooth.co`. `lint` ignores it, because `lint` makes no requests. |
+| `NO_COLOR` | Disables ANSI colour. Colour is already off when stdout is not a TTY. |
+
+There is no API key. The binary reads no credential of any kind and has no write path.
+
+## From an AI assistant
+
+The same public Network powers Trooth's read-only MCP server, so ChatGPT, Claude, Cursor or any MCP client can ask about a company in plain words:
 
 ```
 https://api.trooth.co/public/mcp
 ```
 
-## Notes
+Four read-only tools, public data, no key. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
 
-- `check` reads only the **public** record. There is no key and no account, and
-  it never sends anything about you. It is a read.
-- A "not listed" result is not a judgement. It means no record has been
-  published for that domain yet. A company gets one at
-  <https://trooth.co/get-started>.
-- Set `TROOTH_API` to point at a different base URL (defaults to
-  `https://api.trooth.co`). `lint` ignores it: `lint` makes no requests.
-- Set `NO_COLOR=1` to disable ANSI colour. Colour is already off when stdout is
-  not a TTY.
-
-## Changes in 0.4.0
+## Removed in 0.4.0
 
 Breaking, and deliberately so.
 
-- **`scan` and `eu` are removed.** Trooth does not scan infrastructure against a
-  standard, does not issue a verdict and does not offer a compliance product.
-  Both commands now exit 2 with a sentence saying so, rather than "unknown
-  command", so an old CI job or an old README gets an explanation.
-- **`lint` is real.** In 0.3.0 it shelled out to `@trooth/os`, which was never
-  published, so the command failed for everyone who ran it. It is now
-  implemented in this binary, entirely locally.
-- **`scan_id` is gone from `check --json`.** Every other field is unchanged.
-- **`--strict` is gone**, along with the only command that took it.
-- The package description and keywords no longer name any certification,
-  standard or regulation, because Trooth does not offer one.
+- The `scan` and `eu` commands are gone. Trooth does not check infrastructure against a standard and does not issue a verdict. Running either exits 2 with a sentence saying what happened, rather than "unknown command", so an old CI job or an old bookmark gets an explanation.
+- `lint` is real. In 0.3.0 it shelled out to a package that was never published, so the command failed for everyone who ran it. It is implemented in this binary now, entirely locally.
+- `scan_id` is gone from `check --json`. Every other field is unchanged.
+- `--strict` is gone, along with the only command that took it.
+- The package description and keywords no longer name any certification, standard or regulation, because Trooth does not offer one.
 
-The Trooth Network is Trooth's only product. This CLI, the public API and the
-MCP server are interfaces to it, not separate products.
+The Trooth Network is Trooth's only product. This CLI, the public API and the MCP server are interfaces to that one record, not separate products.
 
-Trooth automates. Trooth never signs for you.
+## Security
+
+Report a vulnerability through the [Vulnerability Disclosure Policy](https://trooth.co/security/vulnerability-disclosure-policy). Nothing in this CLI takes a credential, so there is no key to leak from it.
+
+## Links
+
+- The Network: [trooth.co/network](https://trooth.co/network)
+- This CLI on the site: [trooth.co/cli](https://trooth.co/cli)
+- API reference: [trooth.co/docs/api](https://trooth.co/docs/api)
+- Developers: [trooth.co/developers](https://trooth.co/developers)
+- Publish your own record, free: [trooth.co/get-started](https://trooth.co/get-started)
+- Contact: [trooth.co/contact](https://trooth.co/contact)
 
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
 
-The same licence applies to this repository, to the `trooth` package on npm and
-to the copyright header in `bin/trooth.mjs`. They are meant to agree; if you
-ever find that they do not, that is a defect and we want to hear about it at
-https://trooth.co/contact.
+The same licence applies to this repository, to the `trooth` package on npm and to the copyright header in `bin/trooth.mjs`. They are meant to agree. If you find that they do not, that is a defect and we want to hear about it at [trooth.co/contact](https://trooth.co/contact).
+
+Trooth automates. Trooth never signs for you.
