@@ -72,7 +72,7 @@ jobs:
           [ "$rc" = "2" ] || { echo "expected exit 2, got $rc"; exit 1; }
 
   metadata:
-    name: One licence, one version, one description
+    name: One license, one version, one description
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -80,6 +80,11 @@ jobs:
         with:
           node-version: 22
       - run: node tests/check-metadata.mjs
+
+      # The action tests and the lint tests. Run once, on one Node, because
+      # they read fixtures by path and assert exact counts.
+      - name: The test suite
+        run: npm test
 
       # What npm would actually ship, printed, so a file that should not be in
       # the tarball is visible in the log before it is visible on the registry.

@@ -32,7 +32,7 @@ t("the summary is a table of counts with no verdict, no pass mark and no file na
   assert.match(r.stdout, /\| Digest \| `sha256:[a-f0-9]{64}` \|/);
   assert.match(r.stdout, /nothing is sent to Trooth/);
   assert.ok(!/main\.tf|deploy\.yaml/.test(r.stdout), "no file name in the summary");
-  assert.ok(!/\b(pass|fail|score|grade|verdict:)\b/i.test(r.stdout.replace(/no verdict|No score/g, "")), "no verdict word");
+  assert.ok(!/\b(pass|fail|score|grade|verdict:)\b/i.test(r.stdout.replace(/no verdict/gi, "")), "no verdict word");
 });
 t("nothing read is described as a fact about the directory, not the infrastructure", () => {
   const empty = join(dir, "empty.json");

@@ -4,10 +4,11 @@
 // Licensed under the Apache License, Version 2.0. See the LICENSE file in this
 // repository, or http://www.apache.org/licenses/LICENSE-2.0
 //
-// The Trooth Network is one public record per company: identity, products and demos,
-// domain and marketing links, people, documents, security and privacy posture,
-// procurement terms, relationships and sub-processors — each one witnessed, signed
-// and dated. This CLI is the terminal interface to that record.
+// The Trooth Network is one public, signed record per company: identity, products and
+// demos, domain and marketing links, people, documents, security and privacy posture,
+// procurement terms, relationships and sub-processors. Each fact is dated and labeled
+// with where it came from: witnessed, public record, attested or declared. This CLI is
+// the terminal interface to that record.
 //
 // Commands:
 //   trooth check <domain>   Read a company's witnessed record from the public Trooth
@@ -18,9 +19,9 @@
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
-//   It does not score, rate, rank, grade or tier a company or a repository.
-//   It does not check anything against a named certification, standard or regulation.
-//   It does not produce a verdict, a pass mark or a percentage.
+//   It does not grade, rate or rank a company or a repository.
+//   It does not check anything against a named standard, framework or regulation.
+//   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
 // Exit codes (stable, for scripts):
@@ -39,12 +40,12 @@ import { join, relative, extname, basename } from 'node:path';
 
 const API = process.env.TROOTH_API || 'https://api.trooth.co';
 const require = createRequire(import.meta.url);
-let VERSION = '0.4.0';
+let VERSION = '0.4.3';
 try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3 };
 
-// Colour only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
+// Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
 const c = (code) => (useColor ? code : '');
 const J = c('\x1b[32m'), D = c('\x1b[2m'), B = c('\x1b[1m'), R = c('\x1b[31m'), A = c('\x1b[33m'), C = c('\x1b[36m'), X = c('\x1b[0m');
@@ -94,7 +95,7 @@ const FLAGS = {
  *  means an old README, an old CI job or an old blog post gets a sentence that says
  *  what happened, instead of "unknown command". */
 const RETIRED = {
-  scan: 'Trooth does not scan infrastructure against a standard and does not issue a verdict. `trooth lint` reads what your infrastructure declares and prints those facts, locally.',
+  scan: 'Trooth does not check infrastructure against a standard and does not issue a verdict. `trooth lint` reads what your infrastructure declares and prints those facts, locally.',
   eu:   'Trooth does not ingest regulation-specific evidence. Publish evidence on your company record at https://trooth.co/dashboard.',
   preflight: 'Retired. `trooth lint` reads declared infrastructure facts locally instead.',
 };
@@ -142,7 +143,7 @@ ${B}Examples${X}
   trooth check stripe.com                ${D}# read a company's witnessed record${X}
   trooth check trooth.co --json          ${D}# one JSON document on stdout, for scripting${X}
   trooth lint ./infra                    ${D}# read declared facts + print a canonical digest${X}
-  trooth lint --json >> attestation.json ${D}# the same facts, for a CI artifact${X}
+  trooth lint --json > trooth-lint.json  ${D}# the same facts as one JSON document, for a CI artifact${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
@@ -153,7 +154,7 @@ ${B}Exit codes${X}
 ${D}check reads only public, already-published records. No key, no account.
 lint is entirely local: it opens files, and opens no sockets. Your source never leaves.
 Trooth publishes facts and counts, never one number that sums a company up.
-Trooth automates. Trooth never signs for you.${X}
+Trooth signs what it witnessed. It never signs on a company's behalf.${X}
 `;
 }
 
@@ -202,6 +203,37 @@ function count(obj) {
   return { passed: obj.passed, total: obj.total };
 }
 
+/** The two count lines, in the website's form ("65 read; 64 as expected"). */
+function countLines(rec) {
+  const lines = [];
+  if (rec.probes) lines.push(`${B}Live probes:${X} ${rec.probes.total} read; ${rec.probes.passed} as expected`);
+  if (rec.attested) lines.push(`${B}Self-attestations:${X} ${rec.attested.total} asked; ${rec.attested.passed} attested`);
+  return lines;
+}
+
+/** The feed keeps the ledger oldest first. This returns the `n` most recent
+ *  events, newest first, ordered by timestamp; events with the same timestamp,
+ *  or none, keep the feed's order, later entries first. */
+function latestEvents(events, n) {
+  const t = (e) => { const v = Date.parse(e.at); return Number.isNaN(v) ? -Infinity : v; };
+  return events
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => (t(b.e) - t(a.e)) || (b.i - a.i))
+    .slice(0, n)
+    .map(({ e }) => e);
+}
+
+/** Display names for the feed's event types. The type strings themselves are
+ *  identifiers and are printed unchanged in --json. */
+const EVENT_LABELS = {
+  scan_completed: 'reading completed',
+  standing_published: 'record published to the Trooth Network',
+  rewitnessed: 'live probes re-read',
+};
+function eventLabel(type) {
+  return Object.prototype.hasOwnProperty.call(EVENT_LABELS, type) ? EVENT_LABELS[type] : type.replace(/_/g, ' ');
+}
+
 function projectRecord(v, domain) {
   const events = Array.isArray(v.events)
     ? v.events.filter((e) => e && e.type).map((e) => ({ type: String(e.type), at: e.at, detail: e.detail }))
@@ -240,11 +272,12 @@ async function check() {
     if (asJson) {
       emitJson({ domain, listed: false, record_url: `https://trooth.co/network/${encodeURIComponent(domain)}` });
     } else {
-      out(`\n${B}${domain}${X} ${D}//${X} ${A}not listed on the Trooth Network yet${X}`);
-      out(`\n${D}No witnessed record has been published for this domain. That is not a`);
-      out(`judgement. It simply has not been witnessed. A company gets a record by`);
-      out(`listing at ${X}${C}https://trooth.co/get-started${X}${D}: Trooth reads its public surface and`);
-      out(`publishes a signed, dated record that anyone — or any agent — can check.${X}\n`);
+      out(`\n${B}${domain}${X} ${D}//${X} ${A}not listed in the Trooth Network's public feed${X}`);
+      out(`\n${D}The public feed carries no record for this domain. That says nothing about the`);
+      out(`company: a domain that never listed, a listing Trooth has not published, and a`);
+      out(`record that was revoked all read this way. A company gets a record by listing at`);
+      out(`${X}${C}https://trooth.co/get-started${X}${D}: Trooth reads its public surface and publishes`);
+      out(`a signed, dated record that anyone, or any agent, can read.${X}\n`);
     }
     process.exit(EXIT.FINDING);
   }
@@ -254,19 +287,22 @@ async function check() {
 
   const when = fmtDate(rec.witnessed_at);
   const since = fmtDate(rec.first_published_at);
-  out(`\n${J}${B}Trooth Network${X} ${D}// witnessed · public · read-only //${X}`);
+  out(`\n${J}${B}Trooth Network${X} ${D}// public · signed · read-only //${X}`);
   out(`${B}${rec.company_name}${X}   ${C}${domain}${X}`);
-  out(`Standing: ${J}listed and witnessed${X}` +
-      (when ? `   ${D}witnessed ${when}${X}` : `   ${D}date not published${X}`) +
+  out(`Listing state: ${J}listed and witnessed${X}` +
+      (when ? `   ${D}last witnessed ${when}${X}` : `   ${D}date not published${X}`) +
       (since ? `   ${D}first published ${since}${X}` : ''));
 
-  const line = [];
-  if (rec.probes) line.push(`${B}Live probes${X} ${rec.probes.passed}/${rec.probes.total}`);
-  if (rec.attested) line.push(`${B}Attestations${X} ${rec.attested.passed}/${rec.attested.total}`);
-  if (line.length) {
-    out(`\n${line.join('     ')}`);
-    out(`${D}Probes are checks Trooth read for itself. Attestations are the company's own declarations.`);
-    out(`They are counts, reported apart on purpose. Trooth never adds them up into one number.${X}`);
+  // Two counts, never a ratio, in the form the website's record page uses: an
+  // "N/M" cell reads as a bar, and a bar reads as a grade. The JSON fields keep
+  // the feed's names (`passed`, `total`).
+  const counts = countLines(rec);
+  if (counts.length) {
+    out('');
+    for (const l of counts) out(l);
+    out(`${D}Live probes are readings Trooth took itself, from the company's public surface.`);
+    out(`Self-attestations are what the company attested about itself; Trooth records them`);
+    out(`and did not witness them. The two are reported apart and never added into one number.${X}`);
   }
 
   const ids = [];
@@ -274,14 +310,14 @@ async function check() {
   if (rec.authority_key_id) ids.push(`${D}Key ${rec.authority_key_id}${X}`);
   if (ids.length) out(ids.join('   '));
 
-  if (rec.events.length) {
-    out(`\n${B}Recent witness events${X}`);
-    for (const e of rec.events.slice(0, 3)) {
-      out(`  ${J}•${X} ${D}${fmtDate(e.at)}${X}  ${e.type.replace(/_/g, ' ')}${e.detail ? `${D}  ${e.detail}${X}` : ''}`);
-    }
+  const latest = latestEvents(rec.events, 3);
+  if (latest.length) {
+    out(`\n${B}Latest ledger events, newest first${X}`);
+    for (const e of latest) out(`  ${J}•${X} ${D}${fmtDate(e.at)}${X}  ${eventLabel(e.type)}`);
+    out(`${D}  --json carries the whole ledger, with the feed's own wording for each event.${X}`);
   }
 
-  out(`\n${D}A witnessed, point-in-time reading of public evidence. Not a certification. Not one number.`);
+  out(`\n${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
   out(`Full record: ${X}${C}${rec.record_url}${X}${D}   ·   Signing keys: ${rec.verify_keys}${X}\n`);
   process.exit(EXIT.OK);
 }
@@ -292,20 +328,31 @@ async function check() {
  * It reads the infrastructure a repository DECLARES and reports those
  * declarations as facts: how many storage resources declare encryption, which
  * regions appear, how many rules declare exposure to the whole internet. It
- * does not judge them. There is no verdict, no pass mark, no severity, no
- * score, and nothing is checked against a named standard or regulation.
+ * does not judge them. There is no verdict, no threshold, no severity and no
+ * rating, and nothing is checked against a named standard or regulation.
  * Declaring public ingress is not a failing; a load balancer is supposed to be
- * public. What the facts mean is the reader's call.
+ * public. What the facts mean is the reader's decision.
  *
  * It opens files and opens no sockets. Nothing about the repository leaves the
- * machine. The digest at the end is a SHA-256 over the canonical fact document
- * with the timestamp excluded, so the same tree always produces the same digest
- * and you can record it as evidence that a given state was observed, without
+ * machine. The digest at the end is a SHA-256 over the `facts` object in
+ * canonical form (the timestamp, path and CLI version are outside it), so the
+ * same tree read by the same CLI version always produces the same digest and
+ * you can record it as evidence that a given state was observed, without
  * publishing the tree it came from.
  *
- * It is a declaration reader, not an HCL parser: .tf.json, Kubernetes YAML and
- * terraform plan JSON are parsed properly, and .tf files are read at the
- * attribute level. That limit is stated in the output rather than hidden. */
+ * HOW EACH SOURCE IS READ. It is a pattern reader, not a Terraform evaluator:
+ * variables, modules and for_each are never resolved.
+ *   .tf                 regular expressions, split into top-level resource blocks
+ *   .tf.json            parsed as JSON; each resource is one unit
+ *   plan JSON           parsed as JSON (`terraform show -json`); each planned
+ *                       managed resource is one unit
+ *   Kubernetes YAML     regular expressions, one unit per YAML document,
+ *                       classified by its top-level `kind`
+ *   Dockerfile          read for regions, open addresses, public markers and
+ *                       credential literals only; it declares no resource types
+ * Storage, logging and identity are classified on a unit's resource type or
+ * kind, never on the text around it. The human output prints this list in
+ * short, so the limit is stated where the counts are. */
 
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.terraform', '.next', 'dist', 'build', 'vendor',
@@ -357,6 +404,125 @@ const PUBLIC_RE = /\b(?:publicly_accessible\s*[:=]\s*true|acl\s*[:=]\s*["']publi
 // A literal that looks like a credential sitting in the file. Reported as a
 // count only: no file name, no line, and never the value itself.
 const SECRET_RE = /\b(?:password|secret|api[_-]?key|access[_-]?key|token|private[_-]?key)\s*[:=]\s*["'][^"'${}\n]{8,}["']/i;
+// A storage-matching Terraform type that names a SETTING on a store rather than
+// a store: aws_s3_bucket_server_side_encryption_configuration, a bucket policy,
+// a volume attachment, a subnet group. The substring match above catches these
+// (the fixture's one bucket used to count as two storage declarations), so they
+// are not counted as storage. A setting that declares encryption and references
+// a store credits that store with declaring encryption. Applied to snake_case
+// Terraform types only; Kubernetes kinds are CamelCase and are not settings.
+const STORAGE_SETTING = /_(?:configuration|policy|acl|versioning|notification|public_access_block|ownership_controls|attachment|object|item|logging|iam_member|iam_binding|access_point|mount_target|snapshot|subnet_group|parameter_group|option_group)$/;
+const isStorageSetting = (type) => type.includes('_') && STORAGE_SETTING.test(type);
+// An attribute set to false, null or empty declares nothing: `encrypted = false`
+// and `storage_encrypted: false` must not count as declaring encryption.
+const NEGATIVE_ATTR_RE = /^[^\n:=]*[:=]\s*(?:false|null|"false"|'false'|""|''|\[\]|\{\})\s*,?\s*$/gim;
+const declaresEncryption = (body) => ENCRYPT_RE.test(body.replace(NEGATIVE_ATTR_RE, ''));
+
+/** JSON text with `"key":` rewritten as `key:`, so the attribute patterns above
+ *  (written for `key = "v"` and `key: "v"`) read JSON sources too. Escaped
+ *  quotes inside string values are never rewritten. */
+function flattenJson(text) {
+  return text.replace(/"([A-Za-z_][\w.-]*)"\s*:/g, '$1:');
+}
+
+/** A parsed JSON value with false, null, empty strings, empty arrays and empty
+ *  objects removed, so a plan's unset attributes read as absent. */
+function prune(v) {
+  if (Array.isArray(v)) { const a = v.map(prune).filter((x) => x !== undefined); return a.length ? a : undefined; }
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const [k, x] of Object.entries(v)) { const y = prune(x); if (y !== undefined) o[k] = y; }
+    return Object.keys(o).length ? o : undefined;
+  }
+  return v === null || v === false || v === '' ? undefined : v;
+}
+
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A pattern that finds a Terraform address (aws_s3_bucket.logs) in another
+ *  resource's body, as `aws_s3_bucket.logs.id` or `${aws_s3_bucket.logs.arn}`,
+ *  and not inside a longer address such as aws_s3_bucket.logs2. */
+const addressRef = (address) => new RegExp(`(?:^|[^\\w.])${escRe(address)}(?![\\w-])`);
+
+/** Every resource under `resource` in a .tf.json document, in either of the
+ *  shapes Terraform's JSON syntax allows (objects, or arrays of objects). */
+function tfJsonResources(doc) {
+  const out = [];
+  const each = (v, fn) => { if (Array.isArray(v)) v.forEach((x) => each(x, fn)); else if (v && typeof v === 'object') fn(v); };
+  each(doc, (top) => each(top.resource, (byType) => {
+    for (const [type, byName] of Object.entries(byType)) {
+      if (!/^[a-z0-9_]+$/.test(type)) continue;
+      each(byName, (names) => { for (const [name, body] of Object.entries(names)) out.push({ type, name, body }); });
+    }
+  }));
+  return out;
+}
+
+/** The managed resources a plan (`terraform show -json`) says will exist:
+ *  planned_values, every module deep, or resource_changes when a plan has no
+ *  planned_values. Data sources and deletions are not declarations. */
+function planResources(doc) {
+  const out = [];
+  const walkModule = (m) => {
+    if (!m || typeof m !== 'object') return;
+    for (const r of Array.isArray(m.resources) ? m.resources : []) {
+      if (r && r.mode !== 'data' && typeof r.type === 'string') out.push({ type: r.type, name: String(r.name ?? ''), body: r.values ?? {} });
+    }
+    for (const c of Array.isArray(m.child_modules) ? m.child_modules : []) walkModule(c);
+  };
+  if (doc && doc.planned_values && doc.planned_values.root_module) walkModule(doc.planned_values.root_module);
+  else {
+    for (const rc of Array.isArray(doc && doc.resource_changes) ? doc.resource_changes : []) {
+      const after = rc && rc.change ? rc.change.after : null;
+      if (rc && rc.mode !== 'data' && typeof rc.type === 'string' && after) out.push({ type: rc.type, name: String(rc.name ?? ''), body: after });
+    }
+  }
+  return out;
+}
+
+/** Split one declaration file into the units lint classifies. Each unit has a
+ *  `type` (a resource type or Kubernetes kind, or null when there is none),
+ *  `refs` (patterns another unit's body would contain to refer to this one),
+ *  `body` (the text attribute patterns run on) and `typed` (whether the type
+ *  belongs in the resource type list). */
+function unitsOf(kind, file, text) {
+  if (kind === 'terraform' && !basename(file).toLowerCase().endsWith('.tf.json')) {
+    return text.split(/\n(?=resource\s+")/).map((b) => {
+      const h = b.match(/^resource\s+"([a-z0-9_]+)"\s+"([A-Za-z0-9_-]+)"/);
+      return h ? { type: h[1], refs: [addressRef(`${h[1]}.${h[2]}`)], body: b, typed: false }
+               : { type: null, refs: [], body: b, typed: false };
+    });
+  }
+  if (kind === 'kubernetes') {
+    return text.split(/^---[^\n]*$/m).map((d) => {
+      const k = d.match(/^kind\s*:\s*["']?([A-Za-z][A-Za-z0-9]*)/m);
+      return { type: k ? k[1] : null, refs: [], body: d, typed: false };
+    });
+  }
+  if (kind === 'container') return [{ type: null, refs: [], body: text, typed: false }];
+
+  // .tf.json and plan JSON.
+  let doc;
+  try { doc = JSON.parse(text); } catch { return [{ type: null, refs: [], body: flattenJson(text), typed: false }]; }
+  const asBody = (v) => flattenJson(JSON.stringify(prune(v) ?? {}, null, 1));
+  if (kind === 'terraform-plan') {
+    return planResources(doc).map((r) => {
+      const v = prune(r.body) || {};
+      // A plan carries values, not expressions, so a setting names its store
+      // by the store's own bucket name or id.
+      const refs = ['bucket', 'id'].map((k) => v[k]).filter((x) => typeof x === 'string' && x.length >= 3)
+        .map((x) => new RegExp(escRe(JSON.stringify(x))));
+      return { type: r.type, refs, body: asBody(r.body), typed: true };
+    });
+  }
+  const units = tfJsonResources(doc).map((r) => ({ type: r.type, refs: [addressRef(`${r.type}.${r.name}`)], body: asBody(r.body), typed: true }));
+  // Everything outside `resource` (providers, variables, locals) is one untyped
+  // unit, the way the text before the first resource block is in a .tf file.
+  if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
+    const rest = { ...doc }; delete rest.resource;
+    units.push({ type: null, refs: [], body: asBody(rest), typed: false });
+  }
+  return units;
+}
 
 function classify(file, text) {
   const n = basename(file).toLowerCase();
@@ -393,7 +559,9 @@ function lint() {
   const byKind = { terraform: 0, 'terraform-plan': 0, kubernetes: 0, container: 0 };
   const regions = new Set();
   const resourceTypes = new Map();
-  let read = 0, storage = 0, storageEncrypted = 0, logging = 0, identity = 0;
+  const stores = [];            // { refs, encrypted }, one per storage declaration
+  const encryptingSettings = []; // bodies of storage settings that declare encryption
+  let read = 0, logging = 0, identity = 0;
   let openIngress = 0, publicAccess = 0, inlineCredentials = 0;
 
   for (const f of files) {
@@ -407,28 +575,43 @@ function lint() {
     byKind[kind]++;
     read++;
 
-    for (const m of text.matchAll(REGION_RE)) regions.add(m[1]);
+    // JSON sources are read through flattenJson so `"region": "x"` and
+    // `"password": "..."` meet the same patterns as HCL and YAML.
+    const isJson = extname(f).toLowerCase() === '.json';
+    const flat = isJson ? flattenJson(text) : text;
+    for (const m of flat.matchAll(REGION_RE)) regions.add(m[1]);
+    for (const line of flat.split('\n')) if (SECRET_RE.test(line)) inlineCredentials++;
 
-    if (kind === 'terraform') {
+    if (kind === 'terraform' && !isJson) {
       for (const m of text.matchAll(RESOURCE_RE)) {
         resourceTypes.set(m[1], (resourceTypes.get(m[1]) || 0) + 1);
       }
     }
 
-    // Terraform is split on top-level resource blocks so an attribute in one
-    // resource is never credited to another; every other kind is read whole.
-    const blocks = kind === 'terraform' ? text.split(/\n(?=resource\s+")/) : [text];
-    for (const b of blocks) {
-      const header = b.match(/^resource\s+"([a-z0-9_]+)"/);
-      const subject = header ? header[1] : b;
-      if (STORAGE_TYPE.test(subject)) { storage++; if (ENCRYPT_RE.test(b)) storageEncrypted++; }
-      if (LOGGING_TYPE.test(subject)) logging++;
-      if (IDENTITY_TYPE.test(subject)) identity++;
-      if (OPEN_CIDR_RE.test(b)) openIngress++;
-      if (PUBLIC_RE.test(b)) publicAccess++;
+    // Each unit is classified on its own type, so an attribute in one resource
+    // is never credited to another, and a word in a file's text is never taken
+    // for a resource type.
+    for (const u of unitsOf(kind, f, text)) {
+      const t = u.type;
+      if (t && u.typed) resourceTypes.set(t, (resourceTypes.get(t) || 0) + 1);
+      if (t && STORAGE_TYPE.test(t)) {
+        if (isStorageSetting(t)) { if (declaresEncryption(u.body)) encryptingSettings.push(u.body); }
+        else stores.push({ refs: u.refs, encrypted: declaresEncryption(u.body) });
+      }
+      if (t && LOGGING_TYPE.test(t)) logging++;
+      if (t && IDENTITY_TYPE.test(t)) identity++;
+      if (OPEN_CIDR_RE.test(u.body)) openIngress++;
+      if (PUBLIC_RE.test(u.body)) publicAccess++;
     }
-    for (const line of text.split('\n')) if (SECRET_RE.test(line)) inlineCredentials++;
   }
+
+  // A store declares encryption in its own body, or through a setting resource
+  // (anywhere in the tree) that declares encryption and refers to it.
+  for (const s of stores) {
+    if (!s.encrypted && s.refs.some((re) => encryptingSettings.some((b) => re.test(b)))) s.encrypted = true;
+  }
+  const storage = stores.length;
+  const storageEncrypted = stores.filter((s) => s.encrypted).length;
 
   if (read === 0) {
     const msg = `no infrastructure declarations found under ${target}.`;
@@ -466,7 +649,7 @@ function lint() {
     root: (() => { const r = relative(process.cwd(), target); return !r ? '.' : r.startsWith('..') ? target : r; })(),
     facts,
     digest: `sha256:${digest}`,
-    note: 'Declared facts only. Read locally; nothing was transmitted. No score, no verdict, no assessment against any standard.',
+    note: 'Declared facts only. Read locally; nothing was transmitted. No verdict and no assessment against any standard.',
   };
 
   if (asJson) { emitJson(doc); process.exit(EXIT.OK); }
@@ -495,10 +678,16 @@ function lint() {
 
   out(`\n${B}Digest${X}  ${C}${doc.digest}${X}`);
   out(`${D}A SHA-256 over the facts above, in canonical form, with the timestamp excluded.`);
-  out(`The same tree always produces the same digest, so you can record it as evidence`);
-  out(`that a state was observed without publishing the tree it came from.${X}`);
+  out(`The same tree read by the same trooth version produces the same digest, so you can`);
+  out(`record it as evidence that a state was observed without publishing the tree.${X}`);
 
-  out(`\n${D}Counts of what the files declare. Not a judgement: a public load balancer is`);
+  out(`\n${B}How this was read${X}`);
+  out(`${D}  A pattern reader, not a Terraform evaluator: variables and modules are not resolved.`);
+  out(`  .tf by pattern, one resource block at a time. .tf.json and plan JSON parsed, one`);
+  out(`  resource at a time. Kubernetes YAML by pattern, one document at a time, by kind.`);
+  out(`  Dockerfiles for regions, open addresses, public markers and credential literals only.${X}`);
+
+  out(`\n${D}Counts of what the files declare. Not a judgment: a public load balancer is`);
   out(`supposed to be public. Trooth issues no verdict here and checks nothing against`);
   out(`any standard. Nothing left this machine: lint opens files and opens no sockets.`);
   out(`Publish what you choose on your record at ${X}${C}https://trooth.co/dashboard${X}${D}.${X}\n`);
