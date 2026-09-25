@@ -5,15 +5,16 @@
 # the job summary: how many declaration files, from which sources, which
 # regions, how many storage declarations and how many of those declare
 # encryption, how many rules are open to any address, how many inline
-# credential literals - counts and type names, never a file name, a line, a
+# credential literals: counts and type names, never a file name, a line, a
 # value or a snippet. Nothing is transmitted anywhere; lint is offline by
 # construction (the CLI's own test points it at an unreachable API and proves
 # zero requests leave).
 #
 # THERE IS NO VERDICT. lint reports what your infrastructure declares and does
 # not judge it; declaring public ingress is not a failing, because a load
-# balancer is supposed to be public. So this action cannot fail your workflow
-# unless you opt in, explicitly, to one of two gates that are yours to choose:
+# balancer is supposed to be public. So this action does not fail your
+# workflow over anything it reads unless you opt in, explicitly, to one of two
+# gates that are yours to choose:
 #
 #   fail-on-inline-credentials   a credential literal in infrastructure code
 #                                is unambiguous, and the count is only a count
@@ -23,6 +24,9 @@
 # Everything else is a summary a person reads. A green run says the read
 # happened; it does not say your infrastructure is good, and a summary here is
 # not evidence that Trooth has ingested anything: nothing is sent to Trooth.
+# The step does fail, as the action's own fault, when the read cannot happen
+# at all: a path that does not exist, or a CLI that could not be installed or
+# started.
 #
 # PERMISSIONS: none are needed beyond `contents: read` for the checkout. The
 # action writes the job summary through the runner's own file, never through
@@ -30,13 +34,14 @@
 #
 # HOW THE CLI GETS THERE. It is installed from npm, pinned by version, into a
 # directory under RUNNER_TEMP and run by path. Not npx: npx resolves a name
-# against the checked-out project first, which in a repository named trooth
-# runs nothing and exits 127, and an action that reads nothing must not be
-# green. A run that could not install or start the CLI fails as the action's
-# own fault, with the reason in the annotation.
+# against the checked-out project first, which in a repository whose own
+# package.json is named trooth runs a bin that was never linked and exits 127,
+# and a run in which the read never happened must not show as successful. A
+# run that could not install or start the CLI fails as the action's own fault,
+# with the reason in the annotation.
 # ============================================================================
 name: "Trooth lint (advisory)"
-description: "Read what your infrastructure declares - counts, sources, regions, encryption, open ingress, credential literals - into the job summary. Offline, no verdict, no score. Fails only on the two gates you opt into."
+description: "Read what your infrastructure declares (counts, sources, regions, encryption, open ingress, credential literals) into the job summary. lint runs offline and issues no verdict. The step fails if it cannot run, and otherwise only on the two gates you opt into."
 author: "Trooth, LLC"
 branding:
   icon: "eye"
@@ -62,7 +67,7 @@ inputs:
 
 outputs:
   digest:
-    description: "SHA-256 over the canonical fact document, timestamp excluded. The same tree always produces the same digest."
+    description: "`sha256:` and a SHA-256 over the report's `facts` object in canonical form; the timestamp, the path and the CLI version are not part of it. The same tree read by the same CLI version produces the same digest. Empty when nothing was read."
     value: ${{ steps.lint.outputs.digest }}
   declarations-read:
     description: "How many declaration files were read."
@@ -96,8 +101,8 @@ runs:
         # THE CLI IS INSTALLED INTO ITS OWN DIRECTORY AND RUN BY PATH, NOT THROUGH
         # npx. npx resolves a package name against the checked-out project before
         # it asks the registry, and in a repository whose own package.json is
-        # named trooth (this one) it then runs a bin that was never linked and
-        # exits 127. The self-test found that on its first run. A directory under
+        # named trooth (trooth-cli is one) it then runs a bin that was never
+        # linked and exits 127. The self-test found that on its first run. A directory under
         # RUNNER_TEMP is also the same place on every run and every runner.
         CLI_DIR="$RUNNER_TEMP/trooth-cli-$V"
         TROOTH_BIN="$CLI_DIR/node_modules/trooth/bin/trooth.mjs"
@@ -110,7 +115,7 @@ runs:
           node "$TROOTH_BIN" lint "$TROOTH_LINT_PATH" --json > "$REPORT" 2> "$ERR"
           CODE=$?
         else
-          printf 'trooth: could not install trooth@%s from npm - %s\n' "$V" "$(tr '\n' ' ' < "$RUNNER_TEMP/trooth-install.stderr" | head -c 200)" > "$ERR"
+          printf 'trooth: could not install trooth@%s from npm: %s\n' "$V" "$(tr '\n' ' ' < "$RUNNER_TEMP/trooth-install.stderr" | head -c 200)" > "$ERR"
           CODE=2
         fi
         # An exit the CLI does not define (a runtime that could not start, a
@@ -122,8 +127,8 @@ runs:
         node "$GITHUB_ACTION_PATH/action/outputs.mjs" "$REPORT" "$CODE" >> "$GITHUB_OUTPUT"
         echo "report=$REPORT" >> "$GITHUB_OUTPUT"
         # The two gates, and only the two. Exit code 3 (upstream) cannot happen
-        # for lint; exit code 2 is the action's own fault - a path that does not
-        # exist, or a CLI that could not be installed or did not run - and is
+        # for lint; exit code 2 is the action's own fault (a path that does not
+        # exist, or a CLI that could not be installed or did not run) and is
         # always a failure, because nothing was read.
         if [ "$CODE" = "2" ]; then echo "::error title=Trooth lint::$(head -n 1 "$ERR" | head -c 300)"; exit 2; fi
         if [ "$CODE" = "1" ] && [ "$TROOTH_FAIL_IF_NOTHING_READ" = "true" ]; then echo "::error title=Trooth lint::no infrastructure declarations were found under $TROOTH_LINT_PATH, and fail-if-nothing-read is on"; exit 1; fi

@@ -1,4 +1,4 @@
-// One licence, one version, one description - asserted, not assumed.
+// One license, one version, one description: asserted, not assumed.
 //
 // This package says what it is in five places: package.json, the LICENSE file,
 // the copyright header in bin/trooth.mjs, the README, and whatever npm ends up
@@ -37,7 +37,7 @@ is(d.length <= 250, `description is ${d.length} characters, npm keeps 255`);
 is(!/[—–]/.test(d), 'description has no em or en dash');
 is(/[.!?]$/.test(d), 'description ends on a complete sentence');
 
-console.log('\none licence, stated the same way everywhere');
+console.log('\none license, stated the same way everywhere');
 is(pkg.license === 'Apache-2.0', `package.json license is Apache-2.0 (got "${pkg.license}")`);
 is(existsSync(join(ROOT, 'LICENSE')), 'a LICENSE file exists');
 if (existsSync(join(ROOT, 'LICENSE'))) {
