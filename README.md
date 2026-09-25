@@ -30,7 +30,7 @@ Node 18 or newer, because the binary uses the built-in `fetch`. Zero dependencie
 
 | Command | What it does |
 |---|---|
-| `trooth check <domain>` | Reads a company's record from the live Network and prints whether it is listed, when it was witnessed and first published, the live-probe and attestation counts, the badge id, the id of the key that signed the record, and the first three events in its ledger. `--json` adds the signature itself. |
+| `trooth check <domain>` | Reads a company's record from the live Network and prints whether it is listed, when it was last witnessed and first published, the live-probe and self-attestation counts, the badge id, the id of the key that signed the record, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations plus a canonical SHA-256 digest of them. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
@@ -61,27 +61,30 @@ trooth check trooth.co
 Example output. The values are illustrative; the shape is what the binary prints.
 
 ```
-Trooth Network // witnessed · public · read-only //
+Trooth Network // public · signed · read-only //
 Trooth, LLC   trooth.co
-Standing: listed and witnessed   witnessed 2026-08-30   first published 2026-08-01
+Listing state: listed and witnessed   last witnessed 2026-08-30   first published 2026-08-01
 
-Live probes 64/65     Attestations 27/35
-Probes are checks Trooth read for itself. Attestations are the company's own declarations.
-They are counts, reported apart on purpose. Trooth never adds them up into one number.
+Live probes: 65 read; 64 as expected
+Self-attestations: 35 asked; 27 attested
+Live probes are readings Trooth took itself, from the company's public surface.
+Self-attestations are what the company attested about itself; Trooth records them
+and did not witness them. The two are reported apart and never added into one number.
 Badge rw_...   Key ed25519-2026-01
 
-Recent witness events
-  • 2026-08-01  scan completed  64 of 65 live probes passed · 27 of 35 declarations recorded · signature valid
-  • 2026-08-01  standing published  point-in-time · published to the Trooth Network
-  • 2026-08-30  scan completed  64 of 65 live probes passed · 27 of 35 declarations recorded · signature valid
+Latest ledger events, newest first
+  • 2026-08-30  record published to the Trooth Network
+  • 2026-08-30  reading completed
+  • 2026-08-01  record published to the Trooth Network
+  --json carries the whole ledger, with the feed's own wording for each event.
 
-A witnessed, point-in-time reading of public evidence. Not a certification. Not one number.
+A dated, point-in-time record. Trooth issues no verdict and no single number.
 Full record: https://trooth.co/network/trooth.co   ·   Signing keys: https://api.trooth.co/public/keys
 ```
 
-The line that begins `Standing:` is the binary's label for the listing state. For a listed company it reads `listed and witnessed`, then the date of the most recent published reading and the date the record was first published. The two counts are live probes (how many returned the expected result, out of how many were read at the last reading) and attestations (how many the company attested, out of how many were asked for).
+The line that begins `Listing state:` gives the listing state. For a listed company it reads `listed and witnessed`, then the date of the most recent published reading (`last witnessed`) and the date the record was first published. The two counts use the same form as the record page on trooth.co: live probes (how many were read at the last reading, and how many of those returned the expected result) and self-attestations (how many the company was asked for, and how many it attested). Live probes are readings Trooth took itself; self-attestations are the company's statements about itself, which Trooth records and does not witness.
 
-The events section prints the first three entries in the record's ledger. The feed keeps the ledger oldest first, so these are the record's earliest events even though the heading says "Recent"; `--json` carries every event the feed returns. Event types and details are the feed's own wording, printed as received.
+The events section prints the three newest entries in the record's ledger, newest first, by timestamp; entries with the same timestamp keep the feed's order, the later entry first. Known event types get a plain label: `scan_completed` prints as "reading completed", `standing_published` as "record published to the Trooth Network" and `rewitnessed` as "live probes re-read". A type the CLI does not know prints with its underscores turned into spaces. The human view leaves out each event's detail text. `--json` carries every event the feed returns, with its type and detail exactly as the feed has them.
 
 For scripting:
 
@@ -100,9 +103,9 @@ trooth check trooth.co --json
   "probes": { "passed": 64, "total": 65 },
   "attested": { "passed": 27, "total": 35 },
   "events": [
-    { "type": "scan_completed", "at": "2026-08-01T00:00:00Z", "detail": "64 of 65 live probes passed · 27 of 35 declarations recorded · signature valid" },
+    { "type": "scan_completed", "at": "2026-08-01T00:00:00Z", "detail": "65 probes read · 64 returned the expected result · 27 declarations recorded · reading signed" },
     { "type": "standing_published", "at": "2026-08-01T00:00:00Z", "detail": "point-in-time · published to the Trooth Network" },
-    { "type": "scan_completed", "at": "2026-08-30T00:00:00Z", "detail": "64 of 65 live probes passed · 27 of 35 declarations recorded · signature valid" },
+    { "type": "scan_completed", "at": "2026-08-30T00:00:00Z", "detail": "65 probes read · 64 returned the expected result · 27 declarations recorded · reading signed" },
     { "type": "standing_published", "at": "2026-08-30T00:00:00Z", "detail": "point-in-time · published to the Trooth Network" }
   ],
   "receipt_signature": "...",
@@ -112,9 +115,9 @@ trooth check trooth.co --json
 }
 ```
 
-In `probes`, `total` is how many live probes were read at the last reading and `passed` (the API's field name) is how many returned the expected result. In `attested`, `total` is how many declarations were asked for and `passed` is how many the company attested. `witnessed_at` is the date of the most recent published reading. `events` is the whole ledger, oldest first.
+In `probes`, `total` is how many live probes were read at the last reading and `passed` (the API's field name) is how many returned the expected result. In `attested`, `total` is how many declarations were asked for and `passed` is how many the company attested. `witnessed_at` is the date of the most recent published reading. `events` is the whole ledger, oldest first, in the feed's order. Each event's `detail` is written when the event is stored and is not rewritten afterward, so older and newer events of the same type can be worded differently.
 
-`category` and `description` are added when the record carries them. Those are the only fields `check --json` emits: anything else the feed happens to carry is dropped on the way out, so a script written against this shape keeps working. A field whose name would carry a score, grade, rank, rating or percentage is dropped no matter what the feed sends.
+`category` and `description` are added when the record carries them. Those are the only fields `check --json` emits: anything else the feed happens to carry is dropped on the way out, so a script written against this shape keeps working. A field whose name contains `score`, `tier`, `grade`, `rank`, `rating`, `level` or `percent`, or is `rate`, is dropped no matter what the feed sends.
 
 A company with no record exits 1 and emits `{"domain": "...", "listed": false, "record_url": "..."}`. That is not a judgment. It means the Network's public feed carries no record for that domain. A company gets a record at [trooth.co/get-started](https://trooth.co/get-started), free.
 
@@ -122,50 +125,58 @@ A company with no record exits 1 and emits `{"domain": "...", "listed": false, "
 
 ## `trooth lint`
 
-`lint` reads what your infrastructure **declares** and reports it. It does not judge it. There is no verdict, no pass mark, no severity and no score, and nothing is checked against a named standard or regulation. Declaring public ingress is not a failing: a load balancer is supposed to be public. What the facts mean is your decision.
+`lint` reads what your infrastructure **declares** and reports it. It does not judge it. There is no verdict, no threshold, no severity and no rating, and nothing is checked against a named standard or regulation. Declaring public ingress is not a failing: a load balancer is supposed to be public. What the facts mean is your decision.
 
 ```bash
 trooth lint ./infra
 ```
 
-Example output. The values are illustrative; the shape is what the binary prints.
+Output for the small fixture in this repository (`trooth lint tests/fixtures/infra`, trooth 0.4.3):
 
 ```
 trooth lint // local · offline · declarations only //
-infra   14 declaration file(s) read
-terraform 11 · kubernetes 3
+tests/fixtures/infra   2 declaration file(s) read
+terraform 1 · kubernetes 1
 
 Declared
-  Regions and zones                        eu-west-1, us-east-1
-  Storage declarations                     9
-    of those declaring encryption          9
-  Logging declarations                     4
-  Identity declarations                    6
+  Regions and zones                        us-east-1
+  Storage declarations                     1
+    of those declaring encryption          1
+  Logging declarations                     0
+  Identity declarations                    0
   Open to any address (0.0.0.0/0, ::/0)    1
-  Marked public                            2
+  Marked public                            0
   Inline credential literals               0
 
 Most declared resource types
-     5  aws_s3_bucket
-     3  aws_iam_role
-     2  aws_cloudwatch_log_group
+     1  aws_s3_bucket
+     1  aws_s3_bucket_server_side_encryption_configuration
+     1  aws_security_group_rule
 
-Digest  sha256:...
+Digest  sha256:a40bf6cf27dfd0b9079ac48a326fb2d1423b076c96b405451dde1ed2d7848944
 A SHA-256 over the facts above, in canonical form, with the timestamp excluded.
-The same tree always produces the same digest, so you can record it as evidence
-that a state was observed without publishing the tree it came from.
+The same tree read by the same trooth version produces the same digest, so you can
+record it as evidence that a state was observed without publishing the tree.
 
-Counts of what the files declare. Not a judgement: a public load balancer is
+How this was read
+  A pattern reader, not a Terraform evaluator: variables and modules are not resolved.
+  .tf by pattern, one resource block at a time. .tf.json and plan JSON parsed, one
+  resource at a time. Kubernetes YAML by pattern, one document at a time, by kind.
+  Dockerfiles for regions, open addresses, public markers and credential literals only.
+
+Counts of what the files declare. Not a judgment: a public load balancer is
 supposed to be public. Trooth issues no verdict here and checks nothing against
 any standard. Nothing left this machine: lint opens files and opens no sockets.
 Publish what you choose on your record at https://trooth.co/dashboard.
 ```
 
-It reads `.tf`, `.tf.json`, Kubernetes YAML (anything carrying both `apiVersion` and `kind`), `terraform show -json` plan files and Dockerfiles. It is a declaration reader, not a full HCL parser: it matches patterns in the text of each file and parses none of them, so a count can differ from what a full parser would find. Its output does not state this limit.
+The bucket's encryption configuration is a setting on the bucket, not a second store, so the fixture has one storage declaration, and that one declares encryption.
+
+It reads `.tf`, `.tf.json`, Kubernetes YAML (anything carrying both `apiVersion` and `kind`), `terraform show -json` plan files and Dockerfiles. It is a pattern reader, not a Terraform evaluator: variables, modules and `for_each` are never resolved, so a count can differ from what Terraform itself would plan. `.tf` files are read by pattern, one resource block at a time. `.tf.json` and plan files are parsed as JSON, one resource at a time. Kubernetes YAML is read by pattern, one document at a time, and classified by its `kind`. Dockerfiles are read for regions, open addresses, public markers and credential literals only. Storage, logging and identity are counted by a resource's type or a document's kind, never by the words around it. The output states this under "How this was read".
 
 Nothing leaves the machine. No file name, no line, no code and no value is printed or transmitted, only the path you gave it, counts, resource type names and region strings. The credential count is a count: the literal it found is never shown.
 
-The digest is a SHA-256 over the canonical fact document with the timestamp excluded, so the same tree always produces the same digest. Record it in CI, or on your own record, as evidence that a given state was observed, without publishing the tree it came from.
+The digest is a SHA-256 over the `facts` object in canonical form. The timestamp, the path and the CLI version are outside it, so the same tree read by the same trooth version produces the same digest. A release that changes how something is counted changes the digest of the same tree: the fixture above digests differently under 0.4.2 and 0.4.3. Record the digest in CI, or on your own record, as evidence that a given state was observed, without publishing the tree it came from.
 
 ```bash
 # Keep the fact document as a build artifact.
@@ -202,6 +213,12 @@ https://api.trooth.co/public/mcp
 ```
 
 Four read-only tools, public data, no key. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
+
+## Changed in 0.4.3
+
+- `check` labels the listing state `Listing state:` and prints the two counts in the record page's form (`65 read; 64 as expected`, `35 asked; 27 attested`). It prints the three newest ledger events, newest first, with plain labels and without the detail text. 0.4.2 printed the ledger's three oldest events under a heading that called them recent. `check --json` is unchanged.
+- `lint` no longer counts a storage setting (a bucket's encryption configuration, a bucket policy, a volume attachment) as a second store, and a setting that declares encryption credits the store it refers to. It no longer counts `encrypted = false`, or an empty encryption setting in a plan, as declaring encryption. It classifies by resource type or Kubernetes `kind` only, parses `.tf.json` and plan JSON and counts their resource types, and reads Kubernetes YAML one document at a time. The same tree can therefore produce different counts, and a different digest, than under 0.4.2. The `lint --json` field names are unchanged.
+- The human `lint` output states how each source was read.
 
 ## Removed in 0.4.0
 
