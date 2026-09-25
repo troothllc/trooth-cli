@@ -1,7 +1,7 @@
 {
   "name": "trooth",
   "version": "0.4.2",
-  "description": "The Trooth Network from your terminal. Read any company's public, signed record with no key and no account: identity, products, terms, people, documents, security and AI posture. Also reads what your own repo declares, offline. No score, no verdict.",
+  "description": "The Trooth Network from your terminal. Read a company's public, signed record with no key and no account: listing state, dates, live-probe and attestation counts, signing key id. Also reads what your own repo declares, offline. No score, no verdict.",
   "type": "module",
   "bin": {
     "trooth": "bin/trooth.mjs"
@@ -36,9 +36,7 @@
     "vendor-lookup",
     "due-diligence",
     "procurement",
-    "trust-network",
     "company-directory",
-    "mcp",
     "ai-agents",
     "agent-tools",
     "signed-records",
