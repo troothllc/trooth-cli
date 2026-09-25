@@ -3,9 +3,9 @@
 //   node action/summary.mjs <report.json> <exit-code> <stderr-file>
 //
 // Prints Markdown to stdout; action.yml appends it to $GITHUB_STEP_SUMMARY.
-// It prints counts, type names and region strings - the same things the CLI
-// prints, and nothing the CLI withholds. There is no verdict line, no pass
-// mark and no colour, because lint has none to report.
+// It prints counts, type names and region strings: the same things the CLI
+// prints, and nothing the CLI withholds. There is no verdict line, no
+// threshold and no color, because lint has none to report.
 import { readFileSync, existsSync } from "node:fs";
 
 const [reportPath, codeArg, stderrPath] = process.argv.slice(2);
@@ -36,7 +36,7 @@ const sources = Object.entries(f.sources || {}).map(([k, v]) => `${k} ${v}`).joi
 const regions = (f.regions_and_zones_declared || []).join(", ") || "none declared";
 const types = (f.resource_types || []).map((t) => `${t.type} (${t.count})`).join(", ") || "none";
 
-out.push(`Read \`${doc.root}\` with trooth ${doc.cli_version} at ${doc.observed_at}. Declared facts only, read locally; nothing was transmitted. No score, no verdict, no assessment against any standard.`);
+out.push(`Read \`${doc.root}\` with trooth ${doc.cli_version} at ${doc.observed_at}. Declared facts only, read locally; nothing was transmitted. No verdict and no assessment against any standard.`);
 out.push("");
 out.push("| Declared | |");
 out.push("|---|---|");
@@ -52,5 +52,5 @@ out.push(`| Inline credential literals | ${f.inline_credential_literals ?? 0} (a
 out.push(`| Resource types | ${types} |`);
 out.push(`| Digest | \`${doc.digest || ""}\` |`);
 out.push("");
-out.push("What these facts mean is your call: declaring public ingress is not a failing, because a load balancer is supposed to be public. A green step says the read happened. It is not evidence that Trooth has ingested anything; nothing is sent to Trooth.");
+out.push("What these facts mean is your decision: declaring public ingress is not a failing, because a load balancer is supposed to be public. A green step says the read happened. It is not evidence that Trooth has ingested anything; nothing is sent to Trooth.");
 console.log(out.join("\n"));
