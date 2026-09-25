@@ -11,7 +11,7 @@ This CLI is the terminal interface to that record. It does two things:
 - `trooth check <domain>` reads a company's published record from the public Network. No key, no account, and nothing about you is sent beyond what any web request carries (your IP address and a `trooth-cli/<version>` user-agent).
 - `trooth lint [path]` reads what your own infrastructure declares and prints those declarations as facts. Entirely local: it opens files and opens no sockets.
 
-**Trooth witnesses and dates facts. It does not score, rate, rank or certify anyone.** The CLI prints counts, reported apart, and never adds them into one number.
+**Trooth witnesses and dates facts. It does not grade, rate or rank anyone.** The CLI prints counts, reported apart, and never adds them into one number.
 
 ## Install
 
@@ -118,7 +118,7 @@ In `probes`, `total` is how many live probes were read at the last reading and `
 
 A company with no record exits 1 and emits `{"domain": "...", "listed": false, "record_url": "..."}`. That is not a judgment. It means the Network's public feed carries no record for that domain. A company gets a record at [trooth.co/get-started](https://trooth.co/get-started), free.
 
-`receipt_signature` is Trooth's Ed25519 signature and `authority_key_id` names the key that made it; the public keys are listed at [trooth.co/verify/keys](https://trooth.co/verify/keys). You cannot re-run that signature check from this output yet: the exact bytes the signature covers are not published, and this JSON does not carry every field that goes into them. [`trust-verifier-sdk`](https://github.com/troothllc/trust-verifier-sdk) states that gap and what will close it.
+`receipt_signature` is Trooth's Ed25519 signature and `authority_key_id` names the key that made it; the public keys are listed at [trooth.co/verify/keys](https://trooth.co/verify/keys). You cannot re-run that signature check from this output yet: the exact bytes the signature covers are not published, and this JSON does not carry every field that goes into them. [`trooth-signatures`](https://github.com/troothllc/trooth-signatures) states that gap and what will close it.
 
 ## `trooth lint`
 
