@@ -21,6 +21,12 @@
 #   fail-if-nothing-read         a directory that yields no declarations means
 #                                the action is pointed at the wrong place
 #
+# AN INCOMPLETE READ FAILS BY DEFAULT. When lint skips a file over its size
+# limit, cannot parse a file, cannot read one, or stops at its file limit, the
+# counts describe part of the tree, and a green step would say otherwise. Set
+# allow-incomplete: "true" to keep the step green; the summary still says the
+# read was incomplete and how many files were not read.
+#
 # Everything else is a summary a person reads. A green run says the read
 # happened; it does not say your infrastructure is good, and a summary here is
 # not evidence that Trooth has ingested anything: nothing is sent to Trooth.
@@ -32,8 +38,16 @@
 # action writes the job summary through the runner's own file, never through
 # the API, so it needs no token and works on pull requests from forks.
 #
-# HOW THE CLI GETS THERE. It is installed from npm, pinned by version, into a
-# directory under RUNNER_TEMP and run by path. Not npx: npx resolves a name
+# PIN THIS ACTION BY COMMIT. A tag such as v1 can be moved; a full commit SHA
+# cannot. Use `uses: troothllc/trooth-action@<40-character SHA>  # v1`, and let
+# Dependabot or Renovate propose updates you review.
+#
+# HOW THE CLI GETS THERE. It is installed from npm, pinned to one exact
+# version (a range, a tag or a URL is refused), with install scripts disabled,
+# and the installed package's own version is compared with the one asked for
+# before it runs. npm checks the tarball against the registry's SHA-512
+# integrity value as it installs. It goes into a directory under RUNNER_TEMP
+# and is run by path. Not npx: npx resolves a name
 # against the checked-out project first, which in a repository whose own
 # package.json is named trooth runs a bin that was never linked and exits 127,
 # and a run in which the read never happened must not show as successful. A
@@ -55,7 +69,11 @@ inputs:
   version:
     description: "Version of the `trooth` CLI to run from npm. Pinned on purpose; bump it deliberately."
     required: false
-    default: "0.4.4"
+    default: "0.5.0"
+  allow-incomplete:
+    description: "Keep the step green when lint could not read every selected file (skipped, invalid or unreadable, or the walk hit its limit). The summary reports it either way."
+    required: false
+    default: "false"
   fail-on-inline-credentials:
     description: "Opt in: fail the step when lint counts one or more inline credential literals."
     required: false
@@ -66,9 +84,15 @@ inputs:
     default: "false"
 
 outputs:
+  facts-digest:
+    description: "`sha256:` and a SHA-256 over the report's `facts` object in canonical form. An aggregate: two different trees with the same counts share it. It does not identify file contents, a repository, a commit or a deployment. Empty when nothing was read."
+    value: ${{ steps.lint.outputs.facts-digest }}
   digest:
-    description: "`sha256:` and a SHA-256 over the report's `facts` object in canonical form; the timestamp, the path and the CLI version are not part of it. The same tree read by the same CLI version produces the same digest. Empty when nothing was read."
+    description: "The same value as facts-digest, under its 0.4 name. Kept for existing workflows; use facts-digest."
     value: ${{ steps.lint.outputs.digest }}
+  completeness:
+    description: "`complete` or `incomplete`: whether every selected file was read."
+    value: ${{ steps.lint.outputs.completeness }}
   declarations-read:
     description: "How many declaration files were read."
     value: ${{ steps.lint.outputs.declarations-read }}
@@ -76,7 +100,7 @@ outputs:
     description: "How many inline credential literals were counted. A count; the literals are never printed."
     value: ${{ steps.lint.outputs.inline-credential-literals }}
   report:
-    description: "Path to the JSON fact document, for `actions/upload-artifact` if you want to keep it."
+    description: "Path to this step's own JSON fact document, for `actions/upload-artifact`. Each invocation writes to its own directory, so two steps in one job never overwrite each other's report."
     value: ${{ steps.lint.outputs.report }}
 
 runs:
@@ -89,14 +113,24 @@ runs:
         TROOTH_CLI_VERSION: ${{ inputs.version }}
         TROOTH_FAIL_ON_INLINE_CREDENTIALS: ${{ inputs.fail-on-inline-credentials }}
         TROOTH_FAIL_IF_NOTHING_READ: ${{ inputs.fail-if-nothing-read }}
+        TROOTH_ALLOW_INCOMPLETE: ${{ inputs.allow-incomplete }}
         # lint never calls this, and the CLI's own test proves it; pointing it at
         # an unroutable address makes that a property of this action too.
         TROOTH_API: "http://127.0.0.1:9"
       run: |
         set -uo pipefail
         V="$TROOTH_CLI_VERSION"
-        REPORT="$RUNNER_TEMP/trooth-lint.json"
-        ERR="$RUNNER_TEMP/trooth-lint.stderr"
+        # ONE EXACT VERSION. A range, a dist-tag, a URL or a path would let an
+        # input decide what code runs; only MAJOR.MINOR.PATCH is accepted.
+        if ! printf '%s' "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "::error title=Trooth lint::version must be one exact release such as 0.5.0; got '$V'"; exit 2
+        fi
+        # EACH INVOCATION GETS ITS OWN DIRECTORY. Up to 0.4.4 every step in a job
+        # wrote RUNNER_TEMP/trooth-lint.json, so a second step overwrote the
+        # first step's report before it could be uploaded.
+        OUT_DIR="$(mktemp -d "$RUNNER_TEMP/trooth-lint.XXXXXXXX")"
+        REPORT="$OUT_DIR/trooth-lint.json"
+        ERR="$OUT_DIR/trooth-lint.stderr"
         : > "$REPORT"; : > "$ERR"
         # THE CLI IS INSTALLED INTO ITS OWN DIRECTORY AND RUN BY PATH, NOT THROUGH
         # npx. npx resolves a package name against the checked-out project before
@@ -109,30 +143,35 @@ runs:
         set +e
         if [ ! -f "$TROOTH_BIN" ]; then
           mkdir -p "$CLI_DIR"
-          npm install --prefix "$CLI_DIR" --no-save --no-audit --no-fund --no-package-lock --loglevel=error "trooth@$V" >/dev/null 2> "$RUNNER_TEMP/trooth-install.stderr"
+          npm install --prefix "$CLI_DIR" --no-save --no-audit --no-fund --no-package-lock --ignore-scripts --loglevel=error "trooth@$V" >/dev/null 2> "$OUT_DIR/install.stderr"
         fi
-        if [ -f "$TROOTH_BIN" ]; then
+        PKG="$CLI_DIR/node_modules/trooth/package.json"
+        if [ -f "$PKG" ] && [ "$(node -p 'require(process.argv[1]).version' "$PKG" 2>/dev/null)" != "$V" ]; then
+          printf 'trooth: the installed package is not version %s\n' "$V" > "$ERR"; TROOTH_BIN=""
+        fi
+        if [ -n "$TROOTH_BIN" ] && [ -f "$TROOTH_BIN" ]; then
           node "$TROOTH_BIN" lint "$TROOTH_LINT_PATH" --json > "$REPORT" 2> "$ERR"
           CODE=$?
         else
-          printf 'trooth: could not install trooth@%s from npm: %s\n' "$V" "$(tr '\n' ' ' < "$RUNNER_TEMP/trooth-install.stderr" | head -c 200)" > "$ERR"
+          [ -s "$ERR" ] || printf 'trooth: could not install trooth@%s from npm: %s\n' "$V" "$(tr '\n' ' ' < "$OUT_DIR/install.stderr" 2>/dev/null | head -c 200)" > "$ERR"
           CODE=2
         fi
         # An exit the CLI does not define (a runtime that could not start, a
         # signal) means the read did not happen, and a step that did not read
         # must not be green. It is reported the way a usage error is.
-        case "$CODE" in 0|1|2) ;; *) { printf 'trooth: the CLI exited with code %s before producing a report\n' "$CODE"; cat "$ERR"; } > "$ERR.2"; mv "$ERR.2" "$ERR"; CODE=2;; esac
+        case "$CODE" in 0|1|2|4) ;; *) { printf 'trooth: the CLI exited with code %s before producing a report\n' "$CODE"; cat "$ERR"; } > "$ERR.2"; mv "$ERR.2" "$ERR"; CODE=2;; esac
         set -e
         node "$GITHUB_ACTION_PATH/action/summary.mjs" "$REPORT" "$CODE" "$ERR" >> "$GITHUB_STEP_SUMMARY"
         node "$GITHUB_ACTION_PATH/action/outputs.mjs" "$REPORT" "$CODE" >> "$GITHUB_OUTPUT"
         echo "report=$REPORT" >> "$GITHUB_OUTPUT"
-        # The two gates, and only the two. Exit code 3 (upstream) cannot happen
-        # for lint; exit code 2 is the action's own fault (a path that does not
-        # exist, or a CLI that could not be installed or did not run) and is
-        # always a failure, because nothing was read.
+        # Exit code 3 (upstream) cannot happen for lint; exit code 2 is the
+        # action's own fault (a path that does not exist, or a CLI that could not
+        # be installed or did not run) and is always a failure, because nothing
+        # was read. Exit code 4 is an incomplete read.
         if [ "$CODE" = "2" ]; then echo "::error title=Trooth lint::$(head -n 1 "$ERR" | head -c 300)"; exit 2; fi
+        if [ "$CODE" = "4" ] && [ "$TROOTH_ALLOW_INCOMPLETE" != "true" ]; then echo "::error title=Trooth lint::the read was incomplete: some selected files were skipped, invalid or unreadable. The summary has the counts; set allow-incomplete to keep the step green."; exit 4; fi
         if [ "$CODE" = "1" ] && [ "$TROOTH_FAIL_IF_NOTHING_READ" = "true" ]; then echo "::error title=Trooth lint::no infrastructure declarations were found under $TROOTH_LINT_PATH, and fail-if-nothing-read is on"; exit 1; fi
-        if [ "$CODE" = "0" ] && [ "$TROOTH_FAIL_ON_INLINE_CREDENTIALS" = "true" ]; then
+        if { [ "$CODE" = "0" ] || [ "$CODE" = "4" ]; } && [ "$TROOTH_FAIL_ON_INLINE_CREDENTIALS" = "true" ]; then
           N="$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(j.facts.inline_credential_literals|0)' "$REPORT")"
           if [ "$N" != "0" ]; then echo "::error title=Trooth lint::$N inline credential literal(s) counted, and fail-on-inline-credentials is on. The literals were not printed; find them with your own tooling."; exit 1; fi
         fi

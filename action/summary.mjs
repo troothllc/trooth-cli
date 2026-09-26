@@ -24,7 +24,13 @@ if (code === 2) {
 let doc = null;
 try { doc = JSON.parse(readFileSync(reportPath, "utf8")); } catch { /* handled below */ }
 
-if (!doc || code === 1) {
+if (!doc || (code === 1) || (!doc.facts && code === 4)) {
+  if (doc && doc.coverage && doc.coverage.completeness === "incomplete") {
+    const c = doc.coverage;
+    out.push(`Nothing could be read: ${c.files_skipped} file(s) skipped over the size limit, ${c.files_invalid} invalid, ${c.files_unreadable} unreadable${c.traversal_truncated ? ", and the walk stopped at its file limit" : ""}. The counts are the only detail printed here; the JSON report names the files.`);
+    console.log(out.join("\n"));
+    process.exit(0);
+  }
   const root = doc?.root ? ` under \`${doc.root}\`` : "";
   out.push(`No infrastructure declarations were found${root}. lint reads \`.tf\`, \`.tf.json\`, Kubernetes YAML (apiVersion + kind), \`terraform show -json\` plan files and Dockerfiles. This is a fact about the directory the action was pointed at, not about your infrastructure.`);
   console.log(out.join("\n"));
@@ -44,13 +50,18 @@ out.push(`| Declaration files read | ${f.declarations_read ?? 0} (${sources}) |`
 out.push(`| Regions and zones | ${regions} |`);
 out.push(`| Storage declarations | ${f.storage_declarations ?? 0} |`);
 out.push(`| of those declaring encryption | ${f.storage_declaring_encryption ?? 0} |`);
+out.push(`| declaring encryption off | ${f.storage_declaring_encryption_off ?? 0} |`);
+out.push(`| declaring nothing about encryption | ${f.storage_encryption_not_declared ?? 0} |`);
+out.push(`| set by an unresolved expression | ${f.storage_encryption_unresolved ?? 0} |`);
 out.push(`| Logging declarations | ${f.logging_declarations ?? 0} |`);
 out.push(`| Identity declarations | ${f.identity_declarations ?? 0} |`);
 out.push(`| Open to any address (0.0.0.0/0, ::/0) | ${f.declarations_open_to_any_address ?? 0} |`);
 out.push(`| Marked public | ${f.declarations_marked_public ?? 0} |`);
 out.push(`| Inline credential literals | ${f.inline_credential_literals ?? 0} (a count; the literals are never printed) |`);
 out.push(`| Resource types | ${types} |`);
-out.push(`| Digest | \`${doc.digest || ""}\` |`);
+const cov = doc.coverage || {};
+out.push(`| Coverage | ${cov.completeness || "complete"}: ${cov.files_read ?? f.declarations_read ?? 0} read, ${cov.files_skipped ?? 0} skipped, ${cov.files_invalid ?? 0} invalid, ${cov.files_unreadable ?? 0} unreadable${cov.traversal_truncated ? ", walk truncated" : ""} |`);
+out.push(`| Facts digest | \`${doc.facts_digest || doc.digest || ""}\` (an aggregate of the counts; it does not identify files, a repository or a deployment) |`);
 out.push("");
 out.push("What these facts mean is your decision: declaring public ingress is not a failing, because a load balancer is supposed to be public. A green step says the read happened. It is not evidence that Trooth has ingested anything; nothing is sent to Trooth.");
 console.log(out.join("\n"));
