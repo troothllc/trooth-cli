@@ -1,7 +1,7 @@
 {
   "name": "trooth",
-  "version": "0.4.4",
-  "description": "The Trooth Network from your terminal. Read a company's public, signed record with no key and no account: listing state, dates, live-probe and self-attestation counts, signing key id. Also reads what your own repo declares, offline. No verdict.",
+  "version": "0.5.0",
+  "description": "The Trooth Network from your terminal. Read a company's public record with no key and no account: listing and evidence state, dates, probe and self-attestation counts, signing key id. Also reads what your repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
     "trooth": "bin/trooth.mjs"
@@ -9,7 +9,8 @@
   "files": [
     "bin/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "npm-shrinkwrap.json"
   ],
   "engines": {
     "node": ">=18"
@@ -17,7 +18,7 @@
   "scripts": {
     "check": "node ./bin/trooth.mjs check",
     "lint": "node ./bin/trooth.mjs lint",
-    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs"
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs"
   },
   "license": "Apache-2.0",
   "author": "Trooth, LLC",
@@ -45,5 +46,8 @@
     "terraform",
     "kubernetes",
     "cli"
-  ]
+  ],
+  "dependencies": {
+    "yaml": "2.9.1"
+  }
 }

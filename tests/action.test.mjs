@@ -29,7 +29,8 @@ t("the summary is a table of counts with no verdict, no pass mark and no file na
   assert.match(r.stdout, /^## Trooth lint \(advisory\)/);
   assert.match(r.stdout, /\| Declaration files read \| 2 \(terraform 1 · kubernetes 1\) \|/);
   assert.match(r.stdout, /\| Inline credential literals \| 0 \(a count; the literals are never printed\) \|/);
-  assert.match(r.stdout, /\| Digest \| `sha256:[a-f0-9]{64}` \|/);
+  assert.match(r.stdout, /\| Facts digest \| `sha256:[a-f0-9]{64}` \(an aggregate/);
+  assert.match(r.stdout, /\| Coverage \| complete: 2 read/);
   assert.match(r.stdout, /nothing is sent to Trooth/);
   assert.ok(!/main\.tf|deploy\.yaml/.test(r.stdout), "no file name in the summary");
   assert.ok(!/\b(pass|fail|score|grade|verdict:)\b/i.test(r.stdout.replace(/no verdict/gi, "")), "no verdict word");
@@ -59,7 +60,7 @@ t("outputs carry the digest, the count read and the credential count, in GITHUB_
 t("a missing report yields empty and zero outputs rather than an error", () => {
   const r = run(["action/outputs.mjs", join(dir, "missing.json"), "1"]);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /^digest=\n/);
+  assert.match(r.stdout, /^digest=\n/m);
   assert.match(r.stdout, /declarations-read=0/);
 });
 
@@ -69,10 +70,11 @@ t("advisory by default: both gates default to false and there is no other way to
   assert.match(yml, /fail-on-inline-credentials:[\s\S]*?default: "false"/);
   assert.match(yml, /fail-if-nothing-read:[\s\S]*?default: "false"/);
   const exits = [...yml.matchAll(/exit (\d)/g)].map((m) => m[1]);
-  assert.deepEqual(exits.sort(), ["0", "1", "1", "2"]);
+  assert.deepEqual(exits.sort(), ["0", "1", "1", "2", "2", "4"]);
+  assert.match(yml, /allow-incomplete:[\s\S]*?default: "false"/);
 });
 t("the CLI version is pinned and lint is pointed at an unroutable API", () => {
-  assert.match(yml, /default: "0\.4\.4"/);
+  assert.match(yml, /default: "0\.5\.0"/);
   assert.match(yml, /TROOTH_API: "http:\/\/127\.0\.0\.1:9"/);
 });
 t("it asks for no token and no write permission", () => {
@@ -91,8 +93,8 @@ const step = (path, opts = {}) => {
   const env = {
     ...process.env, RUNNER_TEMP: sim, GITHUB_ACTION_PATH: process.cwd(),
     GITHUB_STEP_SUMMARY: join(sim, "summary.md"), GITHUB_OUTPUT: join(sim, "output.txt"),
-    TROOTH_LINT_PATH: path, TROOTH_CLI_VERSION: "local", TROOTH_API: "http://127.0.0.1:9",
-    TROOTH_FAIL_ON_INLINE_CREDENTIALS: opts.creds || "false", TROOTH_FAIL_IF_NOTHING_READ: opts.nothing || "false",
+    TROOTH_LINT_PATH: path, TROOTH_CLI_VERSION: opts.version || "0.5.0", TROOTH_API: "http://127.0.0.1:9",
+    TROOTH_FAIL_ON_INLINE_CREDENTIALS: opts.creds || "false", TROOTH_FAIL_IF_NOTHING_READ: opts.nothing || "false", TROOTH_ALLOW_INCOMPLETE: opts.incomplete || "false",
   };
   const bin = opts.bin || join(process.cwd(), "bin", "trooth.mjs");
   const script = runBlock.replace(/^TROOTH_BIN=.*$/m, `TROOTH_BIN=${JSON.stringify(bin)}`);
@@ -107,7 +109,9 @@ t("the fixture: exit 0, the summary table, the outputs", () => {
   assert.match(r.summary, /\| Declaration files read \| 2 \(terraform 1 · kubernetes 1\) \|/);
   assert.match(r.output, /^digest=sha256:[a-f0-9]{64}$/m);
   assert.match(r.output, /^declarations-read=2$/m);
-  assert.match(r.output, /^report=.*trooth-lint\.json$/m);
+  assert.match(r.output, /^report=.*trooth-lint\.[A-Za-z0-9]{8}\/trooth-lint\.json$/m);
+  assert.match(r.output, /^completeness=complete$/m);
+  assert.match(r.output, /^facts-digest=sha256:[a-f0-9]{64}$/m);
 });
 t("a directory with nothing to read: exit 0 unless asked, exit 1 when asked", () => {
   reset(); assert.equal(step(".github").status, 0);
@@ -129,10 +133,40 @@ t("a CLI that exits with a code lint does not define is a failure, not a green s
   assert.match(r.summary, /could not run: trooth: the CLI exited with code 127/);
   assert.match(r.output, /^declarations-read=0$/m);
 });
+t("two invocations in one job keep two reports (F65)", () => {
+  reset(); const a = step("tests/fixtures/infra");
+  const ra = a.output.match(/^report=(.*)$/m)[1];
+  const bdir = join(dir, "second"); mkdirSync(bdir, { recursive: true });
+  writeFileSync(join(bdir, "x.tf"), 'resource "aws_ebs_volume" "v" { encrypted = true }\n');
+  const b = step(bdir);
+  const rb = [...b.output.matchAll(/^report=(.*)$/gm)].pop()[1];
+  assert.notEqual(ra, rb);
+  assert.equal(JSON.parse(readFileSync(ra, "utf8")).facts.declarations_read, 2);
+  assert.equal(JSON.parse(readFileSync(rb, "utf8")).facts.declarations_read, 1);
+});
+t("a version that is not one exact release is refused before anything installs (F27)", () => {
+  for (const v of ["latest", "^0.5.0", "0.5", "file:../x", "https://example.com/t.tgz", "0.5.0 || 9"]) {
+    reset(); const r = step("tests/fixtures/infra", { version: v });
+    assert.equal(r.status, 2, v);
+    assert.match(r.stdout, /version must be one exact release/);
+  }
+});
+t("an incomplete read fails by default and passes with allow-incomplete (F23)", () => {
+  const d = join(dir, "partial"); mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, "ok.tf"), 'resource "aws_s3_bucket" "a" {}\n');
+  writeFileSync(join(d, "bad.tf"), 'resource "aws_s3_bucket" "b" {\n');
+  reset(); const r = step(d);
+  assert.equal(r.status, 4);
+  assert.match(r.stdout, /::error title=Trooth lint::the read was incomplete/);
+  assert.match(r.summary, /\| Coverage \| incomplete: 1 read, 0 skipped, 1 invalid/);
+  reset(); const g = step(d, { incomplete: "true" });
+  assert.equal(g.status, 0);
+  assert.match(g.output, /^completeness=incomplete$/m);
+});
 t("the CLI is run by path from its own directory, never through npx", () => {
   const commands = runBlock.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
   assert.ok(!/\bnpx\b/.test(commands), "no npx command in the run block");
-  assert.match(runBlock, /npm install --prefix "\$CLI_DIR" --no-save --no-audit --no-fund --no-package-lock --loglevel=error "trooth@\$V"/);
+  assert.match(runBlock, /npm install --prefix "\$CLI_DIR" --no-save --no-audit --no-fund --no-package-lock --ignore-scripts --loglevel=error "trooth@\$V"/);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

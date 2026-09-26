@@ -32,12 +32,15 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      # Zero dependencies, on purpose. There is nothing to install, and an
-      # install step that installs nothing is a step that can fail for nothing.
-      - name: No dependencies
+      # ONE DEPENDENCY, on purpose: the maintained YAML parser, so Kubernetes
+      # files are parsed rather than pattern-matched. It has no dependencies of
+      # its own. This step holds the line: exactly one, pinned exactly, locked
+      # in npm-shrinkwrap.json, installed with install scripts off.
+      - name: One pinned dependency, installed from the lock
         run: |
-          deps=$(node -p "Object.keys(require('./package.json').dependencies || {}).length")
-          [ "$deps" = "0" ] || { echo "expected zero dependencies, found $deps"; exit 1; }
+          node -e "const p=require('./package.json');const d=p.dependencies||{};const k=Object.keys(d);if(k.length!==1||k[0]!=='yaml'||!/^\d+\.\d+\.\d+$/.test(d.yaml)){console.error('expected exactly yaml at an exact version, found',d);process.exit(1)}"
+          test -f npm-shrinkwrap.json
+          npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Version and help
         run: |
@@ -50,7 +53,7 @@ jobs:
       - name: lint --json emits exactly one JSON document on stdout
         run: |
           node bin/trooth.mjs lint tests/fixtures/infra --json > out.json
-          node -e "const d=require('./out.json'); if(!d.digest) { throw new Error('no digest'); }"
+          node -e "const d=require('./out.json'); if(!d.facts_digest || d.coverage.completeness!=='complete') { throw new Error('no digest, or an incomplete read'); }"
 
       - name: lint says so, rather than failing, when there is nothing to read
         run: |
@@ -79,6 +82,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: node tests/check-metadata.mjs
 
       # The action tests and the lint tests. Run once, on one Node, because
