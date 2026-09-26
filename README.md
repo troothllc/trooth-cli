@@ -214,6 +214,10 @@ https://api.trooth.co/public/mcp
 
 Four read-only tools, public data, no key. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
 
+## Changed in 0.4.4
+
+- `check` asks the Trooth Network for the one record it needs (`/directory/api/vendors/<domain>`) instead of downloading the whole directory list and searching it. When the API does not serve that path yet, it reads the list as 0.4.3 did. The printed output, `check --json` and the exit codes are unchanged.
+
 ## Changed in 0.4.3
 
 - `check` labels the listing state `Listing state:` and prints the two counts in the record page's form (`65 read; 64 as expected`, `35 asked; 27 attested`). It prints the three newest ledger events, newest first, with plain labels and without the detail text. 0.4.2 printed the ledger's three oldest events under a heading that called them recent. `check --json` is unchanged.

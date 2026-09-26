@@ -72,7 +72,7 @@ t("advisory by default: both gates default to false and there is no other way to
   assert.deepEqual(exits.sort(), ["0", "1", "1", "2"]);
 });
 t("the CLI version is pinned and lint is pointed at an unroutable API", () => {
-  assert.match(yml, /default: "0\.4\.3"/);
+  assert.match(yml, /default: "0\.4\.4"/);
   assert.match(yml, /TROOTH_API: "http:\/\/127\.0\.0\.1:9"/);
 });
 t("it asks for no token and no write permission", () => {

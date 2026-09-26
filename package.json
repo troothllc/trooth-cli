@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "The Trooth Network from your terminal. Read a company's public, signed record with no key and no account: listing state, dates, live-probe and self-attestation counts, signing key id. Also reads what your own repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
