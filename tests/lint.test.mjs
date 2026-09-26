@@ -6,6 +6,10 @@
 // The lint trees are written to a scratch directory, so the fixture the action
 // self-test reads (tests/fixtures/infra, two declaration files) never changes.
 // `check` runs against a local HTTP server standing in for the public feed.
+// That server answers as the directory worker in two versions: "current" serves the one-record
+// route /directory/api/vendors/<domain>, and "legacy" answers that route with a
+// plain-text 404 the way a worker without the route does, so the CLI falls back
+// to the list.
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -158,11 +162,29 @@ const events = [
   { type: "some_new_event", at: "2026-08-30T00:00:00Z", detail: "c" },
 ];
 const feed = { vendors: [{ domain: "example.com", company_name: "Example", passed_at: "2026-08-30T00:00:00Z", first_published_at: "2026-08-01T00:00:00Z", badge_id: "b-1", authority_key_id: "k-1", receipt_signature: "sig", probes: { passed: 64, total: 65 }, attested: { passed: 27, total: 35 }, events }] };
-const server = createServer((req, res) => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify(feed)); });
+let mode = "current";
+const requests = [];
+const server = createServer((req, res) => {
+  const path = new URL(req.url, "http://x").pathname;
+  requests.push(path);
+  const one = path.match(/^\/directory\/api\/vendors\/([^/]+)$/);
+  if (one && mode === "current") {
+    const d = decodeURIComponent(one[1]);
+    const v = feed.vendors.find((x) => x.domain === d);
+    res.statusCode = v ? 200 : 404;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(v ?? { domain: d, listed: false, error: "No vendor with this domain in the directory feed." }));
+    return;
+  }
+  if (path === "/directory/api/vendors") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify(feed)); return; }
+  res.statusCode = 404;
+  res.setHeader("content-type", "text/plain");
+  res.end("Not found");
+});
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const api = `http://127.0.0.1:${server.address().port}`;
-const check = (args) => new Promise((resolve) => {
-  const p = spawn(process.execPath, [BIN, "check", ...args], { env: { ...process.env, TROOTH_API: api } });
+const check = (args, base = api) => new Promise((resolve) => {
+  const p = spawn(process.execPath, [BIN, "check", ...args], { env: { ...process.env, TROOTH_API: base } });
   let stdout = "", stderr = "";
   p.stdout.on("data", (b) => (stdout += b)); p.stderr.on("data", (b) => (stderr += b));
   p.on("close", (status) => resolve({ status, stdout, stderr }));
@@ -199,6 +221,49 @@ await t("a domain the feed does not carry: exit 1, and the text claims nothing a
   assert.match(r.stdout, /says nothing about the/);
   assert.ok(!RETIRED.test(r.stdout), r.stdout.match(RETIRED)?.[0]);
   assert.ok(!DASH.test(r.stdout), "no dash used as punctuation");
+});
+
+console.log("check, one-record route and the fallback to the list");
+async function inMode(m, args) {
+  mode = m;
+  requests.length = 0;
+  const r = await check(args);
+  return { ...r, requests: [...requests] };
+}
+await t("a listed record is read from /directory/api/vendors/<domain>, without the list", async () => {
+  const r = await inMode("current", ["example.com"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.requests, ["/directory/api/vendors/example.com"]);
+});
+await t("a JSON 404 with listed:false is not listed: exit 1, the same text, no list request", async () => {
+  const cur = await inMode("current", ["nobody.example"]);
+  const old = await inMode("legacy", ["nobody.example"]);
+  assert.equal(cur.status, 1);
+  assert.deepEqual(cur.requests, ["/directory/api/vendors/nobody.example"]);
+  assert.equal(cur.stdout, old.stdout);
+  assert.equal(cur.status, old.status);
+});
+await t("a worker without the route (plain-text 404) falls back to the list", async () => {
+  const r = await inMode("legacy", ["example.com"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(r.requests, ["/directory/api/vendors/example.com", "/directory/api/vendors"]);
+});
+await t("the printed output and --json are identical through the route and through the fallback", async () => {
+  for (const args of [["example.com"], ["example.com", "--json"], ["nobody.example", "--json"], ["https://www.Example.com/x"]]) {
+    const cur = await inMode("current", args);
+    const old = await inMode("legacy", args);
+    assert.equal(cur.status, old.status, args.join(" "));
+    assert.equal(cur.stdout, old.stdout, args.join(" "));
+  }
+});
+await t("a 200 carrying some other domain's record is an upstream error, exit 3", async () => {
+  const saved = feed.vendors[0].domain;
+  const srv = createServer((req, res) => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ ...feed.vendors[0], domain: "other.example" })); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const r = await check(["example.com"], `http://127.0.0.1:${srv.address().port}`);
+  srv.close();
+  assert.equal(feed.vendors[0].domain, saved);
+  assert.equal(r.status, 3);
 });
 server.close();
 

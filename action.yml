@@ -55,7 +55,7 @@ inputs:
   version:
     description: "Version of the `trooth` CLI to run from npm. Pinned on purpose; bump it deliberately."
     required: false
-    default: "0.4.3"
+    default: "0.4.4"
   fail-on-inline-credentials:
     description: "Opt in: fail the step when lint counts one or more inline credential literals."
     required: false
