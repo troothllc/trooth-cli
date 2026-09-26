@@ -8,8 +8,8 @@
 // `check` runs against a local HTTP server standing in for the public feed.
 // That server answers as the directory worker in two versions: "current" serves the one-record
 // route /directory/api/vendors/<domain>, and "legacy" answers that route with a
-// plain-text 404 the way a worker without the route does, so the CLI falls back
-// to the list.
+// plain-text 404 the way a worker without the route does. Since 0.5.0 the CLI
+// treats that as a service error and never downloads the list.
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -136,7 +136,8 @@ await t("the human output states how each source was read, and uses none of the 
   const r = spawnSync(process.execPath, [BIN, "lint", "tests/fixtures/infra"], { encoding: "utf8" });
   assert.equal(r.status, 0);
   assert.match(r.stdout, /How this was read/);
-  assert.match(r.stdout, /not a Terraform evaluator/);
+  assert.match(r.stdout, /Nothing is evaluated/);
+  assert.match(r.stdout, /Coverage  complete/);
   assert.ok(!RETIRED.test(r.stdout), r.stdout.match(RETIRED)?.[0]);
   assert.ok(!DASH.test(r.stdout), "no dash used as punctuation");
   const note = lintJson("tests/fixtures/infra").note;
@@ -193,7 +194,7 @@ const check = (args, base = api) => new Promise((resolve) => {
 await t("a listed record: listing state, two counts in the website's form, no ratio", async () => {
   const r = await check(["example.com"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^Listing state: listed and witnessed/m);
+  assert.match(r.stdout, /^Listing state: listed; Trooth witnessed a reading/m);
   assert.match(r.stdout, /Live probes: 65 read; 64 as expected/);
   assert.match(r.stdout, /Self-attestations: 35 asked; 27 attested/);
   assert.ok(!/\b\d+\/\d+\b/.test(r.stdout), "no N/M bar");
@@ -223,7 +224,7 @@ await t("a domain the feed does not carry: exit 1, and the text claims nothing a
   assert.ok(!DASH.test(r.stdout), "no dash used as punctuation");
 });
 
-console.log("check, one-record route and the fallback to the list");
+console.log("check, one-record route");
 async function inMode(m, args) {
   mode = m;
   requests.length = 0;
@@ -235,26 +236,15 @@ await t("a listed record is read from /directory/api/vendors/<domain>, without t
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(r.requests, ["/directory/api/vendors/example.com"]);
 });
-await t("a JSON 404 with listed:false is not listed: exit 1, the same text, no list request", async () => {
+await t("a JSON 404 with listed:false is not listed: exit 1, no list request", async () => {
   const cur = await inMode("current", ["nobody.example"]);
-  const old = await inMode("legacy", ["nobody.example"]);
   assert.equal(cur.status, 1);
   assert.deepEqual(cur.requests, ["/directory/api/vendors/nobody.example"]);
-  assert.equal(cur.stdout, old.stdout);
-  assert.equal(cur.status, old.status);
 });
-await t("a worker without the route (plain-text 404) falls back to the list", async () => {
+await t("a worker without the route (plain-text 404) is a service error, exit 3, and the list is never read", async () => {
   const r = await inMode("legacy", ["example.com"]);
-  assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(r.requests, ["/directory/api/vendors/example.com", "/directory/api/vendors"]);
-});
-await t("the printed output and --json are identical through the route and through the fallback", async () => {
-  for (const args of [["example.com"], ["example.com", "--json"], ["nobody.example", "--json"], ["https://www.Example.com/x"]]) {
-    const cur = await inMode("current", args);
-    const old = await inMode("legacy", args);
-    assert.equal(cur.status, old.status, args.join(" "));
-    assert.equal(cur.stdout, old.stdout, args.join(" "));
-  }
+  assert.equal(r.status, 3);
+  assert.deepEqual(r.requests, ["/directory/api/vendors/example.com"]);
 });
 await t("a 200 carrying some other domain's record is an upstream error, exit 3", async () => {
   const saved = feed.vendors[0].domain;

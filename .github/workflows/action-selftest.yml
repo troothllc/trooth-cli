@@ -1,5 +1,5 @@
 # The action, run against its own fixture on every push. A green run here is
-# the action reading two declaration files and writing the summary; it says
+# the action reading its fixtures, twice in one job, and writing the summary; it says
 # nothing about anybody's infrastructure, and that is the point of the action.
 name: action self-test
 on:
@@ -22,7 +22,28 @@ jobs:
         run: |
           test "${{ steps.lint.outputs.declarations-read }}" = "2"
           test "${{ steps.lint.outputs.inline-credential-literals }}" = "0"
-          case "${{ steps.lint.outputs.digest }}" in sha256:*) ;; *) echo "no digest"; exit 1;; esac
+          case "${{ steps.lint.outputs.facts-digest }}" in sha256:*) ;; *) echo "no digest"; exit 1;; esac
+          test "${{ steps.lint.outputs.completeness }}" = "complete"
+      - name: Two invocations in one job keep two reports
+        id: second
+        uses: ./
+        with:
+          path: tests/fixtures/second
+      - shell: bash
+        run: |
+          test "${{ steps.lint.outputs.report }}" != "${{ steps.second.outputs.report }}"
+          test -s "${{ steps.lint.outputs.report }}"
+          test -s "${{ steps.second.outputs.report }}"
+          node -e 'const f=require("fs");const a=JSON.parse(f.readFileSync(process.argv[1]));const b=JSON.parse(f.readFileSync(process.argv[2]));if(a.facts.declarations_read!==2||b.facts.declarations_read!==1)process.exit(1)' "${{ steps.lint.outputs.report }}" "${{ steps.second.outputs.report }}"
+      - name: A version that is not one exact release is refused
+        id: badversion
+        continue-on-error: true
+        uses: ./
+        with:
+          path: tests/fixtures/infra
+          version: latest
+      - shell: bash
+        run: test "${{ steps.badversion.outcome }}" = "failure"
       - name: An empty directory does not fail the step unless asked
         id: empty
         uses: ./

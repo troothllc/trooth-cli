@@ -4,17 +4,21 @@
 // Licensed under the Apache License, Version 2.0. See the LICENSE file in this
 // repository, or http://www.apache.org/licenses/LICENSE-2.0
 //
-// The Trooth Network is one public, signed record per company: identity, products and
-// demos, domain and marketing links, people, documents, security and privacy posture,
-// procurement terms, relationships and sub-processors. Each fact is dated and labeled
-// with where it came from: witnessed, public record, attested or declared. This CLI is
-// the terminal interface to that record.
+// The Trooth Network is one public record per company: identity, products and demos,
+// domain and marketing links, people, documents, security and privacy posture,
+// procurement terms, relationships and sub-processors. Each fact is labeled with where
+// it came from: witnessed, public record, attested or declared. Trooth signs one
+// object, the witness statement for a reading it took; the rest of the profile is not
+// signed. This CLI is the terminal interface to that record.
 //
 // Commands:
-//   trooth check <domain>   Read a company's witnessed record from the public Trooth
-//                           Network. Read-only. No key, no account, nothing sent about you.
+//   trooth check <domain>   Read a company's record from the public Trooth Network.
+//                           Read-only. No key, no account. It sends one request to
+//                           api.trooth.co with the domain you ask about in the URL,
+//                           plus what every HTTPS request carries: your IP address and
+//                           a user agent naming this CLI and its version.
 //   trooth lint [path]      Read the infrastructure THIS repository declares and print
-//                           the declared facts plus a canonical digest of them.
+//                           the declared facts plus an aggregate digest of them.
 //                           Fully local. Offline. Your source never leaves the machine.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
@@ -24,26 +28,36 @@
 //   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
-// Exit codes (stable, for scripts):
-//   0  ok                      (listed; lint read at least one declaration; help/version)
-//   1  finding                 (domain not listed; lint found nothing to read)
-//   2  usage error             (missing argument, unknown flag or command, unreadable path)
-//   3  network/upstream error  (Trooth unreachable, non-2xx, malformed response)
+// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0):
+//   0  ok                      (check: listed, and Trooth witnessed a reading;
+//                               lint: a complete read of at least one declaration)
+//   1  finding                 (check: not listed, or revoked; lint: nothing to read)
+//   2  usage error             (missing argument, unknown flag or command, bad domain,
+//                               path not found)
+//   3  service or contract error (Trooth unreachable or too slow, a non-2xx other than
+//                               the documented not-listed 404, a body that is not JSON
+//                               or not the record asked for). Never an answer about a
+//                               company.
+//   4  incomplete read         (lint: a file was skipped, invalid or unreadable, or the
+//                               walk was truncated; --allow-incomplete exits 0 instead)
+//   5  listed, not witnessed   (check: the record is listed, but it carries no reading
+//                               this CLI can confirm was witnessed)
 //
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
 
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename } from 'node:path';
 
 const API = process.env.TROOTH_API || 'https://api.trooth.co';
 const require = createRequire(import.meta.url);
-let VERSION = '0.4.4';
+let VERSION = '0.5.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -88,7 +102,7 @@ function scrub(value) {
 
 const FLAGS = {
   check: { bool: ['--json'], value: [] },
-  lint:  { bool: ['--json'], value: [] },
+  lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -135,23 +149,28 @@ function helpText() {
 ${J}${B}trooth${X} ${D}v${VERSION} · the terminal interface to the Trooth Network${X}
 
 ${B}Usage${X}
-  trooth check <domain>     Read a company's witnessed record on the Trooth Network
+  trooth check <domain>     Read a company's record on the Trooth Network
   trooth lint [path]        Read what your infrastructure declares, locally. Offline.
   trooth --help | --version
 
 ${B}Examples${X}
-  trooth check stripe.com                ${D}# read a company's witnessed record${X}
+  trooth check stripe.com                ${D}# read a company's record${X}
   trooth check trooth.co --json          ${D}# one JSON document on stdout, for scripting${X}
-  trooth lint ./infra                    ${D}# read declared facts + print a canonical digest${X}
+  trooth lint ./infra                    ${D}# read declared facts, with a coverage report${X}
   trooth lint --json > trooth-lint.json  ${D}# the same facts as one JSON document, for a CI artifact${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
+  --allow-incomplete        lint: exit 0 even when a file was skipped, invalid or unreadable
 
 ${B}Exit codes${X}
-  0 ok   1 finding (not listed / nothing declared)   2 usage error   3 Trooth unreachable
+  0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
+  4 lint read incomplete   5 listed, but no witnessed reading in the record
 
-${D}check reads only public, already-published records. No key, no account.
+${D}check reads only public, already-published records. No key, no account. It sends
+the domain you ask about to api.trooth.co in the request URL, with your IP address
+and a user agent naming this CLI; see https://trooth.co/privacy for what is kept.
+It does not check the record's signature.
 lint is entirely local: it opens files, and opens no sockets. Your source never leaves.
 Trooth publishes facts and counts, never one number that sums a company up.
 Trooth signs what it witnessed. It never signs on a company's behalf.${X}
@@ -160,57 +179,111 @@ Trooth signs what it witnessed. It never signs on a company's behalf.${X}
 
 /* -------------------------------------------------------------- fetch ---- */
 
-/** One request to the API. Exits 3 when the API cannot be reached; any HTTP
- *  status comes back to the caller. */
-async function requestTrooth(path, init, what) {
-  try {
-    return await fetch(`${API}${path}`, {
-      ...init,
-      headers: { accept: 'application/json', 'user-agent': `trooth-cli/${VERSION}`, ...(init && init.headers) },
-    });
-  } catch (e) {
-    fail(EXIT.UPSTREAM, `could not reach ${what} at ${API}: ${e && e.message ? e.message : e}`);
+// Every request is bounded: a deadline, a maximum body size, a JSON content
+// type, and at most one retry, only for a connection failure or a 502, 503 or
+// 504. Nothing here turns a failure into an answer about a company.
+const TIMEOUT_MS = Math.max(1000, Number(process.env.TROOTH_TIMEOUT_MS) || 15000);
+const MAX_BODY = 1024 * 1024;
+const RETRYABLE = new Set([502, 503, 504]);
+
+class Upstream extends Error {
+  constructor(message, extra = {}) { super(message); this.extra = extra; }
+}
+
+async function readBounded(res) {
+  const len = Number(res.headers.get('content-length'));
+  if (Number.isFinite(len) && len > MAX_BODY) throw new Upstream(`the response is ${len} bytes, over the ${MAX_BODY}-byte limit`);
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY) { try { await reader.cancel(); } catch {} throw new Upstream(`the response passed the ${MAX_BODY}-byte limit`); }
+    chunks.push(value);
   }
+  return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8');
 }
 
-async function failHttp(res, what) {
-  const body = await res.text().catch(() => '');
-  fail(EXIT.UPSTREAM, `${what} returned HTTP ${res.status}.${body ? ' ' + body.slice(0, 300).replace(/\s+/g, ' ') : ''}`, { http_status: res.status });
+/** GET one path. Returns { status, contentType, text }. Throws Upstream when the
+ *  API cannot be reached, answers too slowly, or sends too much. */
+async function getTrooth(path) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(`${API}${path}`, {
+        method: 'GET',
+        redirect: 'error',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { accept: 'application/json', 'user-agent': `trooth-cli/${VERSION}` },
+      });
+      if (RETRYABLE.has(res.status) && attempt === 1) { try { await res.body?.cancel(); } catch {} await new Promise((r) => setTimeout(r, 500)); continue; }
+      const text = await readBounded(res);
+      return { status: res.status, contentType: (res.headers.get('content-type') || '').toLowerCase(), text };
+    } catch (e) {
+      if (e instanceof Upstream) throw e;
+      lastErr = e;
+      const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      if (timedOut) throw new Upstream(`the Trooth Network at ${API} did not answer within ${TIMEOUT_MS} ms`);
+      if (attempt === 1) { await new Promise((r) => setTimeout(r, 500)); continue; }
+    }
+  }
+  throw new Upstream(`could not reach the Trooth Network at ${API}: ${lastErr && lastErr.message ? lastErr.message : lastErr}`);
 }
 
-async function callTrooth(path, init, what) {
-  const res = await requestTrooth(path, init, what);
-  if (!res.ok) await failHttp(res, what);
-  try { return await res.json(); }
-  catch { fail(EXIT.UPSTREAM, `${what} returned a response that is not JSON.`); }
+function parseJsonBody(r) {
+  if (!/\bjson\b/.test(r.contentType)) throw new Upstream(`the Trooth Network answered HTTP ${r.status} with ${r.contentType || 'no content type'}, not JSON`, { http_status: r.status });
+  try { return JSON.parse(r.text); }
+  catch { throw new Upstream(`the Trooth Network answered HTTP ${r.status} with a body that is not valid JSON`, { http_status: r.status }); }
 }
 
 /* --------------------------------------------------------------- check ---- */
 
+/**
+ * The domain a user typed, as the one form the Trooth Network keys records by.
+ * Accepts a bare domain or a URL. Parsed with the WHATWG URL parser, so case,
+ * a trailing dot, the default port (80 or 443), a path, a query and an
+ * internationalized name (to its ASCII form) all normalize the same way, and a
+ * leading "www." is dropped. Returns { domain } or { error } for input that is
+ * not one domain: credentials in a URL, a non-default port, an IP address, a
+ * scheme other than http or https, or a name with no dot.
+ */
 function normalizeDomain(input) {
-  if (!input) return '';
-  let s = String(input).trim().toLowerCase();
-  s = s.replace(/^[a-z]+:\/\//, '');
-  s = s.replace(/\/.*$/, '');
-  s = s.replace(/^www\./, '');
-  s = s.replace(/\.$/, '');
-  return s;
+  const s = String(input || '').trim();
+  if (!s) return { error: 'missing <domain>. Try: trooth check stripe.com' };
+  let u;
+  try { u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`); }
+  catch { return { error: `not a domain or URL: ${s}` }; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return { error: `not a web address: ${s}` };
+  if (u.username || u.password) return { error: 'a URL with a user name or password is not accepted; pass the domain alone' };
+  if (u.port) return { error: `port ${u.port} is not a default port; pass the domain alone` };
+  let host = u.hostname.toLowerCase().replace(/\.$/, '');
+  if (/^\[.*\]$/.test(host) || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return { error: 'an IP address is not a company domain' };
+  host = host.replace(/^www\./, '');
+  if (!host.includes('.') || !/^[a-z0-9.-]+$/.test(host) || host.split('.').some((l) => !l || l.length > 63 || l.startsWith('-') || l.endsWith('-'))) {
+    return { error: `not a domain: ${s}` };
+  }
+  return { domain: host };
 }
+const sameDomain = (a, b) => { const x = normalizeDomain(a); return !!x.domain && x.domain === b; };
 
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  if (isNaN(d)) return String(iso);
+  if (isNaN(d)) return '';
   return d.toISOString().slice(0, 10);
 }
 
 function count(obj) {
   if (!obj || typeof obj !== 'object') return null;
-  if (typeof obj.passed !== 'number' || typeof obj.total !== 'number') return null;
-  return { passed: obj.passed, total: obj.total };
+  const { passed, total } = obj;
+  if (!Number.isInteger(passed) || !Number.isInteger(total) || passed < 0 || total < 0 || passed > total) return null;
+  return { passed, total };
 }
 
-/** The two count lines, in the website's form ("65 read; 64 as expected"). */
+/** The two count lines, in the website's form ("65 read; 63 as expected"). */
 function countLines(rec) {
   const lines = [];
   if (rec.probes) lines.push(`${B}Live probes:${X} ${rec.probes.total} read; ${rec.probes.passed} as expected`);
@@ -241,110 +314,139 @@ function eventLabel(type) {
   return Object.prototype.hasOwnProperty.call(EVENT_LABELS, type) ? EVENT_LABELS[type] : type.replace(/_/g, ' ');
 }
 
+/**
+ * THE EVIDENCE STATE, decided from the record's own fields and never from a
+ * matching name. A record that is listed is not therefore witnessed.
+ *   listed_witnessed      a dated reading with at least one live probe read
+ *   listed_not_witnessed  the record says so, or its reading read no probe
+ *   listed_evidence_unknown  listed, with no reading this CLI can interpret
+ *   revoked               the record says it was revoked or withdrawn
+ * An explicit state in the record (`standing` or `evidence_state`) wins over
+ * anything inferred from counts, and can only lower the state, never raise it.
+ */
+const STATE = Object.freeze({
+  NOT_LISTED: 'not_listed',
+  WITNESSED: 'listed_witnessed',
+  NOT_WITNESSED: 'listed_not_witnessed',
+  UNKNOWN: 'listed_evidence_unknown',
+  REVOKED: 'revoked',
+});
+function evidenceState(v, probes) {
+  const explicit = String(v.evidence_state ?? v.standing ?? v.state ?? '').toLowerCase();
+  if (/revoked|withdrawn/.test(explicit)) return STATE.REVOKED;
+  if (/not[_ -]?witnessed|unwitnessed|none/.test(explicit)) return STATE.NOT_WITNESSED;
+  const dated = !!fmtDate(v.passed_at);
+  if (probes && probes.total === 0) return STATE.NOT_WITNESSED;
+  if (probes && probes.total > 0 && dated) return STATE.WITNESSED;
+  return STATE.UNKNOWN;
+}
+
+/** A record, checked field by field. Throws Upstream when the body is not a
+ *  directory record for this domain. */
 function projectRecord(v, domain) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Upstream('the Trooth Network answered with something that is not a record');
+  if (typeof v.error === 'string' && !v.domain) throw new Upstream(`the Trooth Network answered with an error: ${v.error.slice(0, 200)}`);
+  if (typeof v.domain !== 'string' || !sameDomain(v.domain, domain)) throw new Upstream(`the Trooth Network answered with a record that is not the record for ${domain}`);
   const events = Array.isArray(v.events)
-    ? v.events.filter((e) => e && e.type).map((e) => ({ type: String(e.type), at: e.at, detail: e.detail }))
+    ? v.events.filter((e) => e && typeof e.type === 'string').map((e) => ({ type: e.type, at: e.at, detail: e.detail }))
     : [];
+  const probes = count(v.probes);
+  const state = evidenceState(v, probes);
   const rec = {
     domain,
-    listed: true,
-    company_name: v.company_name || domain,
-    witnessed_at: v.passed_at || null,
-    first_published_at: v.first_published_at || null,
-    badge_id: v.badge_id || null,
-    probes: count(v.probes),
+    listed: state !== STATE.REVOKED,
+    state,
+    company_name: typeof v.company_name === 'string' && v.company_name ? v.company_name : domain,
+    witnessed_at: state === STATE.WITNESSED ? v.passed_at : null,
+    first_published_at: fmtDate(v.first_published_at) ? v.first_published_at : null,
+    badge_id: typeof v.badge_id === 'string' ? v.badge_id : null,
+    probes,
     attested: count(v.attested),
     events,
-    receipt_signature: v.receipt_signature || null,
-    authority_key_id: v.authority_key_id || null,
+    receipt_signature: typeof v.receipt_signature === 'string' ? v.receipt_signature : null,
+    authority_key_id: typeof v.authority_key_id === 'string' ? v.authority_key_id : null,
+    signature_checked: false,
     verify_keys: `${API}/public/keys`,
+    verify_how: 'https://trooth.co/docs/verifiable-evidence',
     record_url: `https://trooth.co/network/${encodeURIComponent(domain)}`,
   };
-  if (v.category) rec.category = String(v.category);
-  if (v.description) rec.description = String(v.description);
+  if (typeof v.category === 'string') rec.category = v.category;
+  if (typeof v.description === 'string') rec.description = v.description;
   return scrub(rec);
 }
 
-/** The whole list, searched here. This is how every release up to 0.4.3 read a
- *  company, and it is now only the fallback in readVendor below. */
-async function readVendorFromList(domain, what) {
-  const data = await callTrooth('/directory/api/vendors', { method: 'GET' }, what);
-  const vendors = Array.isArray(data && data.vendors) ? data.vendors : [];
-  return vendors.find((v) => v && normalizeDomain(v.domain) === domain) || null;
-}
-
-/** One company's record from the directory feed, or null when the feed carries
- *  no record for that domain. It asks for that one record
- *  (/directory/api/vendors/<domain>), which returns the same object the list
- *  carries for that domain, and does not download every company to find it. */
+/**
+ * One company's record, from /directory/api/vendors/<domain>. That route
+ * answers a domain it does not carry with a JSON 404 whose body says
+ * `listed: false`; that is the only answer this CLI reads as "not listed".
+ * Any other 404, any other status and any body that is not the record is a
+ * service or contract error (exit 3), never a statement about the company.
+ * 0.4.4 fell back to downloading the whole list on a plain-text 404; the
+ * route has been served since 2026-09-26, and the fallback is gone.
+ */
 async function readVendor(domain) {
-  const what = 'the Trooth Network';
-  const res = await requestTrooth(`/directory/api/vendors/${encodeURIComponent(domain)}`, { method: 'GET' }, what);
-
-  if (res.status === 404) {
-    const text = await res.text().catch(() => '');
+  const r = await getTrooth(`/directory/api/vendors/${encodeURIComponent(domain)}`);
+  if (r.status === 404) {
     let body = null;
-    try { body = JSON.parse(text); } catch {}
-    // The route answered and has no record for this domain. It says so with a
-    // JSON body carrying `listed: false`.
-    if (body && typeof body === 'object' && body.listed === false) return null;
-    // FALLBACK TO THE LIST. Any other 404 comes from a deploy of the directory
-    // worker that predates the single-record route: it answers an unknown path
-    // with a plain-text "Not found". Read the list and search it here, as 0.4.3
-    // does, so this release keeps working against a worker that has not been
-    // redeployed yet, and against a TROOTH_API that points at an older one.
-    // This fallback can go in the first release after api.trooth.co serves the
-    // route, that is, once a request for a domain with no record there returns
-    // a JSON 404 with `listed: false`.
-    return readVendorFromList(domain, what);
+    try { body = JSON.parse(r.text); } catch {}
+    if (body && typeof body === 'object' && body.listed === false && /\bjson\b/.test(r.contentType)) return null;
+    throw new Upstream('the Trooth Network answered 404 without saying whether the domain is listed; this is a service error, not an answer about the company', { http_status: 404 });
   }
-  if (!res.ok) await failHttp(res, what);
-
-  let v;
-  try { v = await res.json(); }
-  catch { fail(EXIT.UPSTREAM, `${what} returned a response that is not JSON.`); }
-  if (!v || typeof v !== 'object' || Array.isArray(v) || normalizeDomain(v.domain) !== domain) {
-    fail(EXIT.UPSTREAM, `${what} returned a response that is not the record for ${domain}.`);
+  if (r.status < 200 || r.status > 299) {
+    throw new Upstream(`the Trooth Network answered HTTP ${r.status}.${r.text ? ' ' + r.text.slice(0, 200).replace(/\s+/g, ' ') : ''}`, { http_status: r.status });
   }
-  return v;
+  return parseJsonBody(r);
 }
+
+const STATE_TEXT = {
+  [STATE.WITNESSED]: `${J}listed; Trooth witnessed a reading${X}`,
+  [STATE.NOT_WITNESSED]: `${A}listed; no reading witnessed${X}`,
+  [STATE.UNKNOWN]: `${A}listed; the reading could not be read from this record${X}`,
+  [STATE.REVOKED]: `${A}revoked${X}`,
+};
 
 async function check() {
   const { positional } = parseArgs('check');
   if (positional.length > 1) fail(EXIT.USAGE, `check takes one <domain>, got: ${positional.join(' ')}`);
-  const domain = normalizeDomain(positional[0]);
-  if (!domain) fail(EXIT.USAGE, 'missing <domain>. Try: trooth check stripe.com');
+  const norm = normalizeDomain(positional[0]);
+  if (norm.error) fail(EXIT.USAGE, norm.error);
+  const domain = norm.domain;
 
-  const vendor = await readVendor(domain);
+  let vendor, rec;
+  try {
+    vendor = await readVendor(domain);
+    rec = vendor ? projectRecord(vendor, domain) : null;
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
 
-  if (!vendor) {
+  if (!rec) {
     if (asJson) {
-      emitJson({ domain, listed: false, record_url: `https://trooth.co/network/${encodeURIComponent(domain)}` });
+      emitJson({ domain, listed: false, state: STATE.NOT_LISTED, record_url: `https://trooth.co/network/${encodeURIComponent(domain)}` });
     } else {
       out(`\n${B}${domain}${X} ${D}//${X} ${A}not listed in the Trooth Network's public feed${X}`);
       out(`\n${D}The public feed carries no record for this domain. That says nothing about the`);
       out(`company: a domain that never listed, a listing Trooth has not published, and a`);
       out(`record that was revoked all read this way. A company gets a record by listing at`);
       out(`${X}${C}https://trooth.co/get-started${X}${D}: Trooth reads its public surface and publishes`);
-      out(`a signed, dated record that anyone, or any agent, can read.${X}\n`);
+      out(`a dated record that anyone, or any agent, can read.${X}\n`);
     }
     process.exit(EXIT.FINDING);
   }
 
-  const rec = projectRecord(vendor, domain);
-  if (asJson) { emitJson(rec); process.exit(EXIT.OK); }
+  const code = rec.state === STATE.WITNESSED ? EXIT.OK : rec.state === STATE.REVOKED ? EXIT.FINDING : EXIT.NOT_WITNESSED;
+  if (asJson) { emitJson(rec); process.exit(code); }
 
   const when = fmtDate(rec.witnessed_at);
   const since = fmtDate(rec.first_published_at);
-  out(`\n${J}${B}Trooth Network${X} ${D}// public · signed · read-only //${X}`);
+  out(`\n${J}${B}Trooth Network${X} ${D}// public record · read-only //${X}`);
   out(`${B}${rec.company_name}${X}   ${C}${domain}${X}`);
-  out(`Listing state: ${J}listed and witnessed${X}` +
-      (when ? `   ${D}last witnessed ${when}${X}` : `   ${D}date not published${X}`) +
+  out(`Listing state: ${STATE_TEXT[rec.state]}` +
+      (when ? `   ${D}reading dated ${when}${X}` : '') +
       (since ? `   ${D}first published ${since}${X}` : ''));
 
-  // Two counts, never a ratio, in the form the website's record page uses: an
-  // "N/M" cell reads as a bar, and a bar reads as a grade. The JSON fields keep
-  // the feed's names (`passed`, `total`).
+  // Two counts, never a ratio, in the form the website's record page uses.
   const counts = countLines(rec);
   if (counts.length) {
     out('');
@@ -362,20 +464,22 @@ async function check() {
   const latest = latestEvents(rec.events, 3);
   if (latest.length) {
     out(`\n${B}Latest ledger events, newest first${X}`);
-    for (const e of latest) out(`  ${J}•${X} ${D}${fmtDate(e.at)}${X}  ${eventLabel(e.type)}`);
+    for (const e of latest) out(`  ${J}•${X} ${D}${fmtDate(e.at) || 'undated'}${X}  ${eventLabel(e.type)}`);
     out(`${D}  --json carries the whole ledger, with the feed's own wording for each event.${X}`);
   }
 
-  out(`\n${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
+  out(`\n${D}This command did not check the record's signature. The signature covers the`);
+  out(`reading, not every fact on the company's profile. To check it yourself:${X} ${C}${rec.verify_how}${X}`);
+  out(`${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
   out(`Full record: ${X}${C}${rec.record_url}${X}${D}   ·   Signing keys: ${rec.verify_keys}${X}\n`);
-  process.exit(EXIT.OK);
+  process.exit(code);
 }
 
 /* ---------------------------------------------------------------- lint ---- */
 /* WHAT lint IS, AND WHAT IT IS CAREFULLY NOT.
  *
  * It reads the infrastructure a repository DECLARES and reports those
- * declarations as facts: how many storage resources declare encryption, which
+ * declarations as counts: how many storage resources declare encryption, which
  * regions appear, how many rules declare exposure to the whole internet. It
  * does not judge them. There is no verdict, no threshold, no severity and no
  * rating, and nothing is checked against a named standard or regulation.
@@ -383,203 +487,78 @@ async function check() {
  * public. What the facts mean is the reader's decision.
  *
  * It opens files and opens no sockets. Nothing about the repository leaves the
- * machine. The digest at the end is a SHA-256 over the `facts` object in
- * canonical form (the timestamp, path and CLI version are outside it), so the
- * same tree read by the same CLI version always produces the same digest and
- * you can record it as evidence that a given state was observed, without
- * publishing the tree it came from.
+ * machine.
  *
- * HOW EACH SOURCE IS READ. It is a pattern reader, not a Terraform evaluator:
- * variables, modules and for_each are never resolved.
- *   .tf                 regular expressions, split into top-level resource blocks
- *   .tf.json            parsed as JSON; each resource is one unit
- *   plan JSON           parsed as JSON (`terraform show -json`); each planned
- *                       managed resource is one unit
- *   Kubernetes YAML     regular expressions, one unit per YAML document,
- *                       classified by its top-level `kind`
- *   Dockerfile          read for regions, open addresses, public markers and
- *                       credential literals only; it declares no resource types
- * Storage, logging and identity are classified on a unit's resource type or
- * kind, never on the text around it. The human output prints this list in
- * short, so the limit is stated where the counts are. */
+ * HOW EACH SOURCE IS READ. Every format is PARSED, and a file that does not
+ * parse is reported as invalid, never as read:
+ *   .tf                 HCL native syntax, by ./lib/hcl.mjs (comments dropped)
+ *   .tf.json            JSON; each resource is one unit
+ *   plan JSON           JSON (`terraform show -json`); each planned managed
+ *                       resource is one unit
+ *   Kubernetes YAML     YAML, by the `yaml` package; one unit per document
+ *   Dockerfile          ENV and ARG settings only
+ * Nothing is evaluated: variables, locals, modules and functions are not
+ * resolved, and a setting that depends on one is reported as UNRESOLVED.
+ *
+ * COMPLETENESS. Every file the walk selects ends in exactly one bucket: read,
+ * not applicable (a JSON or YAML file that is not a plan or a manifest),
+ * excluded by a stated rule (a templated manifest), skipped (over the size
+ * limit), invalid (did not parse) or unreadable (a permission or I/O error).
+ * The walk itself can be truncated at MAX_FILES. A read with anything skipped,
+ * invalid, unreadable or truncated is INCOMPLETE and exits 4 unless the caller
+ * passes --allow-incomplete. */
 
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.terraform', '.next', 'dist', 'build', 'vendor',
   '.venv', 'venv', '__pycache__', '.cache', 'coverage', '.turbo',
 ]);
-const MAX_FILES = 5000;
+const MAX_FILES = Number(process.env.TROOTH_LINT_MAX_FILES) > 0 ? Number(process.env.TROOTH_LINT_MAX_FILES) : 5000;
 const MAX_BYTES = 4 * 1024 * 1024;
+const LIST_CAP = 50;
 
-function walk(root) {
+function selectedName(n) {
+  const ext = extname(n);
+  return ext === '.tf' || n.endsWith('.tf.json') || ext === '.yaml' || ext === '.yml' || ext === '.json' ||
+    n === 'dockerfile' || n.startsWith('dockerfile.');
+}
+
+/** Depth first, entries sorted by name, so two runs over one tree visit files
+ *  in the same order. */
+function walk(root, cov) {
   const found = [];
-  const stack = [root];
   let st;
-  try { st = statSync(root); } catch { return found; }
-  if (st.isFile()) return [root];
-  while (stack.length && found.length < MAX_FILES) {
+  try { st = statSync(root); } catch (e) { cov.unreadable.push({ path: root, reason: e.code || 'stat failed' }); return found; }
+  if (st.isFile()) { cov.discovered++; if (selectedName(basename(root).toLowerCase())) found.push(root); else cov.not_applicable++; return found; }
+  const stack = [root];
+  while (stack.length) {
     const dir = stack.pop();
     let entries;
-    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    try { entries = readdirSync(dir, { withFileTypes: true }); }
+    catch (e) { cov.unreadable.push({ path: dir, reason: e.code || 'directory could not be listed' }); continue; }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const subdirs = [];
     for (const e of entries) {
-      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) stack.push(join(dir, e.name)); continue; }
+      if (e.isDirectory()) { if (SKIP_DIRS.has(e.name)) cov.excluded_directories++; else subdirs.push(join(dir, e.name)); continue; }
       if (!e.isFile()) continue;
-      const n = e.name.toLowerCase();
-      const ext = extname(n);
-      const keep =
-        ext === '.tf' || n.endsWith('.tf.json') ||
-        ext === '.yaml' || ext === '.yml' || ext === '.json' ||
-        n === 'dockerfile' || n.startsWith('dockerfile.');
-      if (keep) found.push(join(dir, e.name));
-      if (found.length >= MAX_FILES) break;
+      cov.discovered++;
+      if (!selectedName(e.name.toLowerCase())) continue;
+      if (found.length >= MAX_FILES) { cov.truncated = true; return found; }
+      found.push(join(dir, e.name));
     }
+    for (let k = subdirs.length - 1; k >= 0; k--) stack.push(subdirs[k]);
   }
   return found;
 }
 
-const REGION_RE = /\b(?:region|location|availability_zone|aws_region)\s*[:=]\s*["']([A-Za-z0-9][A-Za-z0-9._-]{2,40})["']/g;
-const RESOURCE_RE = /\bresource\s+"([a-z0-9_]+)"\s+"([A-Za-z0-9_-]+)"/g;
-const ENCRYPT_RE = /(?:encrypted|encryption|kms_key|sse_algorithm|server_side_encryption|encrypt_at_rest)/i;
-// Classification runs on the RESOURCE TYPE TOKEN (aws_db_instance, not the body
-// text), matched as a substring. An earlier version wrapped these in \b, which
-// never fires inside a snake_case identifier: \bdynamodb\b cannot match
-// aws_dynamodb_table because the underscore either side is a word character, so
-// every storage resource whose name was not the bare word "bucket" went
-// uncounted. Substring matching on the type is both simpler and correct.
-const STORAGE_TYPE = /(bucket|storage|blob|disk|volume|filestore|_db|database|rds|dynamodb|_sql|redis|memcache|elasticache|efs|fileshare|cosmos|bigtable|spanner)/i;
-const LOGGING_TYPE = /(log|trail|audit|monitor|insight|diagnostic)/i;
-const IDENTITY_TYPE = /(iam|role|policy|service_account|serviceaccount|rbac|identity|access_key|keyring|secret)/i;
-const OPEN_CIDR_RE = /(?:"0\.0\.0\.0\/0"|'0\.0\.0\.0\/0'|"::\/0"|'::\/0')/;
-const PUBLIC_RE = /\b(?:publicly_accessible\s*[:=]\s*true|acl\s*[:=]\s*["']public-read|public_network_access_enabled\s*[:=]\s*true|type\s*:\s*LoadBalancer|type\s*:\s*NodePort)\b/;
-// A literal that looks like a credential sitting in the file. Reported as a
-// count only: no file name, no line, and never the value itself.
-const SECRET_RE = /\b(?:password|secret|api[_-]?key|access[_-]?key|token|private[_-]?key)\s*[:=]\s*["'][^"'${}\n]{8,}["']/i;
-// A storage-matching Terraform type that names a SETTING on a store rather than
-// a store: aws_s3_bucket_server_side_encryption_configuration, a bucket policy,
-// a volume attachment, a subnet group. The substring match above catches these
-// (the fixture's one bucket used to count as two storage declarations), so they
-// are not counted as storage. A setting that declares encryption and references
-// a store credits that store with declaring encryption. Applied to snake_case
-// Terraform types only; Kubernetes kinds are CamelCase and are not settings.
-const STORAGE_SETTING = /_(?:configuration|policy|acl|versioning|notification|public_access_block|ownership_controls|attachment|object|item|logging|iam_member|iam_binding|access_point|mount_target|snapshot|subnet_group|parameter_group|option_group)$/;
-const isStorageSetting = (type) => type.includes('_') && STORAGE_SETTING.test(type);
-// An attribute set to false, null or empty declares nothing: `encrypted = false`
-// and `storage_encrypted: false` must not count as declaring encryption.
-const NEGATIVE_ATTR_RE = /^[^\n:=]*[:=]\s*(?:false|null|"false"|'false'|""|''|\[\]|\{\})\s*,?\s*$/gim;
-const declaresEncryption = (body) => ENCRYPT_RE.test(body.replace(NEGATIVE_ATTR_RE, ''));
-
-/** JSON text with `"key":` rewritten as `key:`, so the attribute patterns above
- *  (written for `key = "v"` and `key: "v"`) read JSON sources too. Escaped
- *  quotes inside string values are never rewritten. */
-function flattenJson(text) {
-  return text.replace(/"([A-Za-z_][\w.-]*)"\s*:/g, '$1:');
-}
-
-/** A parsed JSON value with false, null, empty strings, empty arrays and empty
- *  objects removed, so a plan's unset attributes read as absent. */
-function prune(v) {
-  if (Array.isArray(v)) { const a = v.map(prune).filter((x) => x !== undefined); return a.length ? a : undefined; }
-  if (v && typeof v === 'object') {
-    const o = {};
-    for (const [k, x] of Object.entries(v)) { const y = prune(x); if (y !== undefined) o[k] = y; }
-    return Object.keys(o).length ? o : undefined;
-  }
-  return v === null || v === false || v === '' ? undefined : v;
-}
-
-const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** A pattern that finds a Terraform address (aws_s3_bucket.logs) in another
- *  resource's body, as `aws_s3_bucket.logs.id` or `${aws_s3_bucket.logs.arn}`,
- *  and not inside a longer address such as aws_s3_bucket.logs2. */
-const addressRef = (address) => new RegExp(`(?:^|[^\\w.])${escRe(address)}(?![\\w-])`);
-
-/** Every resource under `resource` in a .tf.json document, in either of the
- *  shapes Terraform's JSON syntax allows (objects, or arrays of objects). */
-function tfJsonResources(doc) {
-  const out = [];
-  const each = (v, fn) => { if (Array.isArray(v)) v.forEach((x) => each(x, fn)); else if (v && typeof v === 'object') fn(v); };
-  each(doc, (top) => each(top.resource, (byType) => {
-    for (const [type, byName] of Object.entries(byType)) {
-      if (!/^[a-z0-9_]+$/.test(type)) continue;
-      each(byName, (names) => { for (const [name, body] of Object.entries(names)) out.push({ type, name, body }); });
-    }
-  }));
-  return out;
-}
-
-/** The managed resources a plan (`terraform show -json`) says will exist:
- *  planned_values, every module deep, or resource_changes when a plan has no
- *  planned_values. Data sources and deletions are not declarations. */
-function planResources(doc) {
-  const out = [];
-  const walkModule = (m) => {
-    if (!m || typeof m !== 'object') return;
-    for (const r of Array.isArray(m.resources) ? m.resources : []) {
-      if (r && r.mode !== 'data' && typeof r.type === 'string') out.push({ type: r.type, name: String(r.name ?? ''), body: r.values ?? {} });
-    }
-    for (const c of Array.isArray(m.child_modules) ? m.child_modules : []) walkModule(c);
-  };
-  if (doc && doc.planned_values && doc.planned_values.root_module) walkModule(doc.planned_values.root_module);
-  else {
-    for (const rc of Array.isArray(doc && doc.resource_changes) ? doc.resource_changes : []) {
-      const after = rc && rc.change ? rc.change.after : null;
-      if (rc && rc.mode !== 'data' && typeof rc.type === 'string' && after) out.push({ type: rc.type, name: String(rc.name ?? ''), body: after });
-    }
-  }
-  return out;
-}
-
-/** Split one declaration file into the units lint classifies. Each unit has a
- *  `type` (a resource type or Kubernetes kind, or null when there is none),
- *  `refs` (patterns another unit's body would contain to refer to this one),
- *  `body` (the text attribute patterns run on) and `typed` (whether the type
- *  belongs in the resource type list). */
-function unitsOf(kind, file, text) {
-  if (kind === 'terraform' && !basename(file).toLowerCase().endsWith('.tf.json')) {
-    return text.split(/\n(?=resource\s+")/).map((b) => {
-      const h = b.match(/^resource\s+"([a-z0-9_]+)"\s+"([A-Za-z0-9_-]+)"/);
-      return h ? { type: h[1], refs: [addressRef(`${h[1]}.${h[2]}`)], body: b, typed: false }
-               : { type: null, refs: [], body: b, typed: false };
-    });
-  }
-  if (kind === 'kubernetes') {
-    return text.split(/^---[^\n]*$/m).map((d) => {
-      const k = d.match(/^kind\s*:\s*["']?([A-Za-z][A-Za-z0-9]*)/m);
-      return { type: k ? k[1] : null, refs: [], body: d, typed: false };
-    });
-  }
-  if (kind === 'container') return [{ type: null, refs: [], body: text, typed: false }];
-
-  // .tf.json and plan JSON.
-  let doc;
-  try { doc = JSON.parse(text); } catch { return [{ type: null, refs: [], body: flattenJson(text), typed: false }]; }
-  const asBody = (v) => flattenJson(JSON.stringify(prune(v) ?? {}, null, 1));
-  if (kind === 'terraform-plan') {
-    return planResources(doc).map((r) => {
-      const v = prune(r.body) || {};
-      // A plan carries values, not expressions, so a setting names its store
-      // by the store's own bucket name or id.
-      const refs = ['bucket', 'id'].map((k) => v[k]).filter((x) => typeof x === 'string' && x.length >= 3)
-        .map((x) => new RegExp(escRe(JSON.stringify(x))));
-      return { type: r.type, refs, body: asBody(r.body), typed: true };
-    });
-  }
-  const units = tfJsonResources(doc).map((r) => ({ type: r.type, refs: [addressRef(`${r.type}.${r.name}`)], body: asBody(r.body), typed: true }));
-  // Everything outside `resource` (providers, variables, locals) is one untyped
-  // unit, the way the text before the first resource block is in a .tf file.
-  if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
-    const rest = { ...doc }; delete rest.resource;
-    units.push({ type: null, refs: [], body: asBody(rest), typed: false });
-  }
-  return units;
-}
-
 function classify(file, text) {
   const n = basename(file).toLowerCase();
+  if (n.endsWith('.tf.json')) return 'terraform-json';
   if (n.endsWith('.tf')) return 'terraform';
-  if (n.endsWith('.tf.json')) return 'terraform';
   if (n === 'dockerfile' || n.startsWith('dockerfile.')) return 'container';
   if (n.endsWith('.yaml') || n.endsWith('.yml')) {
-    return /^\s*apiVersion\s*:/m.test(text) && /^\s*kind\s*:/m.test(text) ? 'kubernetes' : null;
+    if (!(/^\s*apiVersion\s*:/m.test(text) && /^\s*kind\s*:/m.test(text))) return null;
+    if (/\{\{[\s\S]*?\}\}/.test(text)) return 'templated';
+    return 'kubernetes';
   }
   if (n.endsWith('.json')) {
     return /"terraform_version"\s*:/.test(text) &&
@@ -598,76 +577,119 @@ function canonical(v) {
   return JSON.stringify(v === undefined ? null : v);
 }
 
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A Terraform address (aws_s3_bucket.logs) inside another resource's values,
+ *  and not inside a longer address such as aws_s3_bucket.logs2. */
+const addressRef = (address) => new RegExp(`(?:^|[^\\w.])${escRe(address)}(?![\\w-])`);
+
+// Classification runs on the resource type or kind, never on the text around it.
+const STORAGE_TYPE = /(bucket|storage|blob|disk|volume|filestore|_db|database|rds|dynamodb|_sql|redis|memcache|elasticache|efs|fileshare|cosmos|bigtable|spanner)/i;
+const LOGGING_TYPE = /(log|trail|audit|monitor|insight|diagnostic)/i;
+const IDENTITY_TYPE = /(iam|role|policy|service_account|serviceaccount|rbac|identity|access_key|keyring|secret)/i;
+// A storage-matching Terraform type that names a SETTING on a store rather than
+// a store. A setting that declares encryption and refers to a store credits it.
+const STORAGE_SETTING = /_(?:configuration|policy|acl|versioning|notification|public_access_block|ownership_controls|attachment|object|item|logging|iam_member|iam_binding|access_point|mount_target|snapshot|subnet_group|parameter_group|option_group)$/;
+const isStorageSetting = (type) => type.includes('_') && STORAGE_SETTING.test(type);
+const rel = (p) => { const r = relative(process.cwd(), p); return !r ? '.' : r.startsWith('..') ? p : r; };
+
 function lint() {
-  const { positional } = parseArgs('lint');
+  const { flags, positional } = parseArgs('lint');
   if (positional.length > 1) fail(EXIT.USAGE, `lint takes one optional [path], got: ${positional.join(' ')}`);
   const target = positional[0] || '.';
   if (!existsSync(target)) fail(EXIT.USAGE, `path not found: ${target}`);
 
-  const files = walk(target);
+  const cov = { discovered: 0, excluded_directories: 0, truncated: false, not_applicable: 0, excluded: [], skipped: [], invalid: [], unreadable: [] };
+  const files = walk(target, cov);
   const byKind = { terraform: 0, 'terraform-plan': 0, kubernetes: 0, container: 0 };
   const regions = new Set();
   const resourceTypes = new Map();
-  const stores = [];            // { refs, encrypted }, one per storage declaration
-  const encryptingSettings = []; // bodies of storage settings that declare encryption
+  const stores = [];             // { address, planIds, state }
+  const encryptingSettings = []; // reference text of settings that declare encryption
   let read = 0, logging = 0, identity = 0;
   let openIngress = 0, publicAccess = 0, inlineCredentials = 0;
 
   for (const f of files) {
     let text;
     try {
-      if (statSync(f).size > MAX_BYTES) continue;
+      const size = statSync(f).size;
+      if (size > MAX_BYTES) { cov.skipped.push({ path: rel(f), reason: `larger than ${MAX_BYTES} bytes (${size})` }); continue; }
       text = readFileSync(f, 'utf8');
-    } catch { continue; }
+    } catch (e) { cov.unreadable.push({ path: rel(f), reason: e.code || 'read failed' }); continue; }
     const kind = classify(f, text);
-    if (!kind) continue;
-    byKind[kind]++;
+    if (!kind) { cov.not_applicable++; continue; }
+    if (kind === 'templated') { cov.excluded.push({ path: rel(f), reason: 'a templated manifest ({{ }}); render it first to read it' }); continue; }
+
+    let units;
+    try { units = unitsOf(kind, text); }
+    catch (e) {
+      if (e instanceof InvalidDeclaration) { cov.invalid.push({ path: rel(f), reason: e.message.slice(0, 200) }); continue; }
+      throw e;
+    }
+    byKind[kind === 'terraform-json' ? 'terraform' : kind]++;
     read++;
 
-    // JSON sources are read through flattenJson so `"region": "x"` and
-    // `"password": "..."` meet the same patterns as HCL and YAML.
-    const isJson = extname(f).toLowerCase() === '.json';
-    const flat = isJson ? flattenJson(text) : text;
-    for (const m of flat.matchAll(REGION_RE)) regions.add(m[1]);
-    for (const line of flat.split('\n')) if (SECRET_RE.test(line)) inlineCredentials++;
-
-    if (kind === 'terraform' && !isJson) {
-      for (const m of text.matchAll(RESOURCE_RE)) {
-        resourceTypes.set(m[1], (resourceTypes.get(m[1]) || 0) + 1);
-      }
-    }
-
-    // Each unit is classified on its own type, so an attribute in one resource
-    // is never credited to another, and a word in a file's text is never taken
-    // for a resource type.
-    for (const u of unitsOf(kind, f, text)) {
+    for (const u of units) {
+      for (const r of regionsIn(u.tree)) regions.add(r);
+      inlineCredentials += credentialLiterals(u.tree);
+      if (opensToAnyAddress(u.tree)) openIngress++;
+      if (markedPublic(u.tree)) publicAccess++;
       const t = u.type;
-      if (t && u.typed) resourceTypes.set(t, (resourceTypes.get(t) || 0) + 1);
-      if (t && STORAGE_TYPE.test(t)) {
-        if (isStorageSetting(t)) { if (declaresEncryption(u.body)) encryptingSettings.push(u.body); }
-        else stores.push({ refs: u.refs, encrypted: declaresEncryption(u.body) });
+      if (!t) continue;
+      if (u.typed) resourceTypes.set(t, (resourceTypes.get(t) || 0) + 1);
+      if (STORAGE_TYPE.test(t)) {
+        const state = encryptionState(u.tree);
+        if (isStorageSetting(t)) { if (state === ENCRYPTION.TRUE) encryptingSettings.push(referenceText(u.tree)); }
+        else {
+          const planIds = u.plan ? ['bucket', 'id'].map((k) => u.tree && u.tree[k]).filter((x) => typeof x === 'string' && x.length >= 3) : [];
+          stores.push({ address: u.address, planIds, state });
+        }
       }
-      if (t && LOGGING_TYPE.test(t)) logging++;
-      if (t && IDENTITY_TYPE.test(t)) identity++;
-      if (OPEN_CIDR_RE.test(u.body)) openIngress++;
-      if (PUBLIC_RE.test(u.body)) publicAccess++;
+      if (LOGGING_TYPE.test(t)) logging++;
+      if (IDENTITY_TYPE.test(t)) identity++;
     }
   }
 
-  // A store declares encryption in its own body, or through a setting resource
-  // (anywhere in the tree) that declares encryption and refers to it.
+  // A store with nothing declared in its own body is credited by a setting
+  // resource, anywhere in the tree, that declares encryption and refers to it.
   for (const s of stores) {
-    if (!s.encrypted && s.refs.some((re) => encryptingSettings.some((b) => re.test(b)))) s.encrypted = true;
+    if (s.state !== ENCRYPTION.ABSENT) continue;
+    const refs = [];
+    if (s.address) refs.push(addressRef(s.address));
+    for (const id of s.planIds) refs.push(new RegExp(`(?:^|\\n)${escRe(id)}(?:$|\\n)`));
+    if (refs.some((re) => encryptingSettings.some((b) => re.test(b)))) s.state = ENCRYPTION.TRUE;
   }
-  const storage = stores.length;
-  const storageEncrypted = stores.filter((s) => s.encrypted).length;
+  const byState = (st) => stores.filter((s) => s.state === st).length;
 
-  if (read === 0) {
+  const incomplete = cov.truncated || cov.skipped.length > 0 || cov.invalid.length > 0 || cov.unreadable.length > 0;
+  const coverage = {
+    completeness: incomplete ? 'incomplete' : 'complete',
+    traversal: 'depth first, entries sorted by name',
+    files_discovered: cov.discovered,
+    files_selected: files.length,
+    files_read: read,
+    files_not_applicable: cov.not_applicable,
+    files_excluded: cov.excluded.length,
+    files_skipped: cov.skipped.length,
+    files_invalid: cov.invalid.length,
+    files_unreadable: cov.unreadable.length,
+    directories_excluded: cov.excluded_directories,
+    traversal_truncated: cov.truncated,
+    limits: { max_files: MAX_FILES, max_bytes_per_file: MAX_BYTES },
+  };
+  const listed = (arr) => ({ entries: arr.slice(0, LIST_CAP), truncated: arr.length > LIST_CAP });
+  const details = { excluded: listed(cov.excluded), skipped: listed(cov.skipped), invalid: listed(cov.invalid), unreadable: listed(cov.unreadable) };
+
+  const exitFor = () => {
+    if (incomplete && !flags['--allow-incomplete']) return EXIT.INCOMPLETE;
+    return read === 0 ? EXIT.FINDING : EXIT.OK;
+  };
+
+  if (read === 0 && !incomplete) {
     const msg = `no infrastructure declarations found under ${target}.`;
     diag(`${A}nothing to read${X} ${msg}`);
     diag(`${D}  lint reads .tf, .tf.json, Kubernetes YAML (apiVersion + kind), terraform plan`);
-    diag(`  JSON and Dockerfiles. ${files.length} file(s) were opened and none matched.${X}`);
-    if (asJson) emitJson({ ok: false, error: msg, exit: EXIT.FINDING, files_opened: files.length });
+    diag(`  JSON and Dockerfiles. ${files.length} file(s) were selected and none held a declaration.${X}`);
+    if (asJson) emitJson({ ok: false, error: msg, exit: EXIT.FINDING, root: rel(target), files_opened: files.length, coverage, coverage_details: details });
     process.exit(EXIT.FINDING);
   }
 
@@ -681,31 +703,43 @@ function lint() {
     sources: Object.fromEntries(Object.entries(byKind).filter(([, n]) => n > 0)),
     regions_and_zones_declared: [...regions].sort(),
     resource_types: topTypes,
-    storage_declarations: storage,
-    storage_declaring_encryption: storageEncrypted,
+    storage_declarations: stores.length,
+    storage_declaring_encryption: byState(ENCRYPTION.TRUE),
+    storage_declaring_encryption_off: byState(ENCRYPTION.FALSE),
+    storage_encryption_not_declared: byState(ENCRYPTION.ABSENT),
+    storage_encryption_unresolved: byState(ENCRYPTION.UNRESOLVED),
+    storage_encryption_unsupported: byState(ENCRYPTION.UNSUPPORTED),
     logging_declarations: logging,
     identity_declarations: identity,
     declarations_open_to_any_address: openIngress,
     declarations_marked_public: publicAccess,
     inline_credential_literals: inlineCredentials,
+    completeness: coverage.completeness,
+    files_selected: files.length,
+    files_not_read: files.length - read - cov.not_applicable - cov.excluded.length,
   };
 
-  const digest = createHash('sha256').update(canonical(facts)).digest('hex');
+  const digest = `sha256:${createHash('sha256').update(canonical(facts)).digest('hex')}`;
   const doc = {
     tool: 'trooth-lint',
+    schema: 'trooth-lint/2',
     cli_version: VERSION,
     observed_at: new Date().toISOString(),
-    root: (() => { const r = relative(process.cwd(), target); return !r ? '.' : r.startsWith('..') ? target : r; })(),
+    root: rel(target),
     facts,
-    digest: `sha256:${digest}`,
+    coverage,
+    coverage_details: details,
+    facts_digest: digest,
+    digest,
+    digest_scope: 'A SHA-256 over the facts object only, in canonical form. It is an aggregate: two different trees with the same counts share it. It does not identify file contents, a repository, a commit or a deployment. `digest` is the same value under its 0.4 name and will be removed in 0.6.',
     note: 'Declared facts only. Read locally; nothing was transmitted. No verdict and no assessment against any standard.',
   };
 
-  if (asJson) { emitJson(doc); process.exit(EXIT.OK); }
+  const code = exitFor();
+  if (asJson) { emitJson(doc); process.exit(code); }
 
   out(`\n${J}${B}trooth lint${X} ${D}// local · offline · declarations only //${X}`);
   out(`${D}${doc.root}   ${read} declaration file(s) read${X}`);
-
   const src = Object.entries(facts.sources).map(([k, n]) => `${k} ${n}`).join(' · ');
   if (src) out(`${D}${src}${X}`);
 
@@ -713,7 +747,11 @@ function lint() {
   const row = (label, value) => out(`  ${label.padEnd(40)} ${value}`);
   row('Regions and zones', facts.regions_and_zones_declared.length ? facts.regions_and_zones_declared.join(', ') : `${D}none declared${X}`);
   row('Storage declarations', `${facts.storage_declarations}`);
-  row('  of those declaring encryption', `${facts.storage_declaring_encryption}`);
+  row('  declaring encryption', `${facts.storage_declaring_encryption}`);
+  row('  declaring encryption off', `${facts.storage_declaring_encryption_off}`);
+  row('  declaring nothing about encryption', `${facts.storage_encryption_not_declared}`);
+  row('  set by an unresolved expression', `${facts.storage_encryption_unresolved}`);
+  if (facts.storage_encryption_unsupported) row('  set to a value lint does not read', `${facts.storage_encryption_unsupported}`);
   row('Logging declarations', `${facts.logging_declarations}`);
   row('Identity declarations', `${facts.identity_declarations}`);
   row('Open to any address (0.0.0.0/0, ::/0)', `${facts.declarations_open_to_any_address}`);
@@ -725,22 +763,29 @@ function lint() {
     for (const t of topTypes.slice(0, 6)) out(`  ${String(t.count).padStart(4)}  ${D}${t.type}${X}`);
   }
 
-  out(`\n${B}Digest${X}  ${C}${doc.digest}${X}`);
-  out(`${D}A SHA-256 over the facts above, in canonical form, with the timestamp excluded.`);
-  out(`The same tree read by the same trooth version produces the same digest, so you can`);
-  out(`record it as evidence that a state was observed without publishing the tree.${X}`);
+  out(`\n${B}Coverage${X}  ${incomplete ? `${A}incomplete${X}` : `${J}complete${X}`}`);
+  out(`${D}  ${coverage.files_selected} selected: ${read} read, ${coverage.files_not_applicable} not declarations, ${coverage.files_excluded} excluded, ${coverage.files_skipped} skipped, ${coverage.files_invalid} invalid, ${coverage.files_unreadable} unreadable${cov.truncated ? `; the walk stopped at ${MAX_FILES} files` : ''}.${X}`);
+  for (const [label, arr] of [['skipped', cov.skipped], ['invalid', cov.invalid], ['unreadable', cov.unreadable], ['excluded', cov.excluded]]) {
+    for (const e of arr.slice(0, 5)) out(`${D}  ${label}: ${e.path} (${e.reason})${X}`);
+    if (arr.length > 5) out(`${D}  and ${arr.length - 5} more ${label}; --json lists up to ${LIST_CAP}.${X}`);
+  }
+  if (incomplete) out(`${D}  Exit code 4 says the read was incomplete. --allow-incomplete reports the same and exits 0.${X}`);
+
+  out(`\n${B}Facts digest${X}  ${C}${doc.facts_digest}${X}`);
+  out(`${D}A SHA-256 over the counts above, in canonical form. It is an aggregate: two different`);
+  out(`trees with the same counts share it. It does not identify your files, your repository`);
+  out(`or a deployment.${X}`);
 
   out(`\n${B}How this was read${X}`);
-  out(`${D}  A pattern reader, not a Terraform evaluator: variables and modules are not resolved.`);
-  out(`  .tf by pattern, one resource block at a time. .tf.json and plan JSON parsed, one`);
-  out(`  resource at a time. Kubernetes YAML by pattern, one document at a time, by kind.`);
-  out(`  Dockerfiles for regions, open addresses, public markers and credential literals only.${X}`);
+  out(`${D}  Every file is parsed; a file that does not parse is reported as invalid, not read.`);
+  out(`  Comments count for nothing. Nothing is evaluated: a setting that depends on a variable,`);
+  out(`  a local, a module or a function is reported as unresolved. Dockerfiles: ENV and ARG only.${X}`);
 
   out(`\n${D}Counts of what the files declare. Not a judgment: a public load balancer is`);
   out(`supposed to be public. Trooth issues no verdict here and checks nothing against`);
   out(`any standard. Nothing left this machine: lint opens files and opens no sockets.`);
   out(`Publish what you choose on your record at ${X}${C}https://trooth.co/dashboard${X}${D}.${X}\n`);
-  process.exit(EXIT.OK);
+  process.exit(code);
 }
 
 /* ---------------------------------------------------------------- main ---- */
