@@ -40,7 +40,7 @@ import { join, relative, extname, basename } from 'node:path';
 
 const API = process.env.TROOTH_API || 'https://api.trooth.co';
 const require = createRequire(import.meta.url);
-let VERSION = '0.4.3';
+let VERSION = '0.4.4';
 try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3 };
@@ -160,20 +160,27 @@ Trooth signs what it witnessed. It never signs on a company's behalf.${X}
 
 /* -------------------------------------------------------------- fetch ---- */
 
-async function callTrooth(path, init, what) {
-  let res;
+/** One request to the API. Exits 3 when the API cannot be reached; any HTTP
+ *  status comes back to the caller. */
+async function requestTrooth(path, init, what) {
   try {
-    res = await fetch(`${API}${path}`, {
+    return await fetch(`${API}${path}`, {
       ...init,
       headers: { accept: 'application/json', 'user-agent': `trooth-cli/${VERSION}`, ...(init && init.headers) },
     });
   } catch (e) {
     fail(EXIT.UPSTREAM, `could not reach ${what} at ${API}: ${e && e.message ? e.message : e}`);
   }
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    fail(EXIT.UPSTREAM, `${what} returned HTTP ${res.status}.${body ? ' ' + body.slice(0, 300).replace(/\s+/g, ' ') : ''}`, { http_status: res.status });
-  }
+}
+
+async function failHttp(res, what) {
+  const body = await res.text().catch(() => '');
+  fail(EXIT.UPSTREAM, `${what} returned HTTP ${res.status}.${body ? ' ' + body.slice(0, 300).replace(/\s+/g, ' ') : ''}`, { http_status: res.status });
+}
+
+async function callTrooth(path, init, what) {
+  const res = await requestTrooth(path, init, what);
+  if (!res.ok) await failHttp(res, what);
   try { return await res.json(); }
   catch { fail(EXIT.UPSTREAM, `${what} returned a response that is not JSON.`); }
 }
@@ -258,15 +265,57 @@ function projectRecord(v, domain) {
   return scrub(rec);
 }
 
+/** The whole list, searched here. This is how every release up to 0.4.3 read a
+ *  company, and it is now only the fallback in readVendor below. */
+async function readVendorFromList(domain, what) {
+  const data = await callTrooth('/directory/api/vendors', { method: 'GET' }, what);
+  const vendors = Array.isArray(data && data.vendors) ? data.vendors : [];
+  return vendors.find((v) => v && normalizeDomain(v.domain) === domain) || null;
+}
+
+/** One company's record from the directory feed, or null when the feed carries
+ *  no record for that domain. It asks for that one record
+ *  (/directory/api/vendors/<domain>), which returns the same object the list
+ *  carries for that domain, and does not download every company to find it. */
+async function readVendor(domain) {
+  const what = 'the Trooth Network';
+  const res = await requestTrooth(`/directory/api/vendors/${encodeURIComponent(domain)}`, { method: 'GET' }, what);
+
+  if (res.status === 404) {
+    const text = await res.text().catch(() => '');
+    let body = null;
+    try { body = JSON.parse(text); } catch {}
+    // The route answered and has no record for this domain. It says so with a
+    // JSON body carrying `listed: false`.
+    if (body && typeof body === 'object' && body.listed === false) return null;
+    // FALLBACK TO THE LIST. Any other 404 comes from a deploy of the directory
+    // worker that predates the single-record route: it answers an unknown path
+    // with a plain-text "Not found". Read the list and search it here, as 0.4.3
+    // does, so this release keeps working against a worker that has not been
+    // redeployed yet, and against a TROOTH_API that points at an older one.
+    // This fallback can go in the first release after api.trooth.co serves the
+    // route, that is, once a request for a domain with no record there returns
+    // a JSON 404 with `listed: false`.
+    return readVendorFromList(domain, what);
+  }
+  if (!res.ok) await failHttp(res, what);
+
+  let v;
+  try { v = await res.json(); }
+  catch { fail(EXIT.UPSTREAM, `${what} returned a response that is not JSON.`); }
+  if (!v || typeof v !== 'object' || Array.isArray(v) || normalizeDomain(v.domain) !== domain) {
+    fail(EXIT.UPSTREAM, `${what} returned a response that is not the record for ${domain}.`);
+  }
+  return v;
+}
+
 async function check() {
   const { positional } = parseArgs('check');
   if (positional.length > 1) fail(EXIT.USAGE, `check takes one <domain>, got: ${positional.join(' ')}`);
   const domain = normalizeDomain(positional[0]);
   if (!domain) fail(EXIT.USAGE, 'missing <domain>. Try: trooth check stripe.com');
 
-  const data = await callTrooth('/directory/api/vendors', { method: 'GET' }, 'the Trooth Network');
-  const vendors = Array.isArray(data && data.vendors) ? data.vendors : [];
-  const vendor = vendors.find((v) => v && normalizeDomain(v.domain) === domain) || null;
+  const vendor = await readVendor(domain);
 
   if (!vendor) {
     if (asJson) {
