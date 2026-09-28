@@ -65,7 +65,9 @@ export function unitsOf(kind, text) {
   if (kind === 'terraform-json') {
     let doc;
     try { doc = JSON.parse(text); } catch (e) { throw new InvalidDeclaration(`not valid JSON: ${e.message}`); }
-    if (!doc || typeof doc !== 'object') throw new InvalidDeclaration('a .tf.json file must hold a JSON object');
+    // Terraform's JSON syntax requires an object at the root. An array is valid
+    // JSON and not a valid declaration, so it is invalid, never read (T19).
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new InvalidDeclaration('Terraform JSON requires an object at the root');
     const units = [];
     each(doc, (top) => each(top.resource, (byType) => {
       for (const [type, byName] of Object.entries(byType)) {
@@ -77,10 +79,8 @@ export function unitsOf(kind, text) {
         });
       }
     }));
-    if (!Array.isArray(doc)) {
-      const rest = { ...doc }; delete rest.resource;
-      if (Object.keys(rest).length) units.push({ type: null, name: null, address: null, tree: tfJsonValue(rest), typed: false });
-    }
+    const rest = { ...doc }; delete rest.resource;
+    if (Object.keys(rest).length) units.push({ type: null, name: null, address: null, tree: tfJsonValue(rest), typed: false });
     return units;
   }
   if (kind === 'terraform-plan') {
@@ -108,31 +108,69 @@ export function unitsOf(kind, text) {
     return units;
   }
   if (kind === 'kubernetes') {
-    const docs = parseAllDocuments(text, { strict: true, uniqueKeys: true, prettyErrors: false });
-    const list = Array.isArray(docs) ? docs : [docs];
-    const units = [];
+    // Parsed BEFORE it is recognized (T16): flow style, quoted keys and several
+    // documents are the same object to the parser, so they are the same object
+    // here. A file none of whose documents is a manifest is not applicable; a
+    // file that mixes manifests with other documents is invalid, as before.
+    let list;
+    try { list = parseAllDocuments(text, { strict: true, uniqueKeys: true, prettyErrors: false }); }
+    catch (e) { throw new InvalidDeclaration(`not valid YAML: ${String(e && e.message).split('\n')[0]}`); }
+    list = Array.isArray(list) ? list : [list];
+    const looksLikeManifest = /["']?apiVersion["']?\s*:/.test(text) && /["']?kind["']?\s*:/.test(text);
+    const values = [];
     for (const d of list) {
-      if (d.errors && d.errors.length) throw new InvalidDeclaration(`not valid YAML: ${d.errors[0].message.split('\n')[0]}`);
-      const v = d.toJS({ maxAliasCount: 100 });
-      if (v === null || v === undefined) continue;
-      if (typeof v !== 'object' || Array.isArray(v)) throw new InvalidDeclaration('a Kubernetes document must be a mapping');
-      const k = typeof v.kind === 'string' && /^[A-Za-z][A-Za-z0-9]*$/.test(v.kind) ? v.kind : null;
-      if (!k || typeof v.apiVersion !== 'string') throw new InvalidDeclaration('a document in a Kubernetes file has no apiVersion and kind');
-      units.push({ type: k, name: v.metadata && v.metadata.name ? String(v.metadata.name) : null, address: null, tree: v, typed: true });
+      if (d.errors && d.errors.length) {
+        if (!looksLikeManifest) return Object.assign([], { notApplicable: true });
+        throw new InvalidDeclaration(`not valid YAML: ${d.errors[0].message.split('\n')[0]}`);
+      }
+      // The alias limit stops expansion safely; it is reported against this
+      // file with the rest of the read carrying on, never as a crash (T19).
+      let v;
+      try { v = d.toJS({ maxAliasCount: 100 }); }
+      catch (e) {
+        const m = String(e && e.message);
+        throw new InvalidDeclaration(/alias/i.test(m) ? 'YAML alias expansion exceeds the limit of 100; the file was not read' : `not valid YAML: ${m.split('\n')[0]}`);
+      }
+      if (v !== null && v !== undefined) values.push(v);
     }
-    return units;
+    const isManifest = (v) => v && typeof v === 'object' && !Array.isArray(v) && typeof v.apiVersion === 'string' && typeof v.kind === 'string' && /^[A-Za-z][A-Za-z0-9]*$/.test(v.kind);
+    if (!values.some(isManifest)) return Object.assign([], { notApplicable: true });
+    const units = [];
+    let membersNotRead = 0;
+    const add = (v, where) => {
+      // A List (kind List, or any kind ending in List that holds items) is a
+      // container, not a resource: each member is read with its own identity.
+      if (/List$/.test(v.kind) && Array.isArray(v.items)) {
+        v.items.forEach((it, i) => { if (isManifest(it)) add(it, `${where}.items[${i}]`); else membersNotRead++; });
+        return;
+      }
+      units.push({ type: v.kind, name: v.metadata && v.metadata.name ? String(v.metadata.name) : null, address: where, tree: v, typed: true });
+    };
+    values.forEach((v, i) => {
+      if (!isManifest(v)) {
+        if (typeof v !== 'object' || Array.isArray(v)) throw new InvalidDeclaration('a Kubernetes document must be a mapping');
+        throw new InvalidDeclaration('a document in a Kubernetes file has no apiVersion and kind');
+      }
+      add(v, `document[${i}]`);
+    });
+    return Object.assign(units, { membersNotRead });
   }
   if (kind === 'container') {
-    return [{ type: null, name: null, address: null, tree: dockerfileTree(text), typed: false }];
+    const { tree, occurrences } = dockerfileTree(text);
+    return [{ type: null, name: null, address: null, tree, occurrences, typed: false }];
   }
   throw new Error(`unknown kind ${kind}`);
 }
 
-/** A Dockerfile's ENV and ARG settings as a tree. Comment lines and line
- *  continuations are handled; every other instruction declares nothing lint
- *  counts. A value that uses $ is unresolved. */
+/** A Dockerfile's ENV and ARG settings, twice: as a tree of effective values
+ *  (the last assignment wins, as it does in a build) and as the ordered list of
+ *  every assignment in the source. Credential literals are counted over the
+ *  occurrences, so an earlier literal is not hidden by a later reference
+ *  (T18); nothing else lint reports uses the occurrence list. Comment lines and
+ *  line continuations are handled; a value that uses $ is unresolved. */
 function dockerfileTree(text) {
   const tree = {};
+  const occurrences = [];
   const logical = [];
   let cur = '';
   for (const raw of text.split(/\r?\n/)) {
@@ -152,33 +190,40 @@ function dockerfileTree(text) {
     const rest = m[2].trim();
     const pairs = rest.match(/[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)/g);
     if (pairs && pairs.join(' ').length >= rest.replace(/\s+/g, ' ').length - pairs.length) {
-      for (const p of pairs) { const i = p.indexOf('='); tree[p.slice(0, i)] = val(p.slice(i + 1)); }
+      for (const p of pairs) { const i = p.indexOf('='); const k = p.slice(0, i), v = val(p.slice(i + 1)); tree[k] = v; occurrences.push([k, v]); }
     } else {
       const sp = /^([A-Za-z_][A-Za-z0-9_]*)(?:\s+(.*))?$/.exec(rest);
-      if (sp) tree[sp[1]] = sp[2] !== undefined ? val(sp[2].trim()) : { $expr: `ARG ${sp[1]}` };
+      if (sp) { const v = sp[2] !== undefined ? val(sp[2].trim()) : { $expr: `ARG ${sp[1]}` }; tree[sp[1]] = v; occurrences.push([sp[1], v]); }
     }
   }
-  return tree;
+  return { tree, occurrences };
 }
 
 /* ----------------------------------------------------------- reading ---- */
 
-/** Every (key, value) pair in a tree, depth first. */
+// Metadata a person writes about a resource: tags, labels, annotations and
+// free-text descriptions. None of it configures anything, so none of it is read
+// as configuration: a tag that says `encrypted = true` does not encrypt a
+// volume, and a note that mentions 0.0.0.0/0 is not a network rule (T14).
+const META_KEY = /^(tags|tags_all|default_tags|labels|annotations|description|descriptions|comment|comments|note|notes)$/i;
+
+/** Every (key, value) pair in a tree, depth first, with metadata left out. */
 function* pairs(tree, parent = null) {
   if (Array.isArray(tree)) { for (const x of tree) yield* pairs(x, parent); return; }
   if (!tree || typeof tree !== 'object' || isExpr(tree)) return;
   for (const [k, v] of Object.entries(tree)) {
+    if (META_KEY.test(k)) continue;
     yield [k, v, parent];
     yield* pairs(v, k);
   }
 }
 
-/** Every string (literal or expression source) in a tree. */
+/** Every string (literal or expression source) in a tree, metadata left out. */
 function* strings(tree) {
   if (typeof tree === 'string') { yield tree; return; }
   if (isExpr(tree)) { yield tree.$expr; return; }
   if (Array.isArray(tree)) { for (const x of tree) yield* strings(x); return; }
-  if (tree && typeof tree === 'object') for (const v of Object.values(tree)) yield* strings(v);
+  if (tree && typeof tree === 'object') for (const [k, v] of Object.entries(tree)) if (!META_KEY.test(k)) yield* strings(v);
 }
 
 const REGION_KEY = /^(region|location|availability_zone|aws_region|aws_default_region|zone)$/i;
@@ -192,19 +237,72 @@ export function regionsIn(tree) {
   return found;
 }
 
-/** A credential literal: a secret-named key holding a literal string of at
- *  least eight characters. One count per key, wherever it sits in the file. */
-export function credentialLiterals(tree) {
-  let n = 0;
-  for (const [k, v] of pairs(tree)) {
-    if (!SECRET_KEY.test(k)) continue;
-    if (typeof v === 'string' && v.length >= 8 && !/[$%]\{/.test(v)) n++;
+// A secret-sounding name that is really an identifier, a location or a size:
+// token_endpoint, secret_arn, kms_key_id, password_length. Excluded by the
+// shape of the name, not by the length of the value (T17).
+const NOT_SECRET_KEY = /(url|uri|endpoint|_arn|arn$|_ids?$|_name$|_names$|_type$|_length$|_path$|_file$|_ttl$|_version$|_count$|_ref$|_policy$|_enabled$|_rotation|rotation_|expir|_mode$|_format$|_algorithm$|_header$)/i;
+
+/** A value that is written into the file, not a reference to one kept
+ *  elsewhere. Empty strings, booleans, template and variable references are
+ *  not literals. A URL is a literal credential only when it carries a password
+ *  in its user information. */
+function isLiteral(v) {
+  if (typeof v !== 'string') return false;
+  const s = v.trim();
+  if (!s) return false;
+  if (/[$%]\{/.test(s) || /\$\(/.test(s) || /^\$[A-Za-z_]/.test(s)) return false;
+  if (/^(true|false|null|none|nil|undefined)$/i.test(s)) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return /^[a-z][a-z0-9+.-]*:\/\/[^/@\s:]*:[^/@\s]+@/i.test(s);
+  return true;
+}
+
+const isSecretKey = (k) => SECRET_KEY.test(k) && !NOT_SECRET_KEY.test(k);
+
+/**
+ * Credential literals in one unit, counted by SOURCE OCCURRENCE: each place a
+ * credential is written into the file counts once. The forms read are
+ *   a secret-named configuration key holding a literal value,
+ *   a Kubernetes env entry whose name is secret-named and whose value is a literal,
+ *   every value in a Kubernetes Secret's data and stringData,
+ *   every ENV or ARG assignment in a Dockerfile, in source order.
+ * The value itself is never returned, printed or hashed.
+ */
+export function credentialLiterals(unitOrTree) {
+  const unit = unitOrTree && unitOrTree.tree !== undefined && ('typed' in unitOrTree) ? unitOrTree : { tree: unitOrTree };
+  if (Array.isArray(unit.occurrences)) {
+    return unit.occurrences.filter(([k, v]) => isSecretKey(k) && isLiteral(v)).length;
   }
+  const tree = unit.tree;
+  let n = 0;
+  const isSecret = tree && typeof tree === 'object' && tree.kind === 'Secret' && typeof tree.apiVersion === 'string';
+  const scan = (node) => {
+    if (Array.isArray(node)) { node.forEach(scan); return; }
+    if (!node || typeof node !== 'object' || isExpr(node)) return;
+    // env: [{ name: API_TOKEN, value: ... }] and the same shape elsewhere.
+    if (typeof node.name === 'string' && 'value' in node && isSecretKey(node.name) && isLiteral(node.value)) n++;
+    for (const [k, v] of Object.entries(node)) {
+      if (META_KEY.test(k)) continue;
+      if (isSecret && node === tree && (k === 'data' || k === 'stringData')) {
+        if (v && typeof v === 'object') for (const x of Object.values(v)) if (isLiteral(x)) n++;
+        continue;
+      }
+      if (isSecretKey(k) && isLiteral(v)) n++;
+      scan(v);
+    }
+  };
+  scan(tree);
   return n;
 }
 
+// Keys that hold an address range in a network rule, in the providers and
+// Kubernetes objects lint reads. An open range counts only here (T14).
+const NET_KEY = /(cidr|source_ranges|sourceRanges|destination_ranges|address_prefix|addressPrefix|ip_ranges?|ipRanges?|source_ip|remote_ip_prefix|allowed_ips?|ip_address_range|loadBalancerSourceRanges|ipBlock)/i;
+
 export function opensToAnyAddress(tree) {
-  for (const s of strings(tree)) if (OPEN_CIDRS.has(s.trim())) return true;
+  for (const [k, v] of pairs(tree)) {
+    if (!NET_KEY.test(k)) continue;
+    for (const s of strings(v)) if (OPEN_CIDRS.has(s.trim())) return true;
+  }
   return false;
 }
 
@@ -256,6 +354,11 @@ function keyState(v) {
   return ENCRYPTION.UNSUPPORTED;
 }
 
+// A block that is present but holds no setting lint recognizes. It is reported
+// as unsupported rather than as declared: an empty `encryption {}` is not an
+// encryption setting (T14). It never outranks a recognized setting elsewhere.
+const UNRECOGNIZED_BLOCK = 'unrecognized_block';
+
 function blockState(v) {
   const blocks = Array.isArray(v) ? v : [v];
   let state = ENCRYPTION.ABSENT;
@@ -265,8 +368,16 @@ function blockState(v) {
       const s = boolState(b.enabled);
       if (s === ENCRYPTION.FALSE) return ENCRYPTION.FALSE;
       if (s === ENCRYPTION.UNRESOLVED) { state = ENCRYPTION.UNRESOLVED; continue; }
+      if (s === ENCRYPTION.TRUE) { if (state !== ENCRYPTION.UNRESOLVED) state = ENCRYPTION.TRUE; continue; }
     }
-    if (state !== ENCRYPTION.UNRESOLVED) state = ENCRYPTION.TRUE;
+    // Otherwise the block declares encryption only through a recognized
+    // setting inside it: a switch, a key or algorithm, or a nested block that
+    // itself holds one.
+    const inner = encryptionState(b, true);
+    if (inner === ENCRYPTION.FALSE) return ENCRYPTION.FALSE;
+    if (inner === ENCRYPTION.UNRESOLVED) { state = ENCRYPTION.UNRESOLVED; continue; }
+    if (inner === ENCRYPTION.TRUE) { if (state !== ENCRYPTION.UNRESOLVED) state = ENCRYPTION.TRUE; continue; }
+    if (state === ENCRYPTION.ABSENT) state = UNRECOGNIZED_BLOCK;
   }
   return state;
 }
@@ -280,12 +391,16 @@ function blockState(v) {
  *   unsupported   a value lint does not interpret (a number for a switch)
  * An explicit switch decides; keys and blocks decide only when no switch is set.
  */
-export function encryptionState(tree) {
+export function encryptionState(tree, inBlock = false) {
   const sw = [], other = [];
+  let unrecognized = false;
   for (const [k, v] of pairs(tree)) {
     if (BOOL_KEY.test(k)) sw.push(boolState(v));
     else if (KEY_KEY.test(k)) other.push(keyState(v));
-    else if (BLOCK_KEY.test(k) && v && typeof v === 'object') other.push(blockState(v));
+    else if (BLOCK_KEY.test(k) && v && typeof v === 'object') {
+      const b = blockState(v);
+      if (b === UNRECOGNIZED_BLOCK) unrecognized = true; else other.push(b);
+    }
   }
   const decide = (list) => {
     if (list.includes(ENCRYPTION.FALSE)) return ENCRYPTION.FALSE;
@@ -296,7 +411,9 @@ export function encryptionState(tree) {
   };
   const s = decide(sw);
   if (s !== ENCRYPTION.ABSENT) return s;
-  return decide(other);
+  const o = decide(other);
+  if (o === ENCRYPTION.ABSENT && unrecognized && !inBlock) return ENCRYPTION.UNSUPPORTED;
+  return o;
 }
 
 /** Every string and expression source in a tree, joined, for finding a
