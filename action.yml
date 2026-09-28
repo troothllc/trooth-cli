@@ -16,8 +16,9 @@
 # workflow over anything it reads unless you opt in, explicitly, to one of two
 # gates that are yours to choose:
 #
-#   fail-on-inline-credentials   a credential literal in infrastructure code
-#                                is unambiguous, and the count is only a count
+#   fail-on-inline-credentials   responds only to inline_credential_literals,
+#                                a count of the forms the CLI README lists; it
+#                                is a heuristic, and zero is not proof of none
 #   fail-if-nothing-read         a directory that yields no declarations means
 #                                the action is pointed at the wrong place
 #
@@ -69,7 +70,7 @@ inputs:
   version:
     description: "Version of the `trooth` CLI to run from npm. Pinned on purpose; bump it deliberately."
     required: false
-    default: "0.5.0"
+    default: "0.5.1"
   allow-incomplete:
     description: "Keep the step green when lint could not read every selected file (skipped, invalid or unreadable, or the walk hit its limit). The summary reports it either way."
     required: false
@@ -123,7 +124,7 @@ runs:
         # ONE EXACT VERSION. A range, a dist-tag, a URL or a path would let an
         # input decide what code runs; only MAJOR.MINOR.PATCH is accepted.
         if ! printf '%s' "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-          echo "::error title=Trooth lint::version must be one exact release such as 0.5.0; got '$V'"; exit 2
+          echo "::error title=Trooth lint::version must be one exact release such as 0.5.1; got '$V'"; exit 2
         fi
         # EACH INVOCATION GETS ITS OWN DIRECTORY. Up to 0.4.4 every step in a job
         # wrote RUNNER_TEMP/trooth-lint.json, so a second step overwrote the
