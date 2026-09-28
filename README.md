@@ -153,7 +153,7 @@ A company with no record exits 1 and emits `{"domain": "...", "listed": false, "
 trooth lint ./infra
 ```
 
-Output for the small fixture in this repository (`trooth lint tests/fixtures/infra`, trooth 0.5.1):
+Output for the small fixture in this repository (`trooth lint tests/fixtures/infra`, trooth 0.5.0):
 
 ```
 trooth lint // local · offline · declarations only //
@@ -207,32 +207,24 @@ The bucket's encryption configuration is a setting on the bucket, not a second s
 | `.tf` | The HCL reader in `bin/lib/hcl.mjs` (comments dropped, heredocs and templates understood) | One `resource` block, at any indentation |
 | `.tf.json` | `JSON.parse` | One resource |
 | `terraform show -json` plan | `JSON.parse` | One planned managed resource; data sources are skipped |
-| Kubernetes YAML (`apiVersion` and `kind`) | The `yaml` package, strict mode, parsed before it is recognized, so flow style, quoted keys and several documents read the same | One document, classified by `kind`; a `List` (or any `...List` with `items`) is not a resource, each member is one unit |
-| Dockerfile | `ENV` and `ARG` instructions only, kept in source order | The file |
+| Kubernetes YAML (`apiVersion` and `kind`) | The `yaml` package, strict mode | One document, classified by `kind` |
+| Dockerfile | `ENV` and `ARG` instructions only | The file |
 
 Nothing is evaluated. A setting that depends on a variable, a local, a module output or a function is reported as unresolved and is never counted as declared. Storage, logging and identity are counted by a resource's type or a document's kind, never by the words around it. Counts are of parsed values, not lines: two credential literals on one minified line are two.
-
-**Metadata is not configuration.** Tags (`tags`, `tags_all`, `default_tags`), labels, annotations and free-text descriptions are never read as settings. A tag that says `encrypted = true` does not declare encryption, and a note that mentions `0.0.0.0/0` is not a network rule. Since 0.5.1.
-
-**References resolve inside their own module.** A Terraform module is a folder, so a setting resource credits a store only when both are in the same folder (for a plan, the same file and module path). Two roots that each declare `aws_s3_bucket.shared` are two buckets, and a setting in one never describes the other. A reference through a module output is not resolved and stays unlinked. Since 0.5.1.
-
-**Open to any address** counts a declaration where `0.0.0.0/0` or `::/0` is the value of an address-range setting: `cidr_blocks`, `ipv6_cidr_blocks`, `source_ranges`, `source_address_prefix`, a Kubernetes `ipBlock` or `loadBalancerSourceRanges`, and the like. The same string anywhere else is not a rule.
-
-**Inline credential literals** are counted by source occurrence, one per place a credential is written into a file, in four forms: a configuration key named like a credential (`password`, `secret`, `token`, `api_key`, `access_key`, `private_key`) holding a literal value; a Kubernetes `env` entry whose `name` is named like one and whose `value` is a literal; every value in a Kubernetes `Secret`'s `data` and `stringData`; and every Dockerfile `ENV` or `ARG` assignment named like one, in source order, so an earlier literal is not hidden by a later reference. A name that is an identifier or a location is not a credential (`token_endpoint`, `secret_arn`, `kms_key_id`, `password_length`), and neither is a value that is empty, a boolean, a `${...}`, `$(...)` or `$VAR` reference, a `valueFrom` or `secretKeyRef`, or a URL (unless the URL carries a password in it). A short literal is still a literal. The count is a heuristic over names and forms and can miss a credential stored under an unrecognized name; zero is not proof that a tree holds none.
 
 **Encryption, per store.** Each storage declaration is counted in exactly one of five states:
 
 | Field | State |
 |---|---|
-| `storage_declaring_encryption` | An explicit `true`, a named key (a literal or a reference to a key resource such as `aws_kms_key.main.arn`), or an encryption block that holds one of those, in the store or in a setting resource in the same module that refers to it |
+| `storage_declaring_encryption` | An explicit `true`, a named key (a literal or a reference to a key resource such as `aws_kms_key.main.arn`), or an encryption block, in the store or in a setting resource that refers to it |
 | `storage_declaring_encryption_off` | An explicit `false`. It wins over any other signal |
 | `storage_encryption_not_declared` | Nothing about encryption. A commented-out setting is nothing |
 | `storage_encryption_unresolved` | Decided by a variable, a local or another expression lint does not evaluate |
-| `storage_encryption_unsupported` | A value lint does not interpret, such as a number where a switch belongs, or an encryption block that is empty or holds no setting lint recognizes |
+| `storage_encryption_unsupported` | A value lint does not interpret, such as a number where a switch belongs |
 
 A declaration is what a file says, not what a cloud account does: a provider default, an account-wide setting or a module can encrypt a store whose file declares nothing, and lint cannot see any of those.
 
-**Coverage.** Every file the walk selects (`.tf`, `.tf.json`, `.json`, `.yaml`, `.yml`, Dockerfiles) ends in exactly one bucket: read; not applicable (a JSON or YAML file that is not a plan or a manifest); excluded by a stated rule (a templated manifest containing `{{ }}`, which has to be rendered first); skipped (over 4 MiB); invalid (did not parse); or unreadable (a permission or I/O error). The walk visits directories depth first with entries sorted by name, skips `node_modules`, `.git`, `.terraform` and the other build and dependency directories listed in the source, and stops at 5,000 selected files. A `.tf.json` file must hold an object at its root, as Terraform requires; an array root is invalid. A YAML file whose aliases would expand past the limit is refused safely and reported as invalid, and the rest of the read continues. A Kubernetes `List` member with no `apiVersion` and `kind` is counted in `list_members_not_read`. A read with anything skipped, invalid or unreadable, a List member not read, or a truncated walk, is **incomplete**: the output says so, `--json` carries a `coverage` object with each count and a `coverage_details` object listing up to 50 paths per bucket with the reason (never file contents), and the exit code is 4 unless you pass `--allow-incomplete`.
+**Coverage.** Every file the walk selects (`.tf`, `.tf.json`, `.json`, `.yaml`, `.yml`, Dockerfiles) ends in exactly one bucket: read; not applicable (a JSON or YAML file that is not a plan or a manifest); excluded by a stated rule (a templated manifest containing `{{ }}`, which has to be rendered first); skipped (over 4 MiB); invalid (did not parse); or unreadable (a permission or I/O error). The walk visits directories depth first with entries sorted by name, skips `node_modules`, `.git`, `.terraform` and the other build and dependency directories listed in the source, and stops at 5,000 selected files. A read with anything skipped, invalid or unreadable, or a truncated walk, is **incomplete**: the output says so, `--json` carries a `coverage` object with each count and a `coverage_details` object listing up to 50 paths per bucket with the reason (never file contents), and the exit code is 4 unless you pass `--allow-incomplete`.
 
 Nothing leaves the machine. No line, no code and no value is printed or transmitted, only the path you gave it, counts, resource type names, region strings and, for files that could not be read, their paths and the reason. The credential count is a count: the literal it found is never shown.
 
@@ -277,17 +269,6 @@ https://api.trooth.co/public/mcp
 ```
 
 Four read-only tools, public data, no key. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
-
-## Changed in 0.5.1
-
-Corrections from the fresh audit of 2026-09-28 (T14 to T19). Each changes a count that 0.5.0 got wrong, so the same tree can give different facts, and a different `facts_digest`, under 0.5.1.
-
-- Tags, labels, annotations and descriptions no longer declare encryption, open a network rule or hold a credential. An empty encryption block, or one with no recognized setting, is `unsupported`, not `declared`.
-- A setting credits only a store in its own module. 0.5.0 matched addresses across the whole tree, so a bucket in one root could be credited with another root's encryption.
-- Kubernetes YAML is parsed before it is recognized: flow style and quoted `apiVersion` and `kind` are read, and a `List`'s members are counted instead of the `List`.
-- Credential literals: a URL-valued setting such as `token_endpoint` is not a credential; a Kubernetes `env` name and value is; every value in a `Secret`'s data is; a short literal is; and an earlier Dockerfile literal is counted even when a later line reassigns the name.
-- A `.tf.json` array root is invalid, and a refused YAML alias expansion is an invalid file in a JSON report with exit 4, not exit 3 with no report.
-- The audit's eighteen fixtures and thirty regression cases run on every release (`tests/audit-0928.test.mjs`).
 
 ## Changed in 0.5.0
 
