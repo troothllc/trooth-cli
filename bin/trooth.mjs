@@ -50,11 +50,11 @@ import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { join, relative, extname, basename } from 'node:path';
+import { join, relative, extname, basename, dirname } from 'node:path';
 
 const API = process.env.TROOTH_API || 'https://api.trooth.co';
 const require = createRequire(import.meta.url);
-let VERSION = '0.5.0';
+let VERSION = '0.5.1';
 try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5 };
@@ -556,7 +556,11 @@ function classify(file, text) {
   if (n.endsWith('.tf')) return 'terraform';
   if (n === 'dockerfile' || n.startsWith('dockerfile.')) return 'container';
   if (n.endsWith('.yaml') || n.endsWith('.yml')) {
-    if (!(/^\s*apiVersion\s*:/m.test(text) && /^\s*kind\s*:/m.test(text))) return null;
+    // Recognition happens after parsing (lib/declarations.mjs), so flow style
+    // and quoted keys are read like block style. Here only the cheap test: a
+    // file that never mentions apiVersion and kind in any spelling is not a
+    // manifest, and a templated manifest is excluded with its reason.
+    if (!(/apiVersion/.test(text) && /kind/.test(text))) return null;
     if (/\{\{[\s\S]*?\}\}/.test(text)) return 'templated';
     return 'kubernetes';
   }
@@ -592,19 +596,35 @@ const STORAGE_SETTING = /_(?:configuration|policy|acl|versioning|notification|pu
 const isStorageSetting = (type) => type.includes('_') && STORAGE_SETTING.test(type);
 const rel = (p) => { const r = relative(process.cwd(), p); return !r ? '.' : r.startsWith('..') ? p : r; };
 
+/** The scope a reference resolves in (T15). A Terraform module is a folder, so
+ *  a .tf or .tf.json resource is resolved only against resources in its own
+ *  folder; two roots that both name aws_s3_bucket.shared are two buckets. A
+ *  plan is one scope per file and module path (module.a.module.b). Nothing is
+ *  resolved across a module output or between roots. */
+function scopeOf(kind, file, address) {
+  if (kind === 'terraform' || kind === 'terraform-json') return `dir:${dirname(rel(file))}`;
+  if (kind === 'terraform-plan') {
+    const mod = String(address || '').match(/^((?:module\.[^.[\]]+(?:\[[^\]]*\])?\.)*)/);
+    return `plan:${rel(file)}:${mod ? mod[1] : ''}`;
+  }
+  return `file:${rel(file)}`;
+}
+/** A plan address without its module path, for matching inside that scope. */
+const localAddress = (a) => String(a || '').replace(/^(?:module\.[^.[\]]+(?:\[[^\]]*\])?\.)+/, '');
+
 function lint() {
   const { flags, positional } = parseArgs('lint');
   if (positional.length > 1) fail(EXIT.USAGE, `lint takes one optional [path], got: ${positional.join(' ')}`);
   const target = positional[0] || '.';
   if (!existsSync(target)) fail(EXIT.USAGE, `path not found: ${target}`);
 
-  const cov = { discovered: 0, excluded_directories: 0, truncated: false, not_applicable: 0, excluded: [], skipped: [], invalid: [], unreadable: [] };
+  const cov = { discovered: 0, excluded_directories: 0, truncated: false, not_applicable: 0, excluded: [], skipped: [], invalid: [], unreadable: [], list_members_not_read: [] };
   const files = walk(target, cov);
   const byKind = { terraform: 0, 'terraform-plan': 0, kubernetes: 0, container: 0 };
   const regions = new Set();
   const resourceTypes = new Map();
-  const stores = [];             // { address, planIds, state }
-  const encryptingSettings = []; // reference text of settings that declare encryption
+  const stores = [];             // { address, planIds, state, scope }
+  const encryptingSettings = []; // { scope, text } of settings that declare encryption
   let read = 0, logging = 0, identity = 0;
   let openIngress = 0, publicAccess = 0, inlineCredentials = 0;
 
@@ -622,15 +642,20 @@ function lint() {
     let units;
     try { units = unitsOf(kind, text); }
     catch (e) {
+      // Every parser failure, including a safely refused YAML alias expansion,
+      // is reported against its own file and the read continues (T19). Only a
+      // fault in lint itself escapes, and that is exit 3, not a coverage fact.
       if (e instanceof InvalidDeclaration) { cov.invalid.push({ path: rel(f), reason: e.message.slice(0, 200) }); continue; }
       throw e;
     }
+    if (units.notApplicable) { cov.not_applicable++; continue; }
+    if (units.membersNotRead) cov.list_members_not_read.push({ path: rel(f), reason: `${units.membersNotRead} List member(s) with no apiVersion and kind were not read` });
     byKind[kind === 'terraform-json' ? 'terraform' : kind]++;
     read++;
 
     for (const u of units) {
       for (const r of regionsIn(u.tree)) regions.add(r);
-      inlineCredentials += credentialLiterals(u.tree);
+      inlineCredentials += credentialLiterals(u);
       if (opensToAnyAddress(u.tree)) openIngress++;
       if (markedPublic(u.tree)) publicAccess++;
       const t = u.type;
@@ -638,10 +663,11 @@ function lint() {
       if (u.typed) resourceTypes.set(t, (resourceTypes.get(t) || 0) + 1);
       if (STORAGE_TYPE.test(t)) {
         const state = encryptionState(u.tree);
-        if (isStorageSetting(t)) { if (state === ENCRYPTION.TRUE) encryptingSettings.push(referenceText(u.tree)); }
+        const scope = scopeOf(kind, f, u.address);
+        if (isStorageSetting(t)) { if (state === ENCRYPTION.TRUE) encryptingSettings.push({ scope, text: referenceText(u.tree) }); }
         else {
           const planIds = u.plan ? ['bucket', 'id'].map((k) => u.tree && u.tree[k]).filter((x) => typeof x === 'string' && x.length >= 3) : [];
-          stores.push({ address: u.address, planIds, state });
+          stores.push({ address: u.plan ? localAddress(u.address) : u.address, planIds, state, scope });
         }
       }
       if (LOGGING_TYPE.test(t)) logging++;
@@ -650,17 +676,18 @@ function lint() {
   }
 
   // A store with nothing declared in its own body is credited by a setting
-  // resource, anywhere in the tree, that declares encryption and refers to it.
+  // resource IN ITS OWN SCOPE that declares encryption and refers to it (T15).
   for (const s of stores) {
     if (s.state !== ENCRYPTION.ABSENT) continue;
     const refs = [];
     if (s.address) refs.push(addressRef(s.address));
     for (const id of s.planIds) refs.push(new RegExp(`(?:^|\\n)${escRe(id)}(?:$|\\n)`));
-    if (refs.some((re) => encryptingSettings.some((b) => re.test(b)))) s.state = ENCRYPTION.TRUE;
+    const settings = encryptingSettings.filter((b) => b.scope === s.scope);
+    if (refs.some((re) => settings.some((b) => re.test(b.text)))) s.state = ENCRYPTION.TRUE;
   }
   const byState = (st) => stores.filter((s) => s.state === st).length;
 
-  const incomplete = cov.truncated || cov.skipped.length > 0 || cov.invalid.length > 0 || cov.unreadable.length > 0;
+  const incomplete = cov.truncated || cov.skipped.length > 0 || cov.invalid.length > 0 || cov.unreadable.length > 0 || cov.list_members_not_read.length > 0;
   const coverage = {
     completeness: incomplete ? 'incomplete' : 'complete',
     traversal: 'depth first, entries sorted by name',
@@ -672,12 +699,13 @@ function lint() {
     files_skipped: cov.skipped.length,
     files_invalid: cov.invalid.length,
     files_unreadable: cov.unreadable.length,
+    list_members_not_read: cov.list_members_not_read.reduce((a, x) => a + Number(x.reason.match(/^\d+/)[0]), 0),
     directories_excluded: cov.excluded_directories,
     traversal_truncated: cov.truncated,
     limits: { max_files: MAX_FILES, max_bytes_per_file: MAX_BYTES },
   };
   const listed = (arr) => ({ entries: arr.slice(0, LIST_CAP), truncated: arr.length > LIST_CAP });
-  const details = { excluded: listed(cov.excluded), skipped: listed(cov.skipped), invalid: listed(cov.invalid), unreadable: listed(cov.unreadable) };
+  const details = { excluded: listed(cov.excluded), skipped: listed(cov.skipped), invalid: listed(cov.invalid), unreadable: listed(cov.unreadable), list_members_not_read: listed(cov.list_members_not_read) };
 
   const exitFor = () => {
     if (incomplete && !flags['--allow-incomplete']) return EXIT.INCOMPLETE;

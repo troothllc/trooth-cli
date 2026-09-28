@@ -74,7 +74,7 @@ t("advisory by default: both gates default to false and there is no other way to
   assert.match(yml, /allow-incomplete:[\s\S]*?default: "false"/);
 });
 t("the CLI version is pinned and lint is pointed at an unroutable API", () => {
-  assert.match(yml, /default: "0\.5\.0"/);
+  assert.match(yml, /default: "0\.5\.1"/);
   assert.match(yml, /TROOTH_API: "http:\/\/127\.0\.0\.1:9"/);
 });
 t("it asks for no token and no write permission", () => {
@@ -93,7 +93,7 @@ const step = (path, opts = {}) => {
   const env = {
     ...process.env, RUNNER_TEMP: sim, GITHUB_ACTION_PATH: process.cwd(),
     GITHUB_STEP_SUMMARY: join(sim, "summary.md"), GITHUB_OUTPUT: join(sim, "output.txt"),
-    TROOTH_LINT_PATH: path, TROOTH_CLI_VERSION: opts.version || "0.5.0", TROOTH_API: "http://127.0.0.1:9",
+    TROOTH_LINT_PATH: path, TROOTH_CLI_VERSION: opts.version || "0.5.1", TROOTH_API: "http://127.0.0.1:9",
     TROOTH_FAIL_ON_INLINE_CREDENTIALS: opts.creds || "false", TROOTH_FAIL_IF_NOTHING_READ: opts.nothing || "false", TROOTH_ALLOW_INCOMPLETE: opts.incomplete || "false",
   };
   const bin = opts.bin || join(process.cwd(), "bin", "trooth.mjs");

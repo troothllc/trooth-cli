@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "The Trooth Network from your terminal. Read a company's public record with no key and no account: listing and evidence state, dates, probe and self-attestation counts, signing key id. Also reads what your repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
@@ -18,7 +18,7 @@
   "scripts": {
     "check": "node ./bin/trooth.mjs check",
     "lint": "node ./bin/trooth.mjs lint",
-    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs"
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs"
   },
   "license": "Apache-2.0",
   "author": "Trooth, LLC",
