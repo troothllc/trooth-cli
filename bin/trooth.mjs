@@ -13,10 +13,15 @@
 //
 // Commands:
 //   trooth check <domain>   Read a company's record from the public Trooth Network.
-//                           Read-only. No key, no account. It sends one request to
-//                           api.trooth.co with the domain you ask about in the URL,
-//                           plus what every HTTPS request carries: your IP address and
-//                           a user agent naming this CLI and its version.
+//                           Read-only. No key, no account. It sends one request,
+//                           GET https://trooth.co/api/network/profile?q=<domain>&contract=2,
+//                           the one record projection the website, the REST API, the
+//                           MCP connector and the llms.txt twin read, with the domain
+//                           you ask about in the URL, plus what every HTTPS request
+//                           carries: your IP address and a user agent naming this CLI
+//                           and its version. Only when that projection cannot be
+//                           reached does it send a second request, to api.trooth.co's
+//                           directory route, and it labels that answer a fallback.
 //   trooth lint [path]      Read the infrastructure THIS repository declares and print
 //                           the declared facts plus an aggregate digest of them.
 //                           Fully local. Offline. Your source never leaves the machine.
@@ -28,7 +33,7 @@
 //   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
-// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0):
+// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
 //   1  finding                 (check: not listed, or revoked; lint: nothing to read)
@@ -42,6 +47,8 @@
 //                               walk was truncated; --allow-incomplete exits 0 instead)
 //   5  listed, not witnessed   (check: the record is listed, but it carries no reading
 //                               this CLI can confirm was witnessed)
+//   6  withheld                (check: the record exists and is withheld while a report
+//                               about it is reviewed; neither an absence nor a finding)
 //
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
@@ -52,12 +59,22 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
-const API = process.env.TROOTH_API || 'https://api.trooth.co';
+// The record projection, GET /api/network/profile, is served by the website:
+// the same route the web page's machine twin, the REST API, the MCP connector
+// and the llms.txt twin read. The directory route on api.trooth.co is read only
+// as a labelled fallback when the projection cannot be reached.
+const WEB = (process.env.TROOTH_WEB || 'https://trooth.co').replace(/\/+$/, '');
+const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, '');
+/** The /api/network/profile contract this CLI is written to, pinned in every
+ *  request so a deployment that stops serving it refuses with 400 instead of
+ *  handing over a shape this code would misread. */
+const PROJECTION_CONTRACT = 2;
+const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.5.1';
+let VERSION = '0.6.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -101,7 +118,7 @@ function scrub(value) {
 /* --------------------------------------------------------------- args ---- */
 
 const FLAGS = {
-  check: { bool: ['--json'], value: [] },
+  check: { bool: ['--json', '--no-fallback'], value: [] },
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
 };
 
@@ -162,15 +179,19 @@ ${B}Examples${X}
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
   --allow-incomplete        lint: exit 0 even when a file was skipped, invalid or unreadable
+  --no-fallback             check: exit 3 when the record projection cannot be reached,
+                            instead of reading the directory feed as a labelled fallback
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
-  4 lint read incomplete   5 listed, but no witnessed reading in the record
+  4 lint read incomplete   5 listed, but no witnessed reading in the record   6 withheld
 
-${D}check reads only public, already-published records. No key, no account. It sends
-the domain you ask about to api.trooth.co in the request URL, with your IP address
-and a user agent naming this CLI; see https://trooth.co/privacy for what is kept.
-It does not check the record's signature.
+${D}check reads only public, already-published records. No key, no account. It reads
+the one record projection, trooth.co/api/network/profile, the same body the website,
+the API and the MCP connector read, and sends the domain you ask about in the request
+URL, with your IP address and a user agent naming this CLI; see
+https://trooth.co/privacy for what is kept. When that projection cannot be reached it
+reads api.trooth.co's directory feed instead and says so. It checks no signature.
 lint is entirely local: it opens files, and opens no sockets. Your source never leaves.
 Trooth publishes facts and counts, never one number that sums a company up.
 Trooth signs what it witnessed. It never signs on a company's behalf.${X}
@@ -183,16 +204,23 @@ Trooth signs what it witnessed. It never signs on a company's behalf.${X}
 // type, and at most one retry, only for a connection failure or a 502, 503 or
 // 504. Nothing here turns a failure into an answer about a company.
 const TIMEOUT_MS = Math.max(1000, Number(process.env.TROOTH_TIMEOUT_MS) || 15000);
-const MAX_BODY = 1024 * 1024;
+// The record projection is bounded at 2 MiB by the server before it is sent
+// (PROFILE_RESPONSE_MAX_BYTES in the web route's output guard), so the CLI
+// accepts exactly that much from it. The directory route keeps 1 MiB.
+const MAX_BODY_PROJECTION = 2 * 1024 * 1024;
+const MAX_BODY_DIRECTORY = 1024 * 1024;
 const RETRYABLE = new Set([502, 503, 504]);
 
 class Upstream extends Error {
-  constructor(message, extra = {}) { super(message); this.extra = extra; }
+  /** `unreachable` is set only when no answer came back at all (a connection
+   *  failure or the deadline), or the answer was a 5xx: the cases in which
+   *  `check` may fall back from the record projection to the directory route. */
+  constructor(message, extra = {}, unreachable = false) { super(message); this.extra = extra; this.unreachable = unreachable; }
 }
 
-async function readBounded(res) {
+async function readBounded(res, maxBody) {
   const len = Number(res.headers.get('content-length'));
-  if (Number.isFinite(len) && len > MAX_BODY) throw new Upstream(`the response is ${len} bytes, over the ${MAX_BODY}-byte limit`);
+  if (Number.isFinite(len) && len > maxBody) throw new Upstream(`the response is ${len} bytes, over the ${maxBody}-byte limit`);
   if (!res.body) return '';
   const reader = res.body.getReader();
   const chunks = [];
@@ -201,36 +229,37 @@ async function readBounded(res) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > MAX_BODY) { try { await reader.cancel(); } catch {} throw new Upstream(`the response passed the ${MAX_BODY}-byte limit`); }
+    if (total > maxBody) { try { await reader.cancel(); } catch {} throw new Upstream(`the response passed the ${maxBody}-byte limit`); }
     chunks.push(value);
   }
   return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8');
 }
 
-/** GET one path. Returns { status, contentType, text }. Throws Upstream when the
- *  API cannot be reached, answers too slowly, or sends too much. */
-async function getTrooth(path) {
+/** GET one path from one base. Returns { status, contentType, headers, text }.
+ *  Throws Upstream when the server cannot be reached, answers too slowly, or
+ *  sends too much. */
+async function getFrom(base, path, maxBody) {
   let lastErr;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const res = await fetch(`${API}${path}`, {
+      const res = await fetch(`${base}${path}`, {
         method: 'GET',
         redirect: 'error',
         signal: AbortSignal.timeout(TIMEOUT_MS),
         headers: { accept: 'application/json', 'user-agent': `trooth-cli/${VERSION}` },
       });
       if (RETRYABLE.has(res.status) && attempt === 1) { try { await res.body?.cancel(); } catch {} await new Promise((r) => setTimeout(r, 500)); continue; }
-      const text = await readBounded(res);
-      return { status: res.status, contentType: (res.headers.get('content-type') || '').toLowerCase(), text };
+      const text = await readBounded(res, maxBody);
+      return { status: res.status, contentType: (res.headers.get('content-type') || '').toLowerCase(), headers: res.headers, text };
     } catch (e) {
       if (e instanceof Upstream) throw e;
       lastErr = e;
       const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
-      if (timedOut) throw new Upstream(`the Trooth Network at ${API} did not answer within ${TIMEOUT_MS} ms`);
+      if (timedOut) throw new Upstream(`the Trooth Network at ${base} did not answer within ${TIMEOUT_MS} ms`, {}, true);
       if (attempt === 1) { await new Promise((r) => setTimeout(r, 500)); continue; }
     }
   }
-  throw new Upstream(`could not reach the Trooth Network at ${API}: ${lastErr && lastErr.message ? lastErr.message : lastErr}`);
+  throw new Upstream(`could not reach the Trooth Network at ${base}: ${lastErr && lastErr.message ? lastErr.message : lastErr}`, {}, true);
 }
 
 function parseJsonBody(r) {
@@ -330,6 +359,7 @@ const STATE = Object.freeze({
   NOT_WITNESSED: 'listed_not_witnessed',
   UNKNOWN: 'listed_evidence_unknown',
   REVOKED: 'revoked',
+  WITHHELD: 'withheld',
 });
 function evidenceState(v, probes) {
   const explicit = String(v.evidence_state ?? v.standing ?? v.state ?? '').toLowerCase();
@@ -376,16 +406,17 @@ function projectRecord(v, domain) {
 }
 
 /**
- * One company's record, from /directory/api/vendors/<domain>. That route
- * answers a domain it does not carry with a JSON 404 whose body says
- * `listed: false`; that is the only answer this CLI reads as "not listed".
- * Any other 404, any other status and any body that is not the record is a
+ * FALLBACK ONLY. One company's entry in the directory feed, from
+ * /directory/api/vendors/<domain> on api.trooth.co. Up to 0.5.1 this was the
+ * only thing `check` read. Since 0.6.0 it is read only when the record
+ * projection could not be reached, and everything printed from it says so.
+ * That route answers a domain it does not carry with a JSON 404 whose body
+ * says `listed: false`; that is the only answer read as "not listed". Any
+ * other 404, any other status and any body that is not the record is a
  * service or contract error (exit 3), never a statement about the company.
- * 0.4.4 fell back to downloading the whole list on a plain-text 404; the
- * route has been served since 2026-09-26, and the fallback is gone.
  */
-async function readVendor(domain) {
-  const r = await getTrooth(`/directory/api/vendors/${encodeURIComponent(domain)}`);
+async function readDirectory(domain) {
+  const r = await getFrom(API, `/directory/api/vendors/${encodeURIComponent(domain)}`, MAX_BODY_DIRECTORY);
   if (r.status === 404) {
     let body = null;
     try { body = JSON.parse(r.text); } catch {}
@@ -398,6 +429,125 @@ async function readVendor(domain) {
   return parseJsonBody(r);
 }
 
+/* ------------------------------------------------------ the projection ---- */
+
+/**
+ * THE ONE PUBLIC RECORD PROJECTION. GET {TROOTH_WEB}/api/network/profile
+ * ?q=<domain>&contract=2 is the evidence envelope the website, the REST API,
+ * the MCP connector and the llms.txt twin all read: one body, shaped in one
+ * place, validated against the published schema before it is sent. `check`
+ * reads that body and carries it whole under `record` in --json, so a script
+ * reading the CLI sees the same facts, the same provenance on each fact and
+ * the same record version as a script reading the API.
+ *
+ * Answers, and what each means here:
+ *   200 found:true, contract 2, this domain   the record (exit 0 or 5)
+ *   200 found:true, withheld:true             withheld pending review (exit 6)
+ *   200 found:false                           no published record (exit 1)
+ *   200 found:false, ambiguous:true           not possible for a domain; a
+ *                                             contract error (exit 3)
+ *   5xx, a connection failure, the deadline   unreachable: the labelled
+ *                                             fallback to the directory route,
+ *                                             unless --no-fallback (exit 3)
+ *   any other status or body                  a contract error (exit 3)
+ */
+async function readProjection(domain) {
+  const url = `${WEB}/api/network/profile?q=${encodeURIComponent(domain)}&contract=${PROJECTION_CONTRACT}`;
+  const r = await getFrom(WEB, `/api/network/profile?q=${encodeURIComponent(domain)}&contract=${PROJECTION_CONTRACT}`, MAX_BODY_PROJECTION);
+  if (r.status >= 500) {
+    throw new Upstream(`the record projection answered HTTP ${r.status}.${r.text ? ' ' + r.text.slice(0, 200).replace(/\s+/g, ' ') : ''}`, { http_status: r.status }, true);
+  }
+  if (r.status < 200 || r.status > 299) {
+    throw new Upstream(`the record projection answered HTTP ${r.status}.${r.text ? ' ' + r.text.slice(0, 200).replace(/\s+/g, ' ') : ''}`, { http_status: r.status });
+  }
+  const body = parseJsonBody(r);
+  const header = (n) => String(r.headers.get(n) || '');
+  const versionHeader = Number(header('trooth-record-version'));
+  const digest = (v) => (/^sha-256=[0-9a-f]{64}$/.test(v) ? v : null);
+  const source = {
+    surface: 'record_projection',
+    fallback: false,
+    url,
+    contract_version: null,
+    contract_schema: null,
+    // WHICH VERSION OF THE RECORD THIS IS, exactly as the projection states
+    // it in Trooth-Record-Version and Trooth-Record-Digest, the same two
+    // values the MCP connector copies into evidence.record_version and
+    // evidence.record_digest. null when the server did not state one; never
+    // guessed.
+    record_version: Number.isInteger(versionHeader) && versionHeader >= 1 ? versionHeader : null,
+    record_digest: digest(header('trooth-record-digest')),
+    record_previous_digest: digest(header('trooth-record-previous-digest')),
+    // The record's own version stamp, the value every fact's
+    // record.recordVersion carries.
+    record_updated_at: null,
+  };
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Upstream('the record projection answered with something that is not a record');
+  if (body.found === false && body.ambiguous === true) throw new Upstream('the record projection answered a domain as an ambiguous name; a domain names one record, so this is a contract error');
+  if (body.found === false) return { kind: 'absent', source };
+  if (body.found !== true) throw new Upstream('the record projection answered without saying whether a record was found');
+  if (body.withheld === true) {
+    return { kind: 'withheld', source, slug: typeof body.slug === 'string' ? body.slug : null, name: typeof body.name === 'string' ? body.name : null, reason: String(body.reason ?? '').slice(0, 400), since: typeof body.since === 'string' ? body.since : null };
+  }
+  if (Number(body.contractVersion) !== PROJECTION_CONTRACT) throw new Upstream(`the record projection answered contract ${body.contractVersion}; this CLI reads contract ${PROJECTION_CONTRACT}`);
+  if (typeof body.slug !== 'string' || !body.slug) throw new Upstream('the record projection answered a record with no slug');
+  if (typeof body.domain !== 'string' || !sameDomain(body.domain, domain)) throw new Upstream(`the record projection answered with a record that is not the record for ${domain}`);
+  if (!Array.isArray(body.facts)) throw new Upstream('the record projection answered a record with no facts list');
+  source.contract_version = PROJECTION_CONTRACT;
+  source.contract_schema = typeof body.contractSchema === 'string' ? body.contractSchema : PROJECTION_SCHEMA;
+  source.record_updated_at = typeof body.updatedAt === 'string' ? body.updatedAt : null;
+  return { kind: 'found', source, body };
+}
+
+/** The projection's coverage block, read field by field, or null. */
+function projectionCoverage(cov) {
+  if (!cov || typeof cov !== 'object') return null;
+  const n = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
+  const run = n(cov.checksRun), passed = n(cov.checksPassed);
+  if (run === null || passed === null || passed > run) return null;
+  return {
+    source: cov.source === 'witness_statement' ? 'witness_statement' : 'result_tally',
+    checks_run: run,
+    checks_as_expected: passed,
+    checks_not_read: n(cov.checksNotRead),
+    checks_in_reading: n(cov.checksInReading),
+  };
+}
+
+/** The CLI's summary of a projection body, with the body itself under
+ *  `record`. The summary is derived; `record` is the projection verbatim
+ *  (less any key the scrub drops, of which contract 2 has none). */
+function fromProjection(read, domain) {
+  const p = read.body;
+  const w = p.witnessed && typeof p.witnessed === 'object' ? p.witnessed : {};
+  const witnessed = w.standing === 'witnessed';
+  const coverage = witnessed ? projectionCoverage(w.coverage) : null;
+  const signing = p.signing && typeof p.signing === 'object' ? p.signing : {};
+  const keyId = typeof signing.keyId === 'string' ? signing.keyId : null;
+  return scrub({
+    domain,
+    listed: true,
+    state: witnessed ? STATE.WITNESSED : STATE.NOT_WITNESSED,
+    company_name: typeof p.name === 'string' && p.name ? p.name : domain,
+    slug: p.slug,
+    witnessed_at: witnessed && fmtDate(w.lastWitnessed) ? w.lastWitnessed : null,
+    first_witnessed_at: witnessed && fmtDate(w.firstWitnessedAt) ? w.firstWitnessedAt : null,
+    coverage,
+    // 0.5 field names, kept for scripts: `probes` is the same reading's counts
+    // in the directory feed's form, and `authority_key_id` the signing key.
+    probes: coverage ? { passed: coverage.checks_as_expected, total: coverage.checks_run } : null,
+    authority_key_id: keyId,
+    facts_published: p.facts.length,
+    facts_contested: Array.isArray(p.conflicts) ? p.conflicts.length : 0,
+    signature_checked: false,
+    verify_keys: typeof signing.keys === 'string' ? signing.keys : `${API}/public/keys`,
+    verify_how: typeof signing.verify === 'string' ? signing.verify : 'https://trooth.co/docs/verifiable-evidence',
+    record_url: typeof p.canonicalUrl === 'string' ? p.canonicalUrl : `https://trooth.co/network/company/${encodeURIComponent(p.slug)}`,
+    source: read.source,
+    record: p,
+  });
+}
+
 const STATE_TEXT = {
   [STATE.WITNESSED]: `${J}listed; Trooth witnessed a reading${X}`,
   [STATE.NOT_WITNESSED]: `${A}listed; no reading witnessed${X}`,
@@ -405,43 +555,99 @@ const STATE_TEXT = {
   [STATE.REVOKED]: `${A}revoked${X}`,
 };
 
-async function check() {
-  const { positional } = parseArgs('check');
-  if (positional.length > 1) fail(EXIT.USAGE, `check takes one <domain>, got: ${positional.join(' ')}`);
-  const norm = normalizeDomain(positional[0]);
-  if (norm.error) fail(EXIT.USAGE, norm.error);
-  const domain = norm.domain;
-
-  let vendor, rec;
-  try {
-    vendor = await readVendor(domain);
-    rec = vendor ? projectRecord(vendor, domain) : null;
-  } catch (e) {
-    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
-    throw e;
+function printNotListed(domain, source) {
+  if (asJson) {
+    emitJson({ domain, listed: false, state: STATE.NOT_LISTED, record_url: `https://trooth.co/network/${encodeURIComponent(domain)}`, source });
+    return;
   }
+  if (source.fallback) for (const l of fallbackLines(source)) out(l);
+  const where = source.fallback ? "in the Trooth Network's directory feed (fallback read)" : 'on the Trooth Network';
+  out(`\n${B}${domain}${X} ${D}//${X} ${A}no published record ${where}${X}`);
+  out(`\n${D}${source.fallback ? 'The directory feed carries no record for this domain.' : 'The record projection carries no published record for this domain.'}`);
+  out(`That says nothing about the company: a domain that never listed, a record not yet`);
+  out(`published, and a record that was revoked all read this way. A company gets a record`);
+  out(`by listing at ${X}${C}https://trooth.co/get-started${X}${D}: Trooth reads its public surface and`);
+  out(`publishes a dated record that anyone, or any agent, can read.${X}\n`);
+}
 
-  if (!rec) {
-    if (asJson) {
-      emitJson({ domain, listed: false, state: STATE.NOT_LISTED, record_url: `https://trooth.co/network/${encodeURIComponent(domain)}` });
+/** The fallback label, printed before anything read from the directory route. */
+function fallbackLines(source) {
+  return [
+    `${A}${B}FALLBACK READ.${X} ${A}The record projection at ${WEB} could not be reached: ${source.projection_error}${X}`,
+    `${D}What follows is the directory feed at ${API}, not the record. It carries the listing and`,
+    `witness fields only: no facts, no per-fact provenance and no record version.`,
+    `Run with --no-fallback to treat an unreachable projection as an error (exit 3).${X}`,
+  ];
+}
+
+function printProjection(rec) {
+  const p = rec.record;
+  const when = fmtDate(rec.witnessed_at);
+  const since = fmtDate(rec.first_witnessed_at);
+  out(`\n${J}${B}Trooth Network${X} ${D}// public record · read-only //${X}`);
+  out(`${B}${rec.company_name}${X}   ${C}${rec.domain}${X}`);
+  out(`Listing state: ${STATE_TEXT[rec.state]}` +
+      (when ? `   ${D}last witnessed ${when}${X}` : '') +
+      (since ? `   ${D}first witnessed ${since}${X}` : ''));
+  const s = rec.source;
+  out(`${D}Record version: ${s.record_version !== null ? `${s.record_version}${s.record_digest ? ` (${s.record_digest})` : ''}` : 'not stated on this read'}` +
+      `${s.record_updated_at ? `   updated ${fmtDate(s.record_updated_at)}` : ''}   contract ${s.contract_version}${X}`);
+  out(`${D}Read from the record projection: ${s.url}${X}`);
+
+  if (rec.state === STATE.WITNESSED) {
+    const cov = rec.coverage;
+    out('');
+    if (cov && cov.source === 'witness_statement' && cov.checks_not_read !== null) {
+      out(`${B}Last reading:${X} ${cov.checks_run} checks read; ${cov.checks_as_expected} as expected; ${cov.checks_not_read} listed but not read` +
+          (cov.checks_in_reading !== null ? ` (${cov.checks_in_reading} in all)` : ''));
+      out(`${D}From Trooth's signed witness statement for that reading. Coverage of a public surface, not an audit opinion.${X}`);
+    } else if (cov) {
+      out(`${B}Last reading:${X} its own tally records ${cov.checks_as_expected} of ${cov.checks_run} entries as expected`);
+      out(`${D}This reading carries no signed witness statement. The tally includes self-attestations and`);
+      out(`outcomes carried from earlier readings, so it is not a count of checks read.${X}`);
     } else {
-      out(`\n${B}${domain}${X} ${D}//${X} ${A}not listed in the Trooth Network's public feed${X}`);
-      out(`\n${D}The public feed carries no record for this domain. That says nothing about the`);
-      out(`company: a domain that never listed, a listing Trooth has not published, and a`);
-      out(`record that was revoked all read this way. A company gets a record by listing at`);
-      out(`${X}${C}https://trooth.co/get-started${X}${D}: Trooth reads its public surface and publishes`);
-      out(`a dated record that anyone, or any agent, can read.${X}\n`);
+      out(`${D}Witnessed by Trooth. The reading's counts were not published on this read.${X}`);
     }
-    process.exit(EXIT.FINDING);
+    const c = p.witnessed && p.witnessed.continuity;
+    if (c && c.unbrokenSince) {
+      out(`${D}Readings unbroken since ${fmtDate(c.unbrokenSince)}: ${Number(c.unbrokenReadings) || 0} in the unbroken run, ${Number(c.totalReadings) || 0} on record.${X}`);
+    }
+  } else {
+    out(`\n${D}Nothing witnessed by Trooth is published on this record yet. What it carries is the`);
+    out(`company's own declaration; the missing witnessed evidence is an absence, not a finding.${X}`);
   }
 
-  const code = rec.state === STATE.WITNESSED ? EXIT.OK : rec.state === STATE.REVOKED ? EXIT.FINDING : EXIT.NOT_WITNESSED;
-  if (asJson) { emitJson(rec); process.exit(code); }
+  // Every fact the record publishes, under its category, each with the label
+  // of who stated or observed it: the same rows the record page renders.
+  const facts = Array.isArray(p.facts) ? p.facts : [];
+  if (facts.length) {
+    out(`\n${B}Facts published: ${facts.length}${X}${D}, each labelled with who stated or observed it${X}`);
+    let cat = null;
+    for (const f of facts) {
+      if (f.category !== cat) { cat = f.category; out(`${B}${cat}${X}`); }
+      out(`  ${f.label}: ${f.value}   ${D}[${f.origin}]${X}`);
+    }
+    if (rec.facts_contested) out(`${D}${rec.facts_contested} with more than one account on record. No account is preferred; --json carries each one.${X}`);
+  }
 
+  const ws = p.witnessStatement && typeof p.witnessStatement.payload === 'string' ? p.witnessStatement : null;
+  out('');
+  out(ws
+    ? `${D}What is signed: only the witness statement for the last reading (key ${ws.key_id}). It covers that`
+      + `\nreading's checks and counts. The profile, its facts and the company's text are not signed.${X}`
+    : `${D}What is signed: nothing in this record. The profile is not signed, and the last reading`
+      + `\ncarries no witness statement.${X}`);
+  out(`${D}This command did not check any signature. To check it yourself:${X} ${C}${rec.verify_how}${X}`);
+  out(`${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
+  out(`Full record: ${X}${C}${rec.record_url}${X}${D}   ·   Signing keys: ${rec.verify_keys}${X}\n`);
+}
+
+function printDirectory(rec) {
+  for (const l of fallbackLines(rec.source)) out(l);
   const when = fmtDate(rec.witnessed_at);
   const since = fmtDate(rec.first_published_at);
-  out(`\n${J}${B}Trooth Network${X} ${D}// public record · read-only //${X}`);
-  out(`${B}${rec.company_name}${X}   ${C}${domain}${X}`);
+  out(`\n${J}${B}Trooth Network${X} ${D}// directory feed, fallback · read-only //${X}`);
+  out(`${B}${rec.company_name}${X}   ${C}${rec.domain}${X}`);
   out(`Listing state: ${STATE_TEXT[rec.state]}` +
       (when ? `   ${D}reading dated ${when}${X}` : '') +
       (since ? `   ${D}first published ${since}${X}` : ''));
@@ -472,6 +678,73 @@ async function check() {
   out(`reading, not every fact on the company's profile. To check it yourself:${X} ${C}${rec.verify_how}${X}`);
   out(`${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
   out(`Full record: ${X}${C}${rec.record_url}${X}${D}   ·   Signing keys: ${rec.verify_keys}${X}\n`);
+}
+
+async function check() {
+  const { flags, positional } = parseArgs('check');
+  if (positional.length > 1) fail(EXIT.USAGE, `check takes one <domain>, got: ${positional.join(' ')}`);
+  const norm = normalizeDomain(positional[0]);
+  if (norm.error) fail(EXIT.USAGE, norm.error);
+  const domain = norm.domain;
+
+  let read;
+  try {
+    read = await readProjection(domain);
+  } catch (e) {
+    if (!(e instanceof Upstream)) throw e;
+    if (!e.unreachable || flags['--no-fallback']) {
+      fail(EXIT.UPSTREAM, e.message, { state: 'service_error', source: { surface: 'record_projection', fallback: false }, ...e.extra });
+    }
+    diag(`${A}fallback${X} the record projection at ${WEB} could not be reached (${e.message}); reading the directory feed at ${API} instead. It carries no facts and no record version.`);
+    read = { kind: 'fallback', projectionError: e.message };
+  }
+
+  if (read.kind === 'absent') { printNotListed(domain, read.source); process.exit(EXIT.FINDING); }
+
+  if (read.kind === 'withheld') {
+    const doc = { domain, listed: true, state: STATE.WITHHELD, company_name: read.name || domain, slug: read.slug, reason: read.reason, since: read.since, source: read.source };
+    if (asJson) emitJson(scrub(doc));
+    else {
+      out(`\n${B}${doc.company_name}${X}   ${C}${domain}${X}`);
+      out(`Listing state: ${A}withheld${X}${read.since ? `   ${D}since ${fmtDate(read.since)}${X}` : ''}`);
+      out(`\n${D}The record exists and is withheld while a report about it is reviewed. That is not`);
+      out(`an absence and not a finding. Trooth's own words:${X} ${read.reason}\n`);
+    }
+    process.exit(EXIT.WITHHELD);
+  }
+
+  if (read.kind === 'found') {
+    const rec = fromProjection(read, domain);
+    const code = rec.state === STATE.WITNESSED ? EXIT.OK : EXIT.NOT_WITNESSED;
+    if (asJson) emitJson(rec); else printProjection(rec);
+    process.exit(code);
+  }
+
+  // The labelled fallback: the directory route, which carries no record version.
+  const source = {
+    surface: 'directory_fallback',
+    fallback: true,
+    url: `${API}/directory/api/vendors/${encodeURIComponent(domain)}`,
+    projection_error: read.projectionError,
+    contract_version: null,
+    contract_schema: null,
+    record_version: null,
+    record_digest: null,
+    record_previous_digest: null,
+    record_updated_at: null,
+  };
+  let rec;
+  try {
+    const vendor = await readDirectory(domain);
+    if (!vendor) { printNotListed(domain, source); process.exit(EXIT.FINDING); }
+    rec = { ...projectRecord(vendor, domain), source };
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', source, ...e.extra });
+    throw e;
+  }
+  const code = rec.state === STATE.WITNESSED ? EXIT.OK : rec.state === STATE.REVOKED ? EXIT.FINDING : EXIT.NOT_WITNESSED;
+  if (asJson) { emitJson(rec); process.exit(code); }
+  printDirectory(rec);
   process.exit(code);
 }
 
@@ -759,7 +1032,7 @@ function lint() {
     coverage_details: details,
     facts_digest: digest,
     digest,
-    digest_scope: 'A SHA-256 over the facts object only, in canonical form. It is an aggregate: two different trees with the same counts share it. It does not identify file contents, a repository, a commit or a deployment. `digest` is the same value under its 0.4 name and will be removed in 0.6.',
+    digest_scope: 'A SHA-256 over the facts object only, in canonical form. It is an aggregate: two different trees with the same counts share it. It does not identify file contents, a repository, a commit or a deployment. `digest` is the same value under its 0.4 name and will be removed in 0.7.',
     note: 'Declared facts only. Read locally; nothing was transmitted. No verdict and no assessment against any standard.',
   };
 
