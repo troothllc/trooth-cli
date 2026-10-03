@@ -5,7 +5,11 @@
 //
 // The lint trees are written to a scratch directory, so the fixture the action
 // self-test reads (tests/fixtures/infra, two declaration files) never changes.
-// `check` runs against a local HTTP server standing in for the public feed.
+// `check` here runs its FALLBACK path: since 0.6.0 it reads the record
+// projection (/api/network/profile, held in tests/check-projection.test.mjs),
+// and reads the directory route only when that projection cannot be reached.
+// TROOTH_WEB points at a closed port, so every check below is a labelled
+// fallback read against a local HTTP server standing in for the directory feed.
 // That server answers as the directory worker in two versions: "current" serves the one-record
 // route /directory/api/vendors/<domain>, and "legacy" answers that route with a
 // plain-text 404 the way a worker without the route does. Since 0.5.0 the CLI
@@ -154,7 +158,7 @@ await t("help carries the signing line exactly, and a CI example that writes one
   assert.ok(!RETIRED.test(r.stdout), r.stdout.match(RETIRED)?.[0]);
 });
 
-console.log("check, against a stand-in feed");
+console.log("check, fallback to a stand-in directory feed");
 const events = [
   { type: "scan_completed", at: "2026-08-01T00:00:00Z", detail: "64 of 65 live probes passed" },
   { type: "standing_published", at: "2026-08-01T00:00:00Z", detail: "point-in-time" },
@@ -185,7 +189,7 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const api = `http://127.0.0.1:${server.address().port}`;
 const check = (args, base = api) => new Promise((resolve) => {
-  const p = spawn(process.execPath, [BIN, "check", ...args], { env: { ...process.env, TROOTH_API: base } });
+  const p = spawn(process.execPath, [BIN, "check", ...args], { env: { ...process.env, TROOTH_WEB: "http://127.0.0.1:9", TROOTH_API: base } });
   let stdout = "", stderr = "";
   p.stdout.on("data", (b) => (stdout += b)); p.stderr.on("data", (b) => (stderr += b));
   p.on("close", (status) => resolve({ status, stdout, stderr }));
@@ -194,6 +198,7 @@ const check = (args, base = api) => new Promise((resolve) => {
 await t("a listed record: listing state, two counts in the website's form, no ratio", async () => {
   const r = await check(["example.com"]);
   assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^FALLBACK READ\. The record projection at http:\/\/127\.0\.0\.1:9 could not be reached/m);
   assert.match(r.stdout, /^Listing state: listed; Trooth witnessed a reading/m);
   assert.match(r.stdout, /Live probes: 65 read; 64 as expected/);
   assert.match(r.stdout, /Self-attestations: 35 asked; 27 attested/);
@@ -214,11 +219,13 @@ await t("--json keeps the feed's field names and the whole ledger, in the feed's
   assert.deepEqual(doc.probes, { passed: 64, total: 65 });
   assert.deepEqual(doc.attested, { passed: 27, total: 35 });
   assert.deepEqual(doc.events.map((e) => e.type), events.map((e) => e.type));
+  assert.equal(doc.source.surface, "directory_fallback");
+  assert.equal(doc.source.record_version, null);
 });
 await t("a domain the feed does not carry: exit 1, and the text claims nothing about the company", async () => {
   const r = await check(["nobody.example"]);
   assert.equal(r.status, 1);
-  assert.match(r.stdout, /not listed in the Trooth Network's public feed/);
+  assert.match(r.stdout, /no published record in the Trooth Network's directory feed \(fallback read\)/);
   assert.match(r.stdout, /says nothing about the/);
   assert.ok(!RETIRED.test(r.stdout), r.stdout.match(RETIRED)?.[0]);
   assert.ok(!DASH.test(r.stdout), "no dash used as punctuation");
