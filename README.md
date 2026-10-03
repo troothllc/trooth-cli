@@ -8,7 +8,7 @@ DNS says where a company is. A TLS certificate says the connection is authentic.
 
 This CLI is the terminal interface to that record. It does two things:
 
-- `trooth check <domain>` reads a company's published record from the public Network: the one record projection, `GET https://trooth.co/api/network/profile`, that the website, the REST API, the MCP server and the llms.txt twin all read. No key and no account. It sends one request with **the domain you ask about in the request URL**, plus what every web request carries: your IP address and a `trooth-cli/<version>` user agent. Trooth's servers can therefore see which domain you looked up; [trooth.co/privacy](https://trooth.co/privacy) and the [retention schedule](https://trooth.co/retention) say what is kept and for how long. Nothing else about you or your machine is sent. Only when that projection cannot be reached does it send a second request, to the directory feed on `api.trooth.co`, and it labels that answer a fallback.
+- `trooth check <domain>` reads a company's published record from the public Network. No key and no account. It sends one request to `api.trooth.co` with **the domain you ask about in the request URL**, plus what every web request carries: your IP address and a `trooth-cli/<version>` user agent. Trooth's servers can therefore see which domain you looked up; [trooth.co/privacy](https://trooth.co/privacy) and the [retention schedule](https://trooth.co/retention) say what is kept and for how long. Nothing else about you or your machine is sent.
 - `trooth lint [path]` reads what your own infrastructure declares and prints those declarations as facts. Entirely local: it opens files and opens no sockets.
 
 **Trooth witnesses and dates facts. It does not grade, rate or rank anyone.** The CLI prints counts, reported apart, and never adds them into one number.
@@ -30,14 +30,14 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 
 | Command | What it does |
 |---|---|
-| `trooth check <domain>` | Reads a company's record from the record projection and prints its evidence state, the record version, the last reading's counts, and every published fact under its category with the label of who stated or observed it. `--json` carries the projection body whole, under `record`, so every fact's provenance is there exactly as the API serves it. It does not check any signature. |
+| `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-`--json` is the flag both commands take; `lint` also takes `--allow-incomplete`, and `check` takes `--no-fallback`, which makes an unreachable record projection exit 3 instead of reading the directory feed. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag both commands take; `lint` also takes `--allow-incomplete`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 Any other flag is a usage error. The message names the flag, and for a `--` flag given to `check` or `lint` it also lists the ones that exist.
 
@@ -46,118 +46,104 @@ Any other flag is a usage error. The message names the flag, and for a `--` flag
 | Code | Meaning |
 |---|---|
 | 0 | `check`: listed, and the record carries a dated reading Trooth witnessed. `lint`: a complete read of at least one declaration. Help and version also exit 0. |
-| 1 | `check`: no published record, or revoked. `lint`: nothing to read. |
+| 1 | `check`: not listed, or revoked. `lint`: nothing to read. |
 | 2 | Usage error: a missing argument, an unknown flag or command, input that is not one domain, or a path that does not exist. |
-| 3 | Service or contract error: Trooth unreachable or slower than 15 seconds (with `--no-fallback`, or when the fallback also fails), a status other than 2xx, a contract other than 2, a body over its limit (2 MiB from the projection, 1 MiB from the directory feed), a body that is not JSON, or a record for a different domain. Never an answer about a company. An unexpected failure inside the CLI also exits 3. |
+| 3 | Service or contract error: Trooth unreachable or slower than 15 seconds, a status other than 2xx or the documented not-listed 404, a body over 1 MiB, a body that is not JSON, or a record for a different domain. Never an answer about a company. An unexpected failure inside the CLI also exits 3. |
 | 4 | `lint`: the read was incomplete. A selected file was over the size limit, did not parse or could not be read, or the walk stopped at its file limit. `--allow-incomplete` reports the same and exits 0 (or 1 when nothing was read). New in 0.5.0. |
 | 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. New in 0.5.0. |
-| 6 | `check`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
 
 A company with no record, a listed company without a witnessed reading, and a Network that could not be read are different answers, so they exit differently. A pipeline can tell them apart without parsing prose, and a Trooth outage never reads as a company with no record.
 
 ## `trooth check`
 
 ```bash
-trooth check acme.example
+trooth check trooth.co
 ```
 
 Example output. The values are illustrative; the shape is what the binary prints.
 
 ```
 Trooth Network // public record · read-only //
-Acme Cloud   acme.example
-Listing state: listed; Trooth witnessed a reading   last witnessed 2026-09-29   first witnessed 2026-08-01
-Record version: 7 (sha-256=3f1c...)   updated 2026-09-30   contract 2
-Read from the record projection: https://trooth.co/api/network/profile?q=acme.example&contract=2
+Trooth, LLC   trooth.co
+Listing state: listed; Trooth witnessed a reading   reading dated 2026-09-26   first published 2026-08-01
 
-Last reading: 65 checks read; 63 as expected; 2 listed but not read (67 in all)
-From Trooth's signed witness statement for that reading. Coverage of a public surface, not an audit opinion.
-Readings unbroken since 2026-09-01: 700 in the unbroken run, 1400 on record.
+Live probes: 65 read; 63 as expected
+Self-attestations: 35 asked; 27 attested
+Live probes are readings Trooth took itself, from the company's public surface.
+Self-attestations are what the company attested about itself; Trooth records them
+and did not witness them. The two are reported apart and never added into one number.
+Badge rw_...   Key trooth-master-2026-09
 
-Facts published: 6, each labelled with who stated or observed it
-Identity
-  Legal name: Acme Cloud, Inc.   [company-declared]
-  Operating status: Active   [company-declared]
-  Industries: Payroll   [company-declared]
-AI practices
-  Trains on customer data: No, never   [company-declared]
-  AI in this product: Customer-facing   [company-declared]
-  AI approaches: Generative, Rule-based   [company-declared]
+Latest ledger events, newest first
+  • 2026-09-26  live probes re-read
+  • 2026-09-26  reading completed
+  • 2026-08-01  record published to the Trooth Network
+  --json carries the whole ledger, with the feed's own wording for each event.
 
-What is signed: only the witness statement for the last reading (key trooth-master-2026-09). It covers that
-reading's checks and counts. The profile, its facts and the company's text are not signed.
-This command did not check any signature. To check it yourself: https://trooth.co/docs/verifiable-evidence
+This command did not check the record's signature. The signature covers the
+reading, not every fact on the company's profile. To check it yourself: https://trooth.co/docs/verifiable-evidence
 A dated, point-in-time record. Trooth issues no verdict and no single number.
-Full record: https://trooth.co/network/company/acme-cloud   ·   Signing keys: https://api.trooth.co/public/keys
+Full record: https://trooth.co/network/trooth.co   ·   Signing keys: https://api.trooth.co/public/keys
 ```
 
-**What `check` reads.** One `GET https://trooth.co/api/network/profile?q=<domain>&contract=2`. That route is the one public record projection: the body the website's record page is held to, the REST API serves, the MCP server's `trooth_public_trust_profile` reads, and the llms.txt twin is written from. It is validated against the published schema, [network-profile.v2.schema.json](https://trooth.co/schemas/network-profile.v2.schema.json), before it is sent. The contract number is pinned in the request, so a server that stops serving contract 2 refuses rather than handing the CLI a shape it would misread. `TROOTH_WEB` changes the base URL.
-
-The line that begins `Listing state:` gives the evidence state, decided from the record's own fields:
+The line that begins `Listing state:` gives the listing and evidence state, decided from the record's own fields and never from a matching name:
 
 | `state` in `--json` | Printed | Exit | Meaning |
 |---|---|---|---|
-| `listed_witnessed` | listed; Trooth witnessed a reading | 0 | The projection's `witnessed.standing` is `witnessed`. |
-| `listed_not_witnessed` | listed; no reading witnessed | 5 | A published record with nothing witnessed on it: what it carries is the company's own declaration. |
-| `withheld` | withheld | 6 | The projection answered `found: true, withheld: true`. The reason is printed in Trooth's own words. |
-| `not_listed` | no published record on the Trooth Network | 1 | The projection answered `found: false`. |
+| `listed_witnessed` | listed; Trooth witnessed a reading | 0 | The record carries a dated reading with at least one live probe read. |
+| `listed_not_witnessed` | listed; no reading witnessed | 5 | The record says it was not witnessed, or its reading read no probe. |
+| `listed_evidence_unknown` | listed; the reading could not be read from this record | 5 | Listed, with no reading this CLI can interpret. |
+| `revoked` | revoked | 1 | The record says it was revoked or withdrawn. |
+| `not_listed` | not listed in the Trooth Network's public feed | 1 | The documented not-listed answer: a JSON 404 whose body says `listed: false`. |
 | `service_error` | (an error on stderr) | 3 | Anything else. Never read as an answer about the company. |
-| `listed_evidence_unknown`, `revoked` | as in 0.5 | 5, 1 | Only from the directory fallback below. |
 
-**The record version.** `Record version` is the number and SHA-256 digest the projection states in its `Trooth-Record-Version` and `Trooth-Record-Digest` headers, the same two values the MCP server reports as `record_version` and `record_digest`. When the server does not state them, the CLI prints "not stated on this read" and `--json` carries `null`; it never guesses. `updated` is the record's own `updatedAt`, the value every fact's `record.recordVersion` carries.
+The two counts use the same form as the record page on trooth.co: live probes (how many were read at the last reading, and how many of those returned the expected result) and self-attestations (how many the company was asked for, and how many it attested). Live probes are readings Trooth took itself; self-attestations are the company's statements about itself, which Trooth records and does not witness. The counts come from the directory record; they are the counts of the signed reading, and not any other total a page may show.
 
-**The fallback, and only when the projection is unreachable.** When the projection cannot be reached at all, does not answer within the deadline, or answers 5xx (after one retry), `check` reads the directory feed instead, `GET https://api.trooth.co/directory/api/vendors/<domain>` (`TROOTH_API` changes the base). Every fallback answer is labelled: the human output starts with `FALLBACK READ.` and the reason, stderr says so, and `--json` carries `"source": {"surface": "directory_fallback", "fallback": true, "projection_error": "...", "record_version": null, ...}`. The directory feed carries the listing and witness fields only (counts, badge id, signing key id, ledger events): no facts, no per-fact provenance and no record version, which is why it is not the record. A 4xx from the projection, a contract mismatch or a body that is not the record is an error (exit 3), not a reason to fall back. `--no-fallback` turns the fallback off for pipelines that must read the record or nothing.
+The events section prints the three newest entries in the record's ledger, newest first, by timestamp; entries with the same timestamp keep the feed's order, the later entry first. Known event types get a plain label: `scan_completed` prints as "reading completed", `standing_published` as "record published to the Trooth Network" and `rewitnessed` as "live probes re-read". A type the CLI does not know prints with its underscores turned into spaces. `--json` carries every event the feed returns, with its type and detail exactly as the feed has them.
 
-**What `check` accepts.** A bare domain or a URL. It is parsed with the standard URL parser, so case, a trailing dot, the default port (80 or 443), a path and an internationalized name (converted to its ASCII form) normalize to one domain, and a leading `www.` is dropped: `https://Acme.example:443/path` reads `acme.example`. A URL with a user name or password, a non-default port, an IP address, a scheme other than http or https, or a name with no dot is a usage error (exit 2) rather than a guess.
+**What `check` accepts.** A bare domain or a URL. It is parsed with the standard URL parser, so case, a trailing dot, the default port (80 or 443), a path and an internationalized name (converted to its ASCII form) normalize to one domain, and a leading `www.` is dropped: `https://Trooth.co:443/path` reads `trooth.co`. A URL with a user name or password, a non-default port, an IP address, a scheme other than http or https, or a name with no dot is a usage error (exit 2) rather than a guess.
 
-**How `check` asks.** A 15-second deadline per request (`TROOTH_TIMEOUT_MS` changes it), a body limit (2 MiB from the projection, the bound the server itself enforces before sending; 1 MiB from the directory feed), redirects refused, a JSON content type required, and at most one retry, only after a connection failure or a 502, 503 or 504.
+**How `check` asks.** One `GET /directory/api/vendors/<domain>`, with a 15-second deadline (`TROOTH_TIMEOUT_MS` changes it), a 1 MiB limit on the body, redirects refused, a JSON content type required, and at most one retry, only after a connection failure or a 502, 503 or 504. Up to 0.4.4, a plain-text 404 made the CLI download the whole directory list and search it; the single-record route has been served since 2026-09-26, and 0.5.0 has no fallback, so an unexpected answer is a service error, never "not listed".
 
 For scripting:
 
 ```bash
-trooth check acme.example --json
+trooth check trooth.co --json
 ```
 
 ```json
 {
-  "domain": "acme.example",
+  "domain": "trooth.co",
   "listed": true,
   "state": "listed_witnessed",
-  "company_name": "Acme Cloud",
-  "slug": "acme-cloud",
-  "witnessed_at": "2026-09-29T05:00:00.000Z",
-  "first_witnessed_at": "2026-08-01T05:00:00.000Z",
-  "coverage": { "source": "witness_statement", "checks_run": 65, "checks_as_expected": 63, "checks_not_read": 2, "checks_in_reading": 67 },
-  "probes": { "passed": 63, "total": 65 },
+  "company_name": "Trooth, LLC",
+  "witnessed_at": "2026-08-30T00:00:00Z",
+  "first_published_at": "2026-08-01T00:00:00Z",
+  "badge_id": "rw_...",
+  "probes": { "passed": 64, "total": 65 },
+  "attested": { "passed": 27, "total": 35 },
+  "events": [
+    { "type": "scan_completed", "at": "2026-08-01T00:00:00Z", "detail": "65 probes read · 64 returned the expected result · 27 declarations recorded · reading signed" },
+    { "type": "standing_published", "at": "2026-08-01T00:00:00Z", "detail": "point-in-time · published to the Trooth Network" },
+    { "type": "scan_completed", "at": "2026-08-30T00:00:00Z", "detail": "65 probes read · 64 returned the expected result · 27 declarations recorded · reading signed" },
+    { "type": "standing_published", "at": "2026-08-30T00:00:00Z", "detail": "point-in-time · published to the Trooth Network" }
+  ],
+  "receipt_signature": "...",
   "authority_key_id": "trooth-master-2026-09",
-  "facts_published": 6,
-  "facts_contested": 0,
   "signature_checked": false,
   "verify_keys": "https://api.trooth.co/public/keys",
   "verify_how": "https://trooth.co/docs/verifiable-evidence",
-  "record_url": "https://trooth.co/network/company/acme-cloud",
-  "source": {
-    "surface": "record_projection",
-    "fallback": false,
-    "url": "https://trooth.co/api/network/profile?q=acme.example&contract=2",
-    "contract_version": 2,
-    "contract_schema": "https://trooth.co/schemas/network-profile.v2.schema.json",
-    "record_version": 7,
-    "record_digest": "sha-256=3f1c...",
-    "record_previous_digest": "sha-256=9a0e...",
-    "record_updated_at": "2026-09-30T09:00:00.000Z"
-  },
-  "record": { "found": true, "contractVersion": 2, "slug": "acme-cloud", "domain": "acme.example", "facts": ["..."], "conflicts": [], "signing": {}, "...": "the projection body, whole" }
+  "record_url": "https://trooth.co/network/trooth.co"
 }
 ```
 
-`record` is the projection body exactly as the API serves it: every fact with its `key`, `category`, `label`, `value`, `origin`, its typed `claim` (subject and scope, evidence class, dates where known, and what is unknown) and its `record` (record version, issuer, source reference, freshness), plus `conflicts`, `witnessed`, `signing`, `methodology` and the rest. The web repository's cross-surface contract test runs the published CLI tarball against the same body the REST, MCP and llms.txt tests use and compares them field by field. Everything above `record` is a summary derived from it. `probes` and `authority_key_id` keep their 0.5 names for scripts: the same reading's counts and the signing key id.
+In `probes`, `total` is how many live probes were read at the last reading and `passed` (the API's field name) is how many returned the expected result. In `attested`, `total` is how many declarations were asked for and `passed` is how many the company attested. `witnessed_at` is the date of the witnessed reading, and is `null` unless `state` is `listed_witnessed`; it is never a profile edit time. `events` is the whole ledger, oldest first, in the feed's order. Each event's `detail` is written when the event is stored and is not rewritten afterward, so older and newer events of the same type can be worded differently.
 
-A field whose name contains `score`, `tier`, `grade`, `rank`, `rating`, `level` or `percent`, or is `rate`, is dropped no matter what the server sends. Contract 2 has none.
+`category` and `description` are added when the record carries them. Those are the only fields `check --json` emits: anything else the feed happens to carry is dropped on the way out, so a script written against this shape keeps working. A field whose name contains `score`, `tier`, `grade`, `rank`, `rating`, `level` or `percent`, or is `rate`, is dropped no matter what the feed sends.
 
-A company with no record exits 1 and emits `{"domain": "...", "listed": false, "state": "not_listed", "record_url": "...", "source": {...}}`. That is not a judgment. It means the Network carries no published record for that domain. A company gets a record at [trooth.co/get-started](https://trooth.co/get-started), free.
+A company with no record exits 1 and emits `{"domain": "...", "listed": false, "state": "not_listed", "record_url": "..."}`. That is not a judgment. It means the Network's public feed carries no record for that domain. A company gets a record at [trooth.co/get-started](https://trooth.co/get-started), free.
 
-`signature_checked` is always `false`: this CLI does not check any signature, and nothing it prints should be read as a checked signature. The one signed object in the record is the reading's witness statement, carried in `record.witnessStatement` when the reading was signed: `payload` is the exact string Trooth signed and `key_id` names the key at [trooth.co/verify/keys](https://trooth.co/verify/keys). [trooth.co/docs/verifiable-evidence](https://trooth.co/docs/verifiable-evidence) shows how to check it offline. That signature covers the reading. It does not cover the company's own declarations, which are not signed by anyone.
+`receipt_signature` is Trooth's Ed25519 signature over the directory receipt and `authority_key_id` names the key that made it; the public keys are listed at [trooth.co/verify/keys](https://trooth.co/verify/keys). `signature_checked` is always `false`: this CLI does not check any signature, and nothing it prints should be read as a checked signature. The object whose exact signed bytes Trooth publishes is the reading's witness statement, which is not part of this feed; [trooth.co/docs/verifiable-evidence](https://trooth.co/docs/verifiable-evidence) shows how to fetch and check it offline. That signature covers the reading. It does not cover the company's own declarations, which are not signed by anyone.
 
 ## `trooth lint`
 
@@ -267,8 +253,7 @@ That repository's README documents the inputs and outputs.
 
 | Variable | Effect |
 |---|---|
-| `TROOTH_WEB` | Base URL of the record projection `check` reads. Defaults to `https://trooth.co`. |
-| `TROOTH_API` | Base URL of the directory feed `check` reads only as a labelled fallback. Defaults to `https://api.trooth.co`. `lint` ignores both, because `lint` makes no requests. |
+| `TROOTH_API` | Base URL for `check`. Defaults to `https://api.trooth.co`. `lint` ignores it, because `lint` makes no requests. |
 | `TROOTH_TIMEOUT_MS` | The deadline for each `check` request. Defaults to 15000; the minimum is 1000. |
 | `TROOTH_LINT_MAX_FILES` | The number of selected files after which `lint` stops walking and reports the read as truncated. Defaults to 5000. |
 | `NO_COLOR` | Disables ANSI color. Color is already off when stdout is not a TTY. |
@@ -284,16 +269,6 @@ https://api.trooth.co/public/mcp
 ```
 
 Four read-only tools, public data, no key. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
-
-## Changed in 0.6.0
-
-See [CHANGELOG.md](CHANGELOG.md) for the full entry.
-
-- `check` reads the one record projection, `GET https://trooth.co/api/network/profile?q=<domain>&contract=2`, instead of the directory feed. Its output carries the same facts, the same per-fact provenance and the same record version as the website, the REST API, the MCP server and the llms.txt twin. `--json` carries the projection body whole under `record`, and `source` says where the answer was read and at which record version.
-- The directory feed is read only when the projection cannot be reached, and that answer is labelled a fallback everywhere it appears. `--no-fallback` turns it off.
-- Exit 6 is new: the record is withheld while a report about it is reviewed.
-- `check --json` no longer emits `badge_id`, `attested`, `events`, `receipt_signature` or `first_published_at` from a projection read, because the projection does not carry them; a fallback read still does. It adds `slug`, `first_witnessed_at`, `coverage`, `facts_published`, `facts_contested`, `source` and `record`.
-- Releases are published from GitHub Actions with npm trusted publishing and a provenance statement (`.github/workflows/publish.yml`).
 
 ## Changed in 0.5.0
 
@@ -329,7 +304,7 @@ The Trooth Network is Trooth's only product. This CLI, the public API and the MC
 
 ## Security
 
-Report a vulnerability through the [Vulnerability Disclosure Policy](https://trooth.co/security/vulnerability-disclosure-policy). Nothing in this CLI takes a credential, so there is no key to leak from it. Reproduce the published tarball with `npm pack` at the tagged commit and compare its SHA-512 with the `integrity` value `npm view trooth@<version> dist.integrity` prints. From 0.6.0, releases are published by `.github/workflows/publish.yml` on a version tag, with npm trusted publishing and `npm publish --provenance`, so the registry carries a provenance statement naming this repository, that workflow and the commit; `npm audit signatures` checks it after install. A release published any other way carries no provenance statement.
+Report a vulnerability through the [Vulnerability Disclosure Policy](https://trooth.co/security/vulnerability-disclosure-policy). Nothing in this CLI takes a credential, so there is no key to leak from it. Reproduce the published tarball with `npm pack` at the tagged commit and compare its SHA-512 with the `integrity` value `npm view trooth@<version> dist.integrity` prints.
 
 ## Links
 
