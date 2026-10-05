@@ -3,7 +3,7 @@
 //   node tests/action.test.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, chmodSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -97,7 +97,7 @@ const step = (path, opts = {}) => {
     TROOTH_FAIL_ON_INLINE_CREDENTIALS: opts.creds || "false", TROOTH_FAIL_IF_NOTHING_READ: opts.nothing || "false", TROOTH_ALLOW_INCOMPLETE: opts.incomplete || "false",
   };
   const bin = opts.bin || join(process.cwd(), "bin", "trooth.mjs");
-  const script = runBlock.replace(/^TROOTH_BIN=.*$/m, `TROOTH_BIN=${JSON.stringify(bin)}`);
+  const script = runBlock.replace(/^TROOTH_BIN=.*$/m, `TROOTH_BIN=${JSON.stringify(bin)}`).replace(/^npm install --prefix .*$/m, ":");
   const r = spawnSync("bash", ["-c", script], { encoding: "utf8", env });
   return { status: r.status, stdout: r.stdout, summary: readFileSync(join(sim, "summary.md"), "utf8"), output: readFileSync(join(sim, "output.txt"), "utf8") };
 };
@@ -167,6 +167,31 @@ t("the CLI is run by path from its own directory, never through npx", () => {
   const commands = runBlock.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
   assert.ok(!/\bnpx\b/.test(commands), "no npx command in the run block");
   assert.match(runBlock, /npm install --prefix "\$CLI_DIR" --no-save --no-audit --no-fund --no-package-lock --ignore-scripts --loglevel=error "trooth@\$V"/);
+});
+
+t("V10: every run installs into a fresh private directory; a file planted at the old fixed path never runs", () => {
+  assert.ok(!/if \[ ! -f "\$TROOTH_BIN" \]/.test(runBlock), "install is never skipped because a bin already exists");
+  assert.match(runBlock, /CLI_DIR="\$\(mktemp -d "\$RUNNER_TEMP\/trooth-cli-\$V\.XXXXXXXX"\)"/);
+  const pkgVersion = JSON.parse(readFileSync("package.json", "utf8")).version;
+  // Plant an executable where 0.6.0's action would have reused it.
+  const planted = join(sim, `trooth-cli-${pkgVersion}`, "node_modules", "trooth", "bin");
+  mkdirSync(planted, { recursive: true });
+  const marker = join(sim, "PLANTED-RAN");
+  writeFileSync(join(planted, "trooth.mjs"), `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(marker)}, "x");\n`);
+  writeFileSync(join(sim, `trooth-cli-${pkgVersion}`, "node_modules", "trooth", "package.json"), JSON.stringify({ name: "trooth", version: pkgVersion }));
+  // A fake npm that "installs" this checkout into whatever --prefix it is given.
+  const shim = join(dir, "npmshim"); mkdirSync(shim, { recursive: true });
+  const real = process.cwd();
+  writeFileSync(join(shim, "npm"), `#!/bin/bash\nwhile [ "$1" != "--prefix" ]; do shift; done; P="$2"\nmkdir -p "$P/node_modules/trooth" && cp -R ${JSON.stringify(real)}/bin "$P/node_modules/trooth/" && cp ${JSON.stringify(real)}/package.json "$P/node_modules/trooth/" && cp -R ${JSON.stringify(real)}/node_modules "$P/node_modules/trooth/"\n`);
+  chmodSync(join(shim, "npm"), 0o755);
+  reset();
+  const env = { ...process.env, PATH: `${shim}:${process.env.PATH}`, RUNNER_TEMP: sim, GITHUB_ACTION_PATH: process.cwd(),
+    GITHUB_STEP_SUMMARY: join(sim, "summary.md"), GITHUB_OUTPUT: join(sim, "output.txt"), TROOTH_LINT_PATH: "tests/fixtures/infra",
+    TROOTH_CLI_VERSION: "0.5.1", TROOTH_API: "http://127.0.0.1:9", TROOTH_FAIL_ON_INLINE_CREDENTIALS: "false", TROOTH_FAIL_IF_NOTHING_READ: "false", TROOTH_ALLOW_INCOMPLETE: "false" };
+  const r = spawnSync("bash", ["-c", runBlock], { encoding: "utf8", env: { ...env, TROOTH_CLI_VERSION: pkgVersion } });
+  assert.ok(!existsSync(marker), "the planted file must not run");
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(readFileSync(join(sim, "output.txt"), "utf8"), /^declarations-read=2$/m);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

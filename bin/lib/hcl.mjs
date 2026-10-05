@@ -55,6 +55,11 @@ export function tokenize(src) {
       continue;
     }
     if (ch === '"') {
+      // A quoted template. Outside an interpolation the backslash escapes
+      // \n \t \r \" \\ \uNNNN and \UNNNNNNNN are DECODED, and $${ and %%{ are
+      // the literal text ${ and %{ (N03). A string with no live ${ } or %{ }
+      // is a constant: its decoded value is a plain string however many
+      // dollar signs it holds. A string with one is an unresolved expression.
       const startLine = line;
       let j = i + 1, value = '', interp = false, depth = 0;
       for (;;) {
@@ -66,12 +71,19 @@ export function tokenize(src) {
           const e = src[j + 1];
           const map = { n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\' };
           if (e in map) { value += map[e]; j += 2; continue; }
-          if (e === 'u' || e === 'U') { value += '\\' + e; j += 2; continue; }
-          throw new HclParseError(`invalid escape \\${e}`, line);
+          if (e === 'u' || e === 'U') {
+            const width = e === 'u' ? 4 : 8;
+            const hex = src.slice(j + 2, j + 2 + width);
+            const cp = /^[0-9A-Fa-f]+$/.test(hex) && hex.length === width ? parseInt(hex, 16) : -1;
+            // The digits are never echoed: they may sit inside a credential.
+            if (cp < 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) throw new HclParseError(`invalid \\${e} escape: it needs ${width} hexadecimal digits naming a Unicode scalar value`, line);
+            value += String.fromCodePoint(cp); j += 2 + width; continue;
+          }
+          throw new HclParseError(`invalid escape \\${e === undefined ? '' : e.replace(/[^\x21-\x7e]/g, '?')}`, line);
         }
-        if ((c === '$' || c === '%') && src[j + 1] === '{' && depth === 0) {
-          if (src[j - 1] === c && src[j - 2] !== c) { value += '{'; j += 2; continue; } // $${ escapes
-          interp = true; depth = 1; value += c + '{'; j += 2; continue;
+        if ((c === '$' || c === '%') && depth === 0) {
+          if (src[j + 1] === c && src[j + 2] === '{') { value += c + '{'; j += 3; continue; } // $${ and %%{ are literal
+          if (src[j + 1] === '{') { interp = true; depth = 1; value += c + '{'; j += 2; continue; }
         }
         if (depth > 0) {
           if (c === '{') depth++;
@@ -99,7 +111,7 @@ export function tokenize(src) {
         const marker = m[2];
         let j = i + m[0].length;
         line++;
-        const lines = [];
+        let lines = [];
         let closed = false;
         while (j <= n) {
           let e = src.indexOf('\n', j);
@@ -112,8 +124,17 @@ export function tokenize(src) {
           j = e + 1;
         }
         if (!closed) throw new HclParseError(`unterminated heredoc <<${marker}`, startLine);
-        const value = lines.join('\n');
-        push('str', value, { interp: /[$%]\{/.test(value), raw: src.slice(i, j), heredoc: true });
+        if (m[1] === '-') {
+          // <<- strips the smallest indentation shared by the non-blank lines.
+          const ind = Math.min(...lines.filter((l) => l.trim()).map((l) => /^[ \t]*/.exec(l)[0].length));
+          if (Number.isFinite(ind) && ind > 0) lines = lines.map((l) => l.slice(Math.min(ind, /^[ \t]*/.exec(l)[0].length)));
+        }
+        // A heredoc is a template too. Backslashes are literal in a heredoc,
+        // as Terraform documents, but $${ and %%{ are the same literal markers
+        // as in a quoted string, and only a live ${ or %{ makes it an
+        // expression (N03).
+        const { value, interp } = heredocTemplate(lines.join('\n'));
+        push('str', value, { interp, raw: src.slice(i, j), heredoc: true });
         i = j;
         continue;
       }
@@ -143,6 +164,20 @@ export function tokenize(src) {
   return toks;
 }
 
+/** A heredoc body as a template: `$${` and `%%{` decode to the literal `${`
+ *  and `%{`; any other `${` or `%{` is a live interpolation or directive, and
+ *  then the whole heredoc is an unresolved expression (its source is kept). */
+function heredocTemplate(text) {
+  let value = '', interp = false;
+  for (let k = 0; k < text.length; k++) {
+    const c = text[k];
+    if ((c === '$' || c === '%') && text[k + 1] === c && text[k + 2] === '{') { value += c + '{'; k += 2; continue; }
+    if ((c === '$' || c === '%') && text[k + 1] === '{') interp = true;
+    value += c;
+  }
+  return { value: interp ? text : value, interp };
+}
+
 const OPEN = { '{': '}', '[': ']', '(': ')' };
 
 class Parser {
@@ -155,6 +190,10 @@ class Parser {
   /** A body: attributes and blocks until `}` (nested) or end of file (top). */
   body(nested) {
     const items = [];
+    // HCL allows one definition of an attribute per body. A repeat is an
+    // error in Terraform, and reading either copy would let a file declare
+    // encrypted = false and encrypted = true at once (N01).
+    const seen = new Map();
     for (;;) {
       this.skipNl();
       const tok = this.peek();
@@ -164,6 +203,8 @@ class Parser {
       const name = this.next().v;
       if (this.peek().t === '=' ) {
         this.next();
+        if (seen.has(name)) this.error(`duplicate attribute ${JSON.stringify(name)} in one body; it is first set on line ${seen.get(name)}`, tok);
+        seen.set(name, tok.line);
         const exprToks = this.collectExpr(tok.line);
         items.push({ kind: 'attr', key: name, value: exprValue(exprToks), line: tok.line });
         continue;
@@ -257,6 +298,9 @@ export function exprValue(toks) {
       const m = member.filter((t) => t.t !== 'nl');
       const eq = m.findIndex((t) => t.t === '=' || t.t === ':');
       if (eq !== 1 || !(m[0].t === 'ident' || (m[0].t === 'str' && !m[0].interp))) return { $expr: sourceOf(ts) };
+      // A repeated constant key in one object constructor is an error in HCL;
+      // it is never resolved by keeping one of the two (N01).
+      if (Object.prototype.hasOwnProperty.call(obj, m[0].v)) throw new HclParseError(`duplicate key ${JSON.stringify(m[0].v)} in an object`, m[0].line);
       obj[m[0].v] = exprValue(m.slice(2));
     }
     return obj;

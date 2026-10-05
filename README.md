@@ -51,6 +51,8 @@ Any other flag is a usage error. The message names the flag, and for a `--` flag
 | 3 | Service or contract error: Trooth unreachable or slower than 15 seconds, a status other than 2xx or the documented not-listed 404, a body over 1 MiB, a body that is not JSON, or a record for a different domain. Never an answer about a company. An unexpected failure inside the CLI also exits 3. |
 | 4 | `lint`: the read was incomplete. A selected file was over the size limit, did not parse or could not be read, or the walk stopped at its file limit. `--allow-incomplete` reports the same and exits 0 (or 1 when nothing was read). New in 0.5.0. |
 | 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. New in 0.5.0. |
+| 6 | `check`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
+| 7 | Output not delivered: stdout or stderr failed or was closed before everything was written, for example a reader that stopped early (EPIPE) or a full disk. The command's own result was not delivered, whatever it would have been, so this code replaces it. Nothing is retried. New in 0.6.1. |
 
 A company with no record, a listed company without a witnessed reading, and a Network that could not be read are different answers, so they exit differently. A pipeline can tell them apart without parsing prose, and a Trooth outage never reads as a company with no record.
 
@@ -204,11 +206,11 @@ The bucket's encryption configuration is a setting on the bucket, not a second s
 
 | Source | Parsed with | Unit |
 |---|---|---|
-| `.tf` | The HCL reader in `bin/lib/hcl.mjs` (comments dropped, heredocs and templates understood) | One `resource` block, at any indentation |
-| `.tf.json` | `JSON.parse` | One resource |
-| `terraform show -json` plan | `JSON.parse` | One planned managed resource; data sources are skipped |
-| Kubernetes YAML (`apiVersion` and `kind`) | The `yaml` package, strict mode | One document, classified by `kind` |
-| Dockerfile | `ENV` and `ARG` instructions only | The file |
+| `.tf` | The HCL reader in `bin/lib/hcl.mjs` (comments dropped, heredocs and templates understood, string escapes decoded, a repeated attribute in one body rejected) | One `resource` block, at any indentation |
+| `.tf.json` | `JSON.parse`, with a repeated key in one object rejected and each `resource` level required to be an object or an array of objects | One resource |
+| `terraform show -json` plan | `JSON.parse`, with `after_unknown` and `proposed_unknown` merged in, so a value known only after apply is unresolved | One planned managed resource; data sources are skipped |
+| Kubernetes YAML (`apiVersion` and `kind`) | The `yaml` package, strict mode; a `List` must carry an `items` array | One document, classified by `kind` |
+| Dockerfile | `ENV` and `ARG` instructions only, from logical lines formed as the build forms them: continuations joined with nothing inserted, comment lines inside a continuation dropped, the `# escape=` directive honored | The file |
 
 Nothing is evaluated. A setting that depends on a variable, a local, a module output or a function is reported as unresolved and is never counted as declared. Storage, logging and identity are counted by a resource's type or a document's kind, never by the words around it. Counts are of parsed values, not lines: two credential literals on one minified line are two.
 
@@ -268,7 +270,25 @@ The same public Network powers Trooth's read-only MCP server, so ChatGPT, Claude
 https://api.trooth.co/public/mcp
 ```
 
-Four read-only tools, public data, no key. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
+Five read-only tools on public data, no key. A sixth, for a signed-in company's own record, is not available on this deployment yet. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
+
+## Changed in 0.6.1
+
+See [CHANGELOG.md](CHANGELOG.md) for the full entry.
+
+- `--json` output is no longer cut short when stdout is a pipe. The CLI waits for its output to be written before it ends, and a reader that stops early gets exit 7, never a success code.
+- `lint` reads four more cases correctly: malformed nested shapes and repeated attributes are invalid (exit 4), plan values unknown until apply are unresolved, HCL string escapes are decoded, and Dockerfile continuations are joined as the build joins them.
+- The GitHub Action installs the CLI into a fresh directory on every run and never reuses one left by an earlier step or runner.
+
+## Changed in 0.6.0
+
+See [CHANGELOG.md](CHANGELOG.md) for the full entry.
+
+- `check` reads the one record projection, `GET https://trooth.co/api/network/profile?q=<domain>&contract=2`, instead of the directory feed. Its output carries the same facts, the same per-fact provenance and the same record version as the website, the REST API, the MCP server and the llms.txt twin. `--json` carries the projection body whole under `record`, and `source` says where the answer was read and at which record version.
+- The directory feed is read only when the projection cannot be reached, and that answer is labelled a fallback everywhere it appears. `--no-fallback` turns it off.
+- Exit 6 is new: the record is withheld while a report about it is reviewed.
+- `check --json` no longer emits `badge_id`, `attested`, `events`, `receipt_signature` or `first_published_at` from a projection read, because the projection does not carry them; a fallback read still does. It adds `slug`, `first_witnessed_at`, `coverage`, `facts_published`, `facts_contested`, `source` and `record`.
+- Releases are published from GitHub Actions with npm trusted publishing and a provenance statement (`.github/workflows/publish.yml`).
 
 ## Changed in 0.5.0
 

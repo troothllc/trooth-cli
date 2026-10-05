@@ -33,7 +33,7 @@
 //   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
-// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0):
+// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
 //   1  finding                 (check: not listed, or revoked; lint: nothing to read)
@@ -49,6 +49,10 @@
 //                               this CLI can confirm was witnessed)
 //   6  withheld                (check: the record exists and is withheld while a report
 //                               about it is reviewed; neither an absence nor a finding)
+//   7  output not delivered    (new in 0.6.1: stdout or stderr failed or was closed, for
+//                               example EPIPE from a reader that stopped early, before
+//                               everything was written; the result was not delivered,
+//                               whatever it would have been)
 //
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
@@ -71,10 +75,10 @@ const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, 
 const PROJECTION_CONTRACT = 2;
 const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.6.0';
+let VERSION = '0.6.1';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -87,14 +91,63 @@ const asJson = argv.includes('--json');
 
 /* ------------------------------------------------------------- output ---- */
 
-function out(s) { process.stdout.write(s + '\n'); }
-function diag(s) { process.stderr.write(s + '\n'); }
+// THE OUTPUT BOUNDARY (O04). Up to 0.6.0 a command wrote its document and
+// called process.exit at once. When stdout is a pipe the write is queued, and
+// a forced exit drops whatever is still queued, so a reader could get the
+// first 64 KiB of a JSON document with exit 0. Now nothing calls
+// process.exit. A command RETURNS its exit code (fail() throws one) to the
+// dispatcher at the bottom of this file, which waits until every write has
+// been handed to the operating system, then sets process.exitCode and lets
+// Node end on its own.
+//
+// A write that fails (EPIPE when the reader stopped early, EBADF, ENOSPC)
+// is caught here: nothing more is written to that stream, a short note goes to
+// the other stream when it still works, and the exit code is 7, never the
+// command's own code, so a partial document can never pass for a delivered one.
+const pendingWrites = new Set();
+let outputFailure = null;
+function noteOutputFailure(name, err) {
+  if (outputFailure) return;
+  outputFailure = { stream: name, code: (err && err.code) || 'write failed' };
+}
+for (const [name, stream] of [['stdout', process.stdout], ['stderr', process.stderr]]) {
+  stream.on('error', (err) => noteOutputFailure(name, err));
+}
+function write(name, stream, s) {
+  if (outputFailure) return;
+  const done = new Promise((resolve) => {
+    try {
+      stream.write(s, (err) => { if (err) noteOutputFailure(name, err); resolve(); });
+    } catch (err) { noteOutputFailure(name, err); resolve(); }
+  });
+  pendingWrites.add(done);
+  done.then(() => pendingWrites.delete(done));
+}
+/** Resolves when every write so far has been flushed or has failed. A failed
+ *  or closed stream also resolves it, so a reader that went away cannot hold
+ *  the process open. */
+async function drainOutput() {
+  while (pendingWrites.size && !outputFailure) {
+    const closed = new Promise((resolve) => {
+      const fire = () => resolve();
+      for (const st of [process.stdout, process.stderr]) { st.once('close', fire); st.once('error', fire); }
+    });
+    await Promise.race([Promise.all([...pendingWrites]), closed]);
+  }
+}
+function out(s) { write('stdout', process.stdout, s + '\n'); }
+function diag(s) { write('stderr', process.stderr, s + '\n'); }
 function emitJson(obj) { out(JSON.stringify(obj, null, 2)); }
+
+/** Thrown to end a command with an exit code; caught only by the dispatcher. */
+class ExitWith {
+  constructor(code) { this.code = code; }
+}
 
 function fail(code, message, extra = {}) {
   diag(`${R}error${X} ${message}`);
   if (asJson) emitJson({ ok: false, error: message, exit: code, ...extra });
-  process.exit(code);
+  throw new ExitWith(code);
 }
 
 /** Keys that would carry a score, tier, grade, rank, rating or percentage. Nothing
@@ -185,6 +238,7 @@ ${B}Flags${X}
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
   4 lint read incomplete   5 listed, but no witnessed reading in the record   6 withheld
+  7 output not delivered: stdout or stderr failed or closed before everything was written
 
 ${D}check reads only public, already-published records. No key, no account. It reads
 the one record projection, trooth.co/api/network/profile, the same body the website,
@@ -699,7 +753,7 @@ async function check() {
     read = { kind: 'fallback', projectionError: e.message };
   }
 
-  if (read.kind === 'absent') { printNotListed(domain, read.source); process.exit(EXIT.FINDING); }
+  if (read.kind === 'absent') { printNotListed(domain, read.source); return EXIT.FINDING; }
 
   if (read.kind === 'withheld') {
     const doc = { domain, listed: true, state: STATE.WITHHELD, company_name: read.name || domain, slug: read.slug, reason: read.reason, since: read.since, source: read.source };
@@ -710,14 +764,14 @@ async function check() {
       out(`\n${D}The record exists and is withheld while a report about it is reviewed. That is not`);
       out(`an absence and not a finding. Trooth's own words:${X} ${read.reason}\n`);
     }
-    process.exit(EXIT.WITHHELD);
+    return EXIT.WITHHELD;
   }
 
   if (read.kind === 'found') {
     const rec = fromProjection(read, domain);
     const code = rec.state === STATE.WITNESSED ? EXIT.OK : EXIT.NOT_WITNESSED;
     if (asJson) emitJson(rec); else printProjection(rec);
-    process.exit(code);
+    return code;
   }
 
   // The labelled fallback: the directory route, which carries no record version.
@@ -736,16 +790,16 @@ async function check() {
   let rec;
   try {
     const vendor = await readDirectory(domain);
-    if (!vendor) { printNotListed(domain, source); process.exit(EXIT.FINDING); }
+    if (!vendor) { printNotListed(domain, source); return EXIT.FINDING; }
     rec = { ...projectRecord(vendor, domain), source };
   } catch (e) {
     if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', source, ...e.extra });
     throw e;
   }
   const code = rec.state === STATE.WITNESSED ? EXIT.OK : rec.state === STATE.REVOKED ? EXIT.FINDING : EXIT.NOT_WITNESSED;
-  if (asJson) { emitJson(rec); process.exit(code); }
+  if (asJson) { emitJson(rec); return code; }
   printDirectory(rec);
-  process.exit(code);
+  return code;
 }
 
 /* ---------------------------------------------------------------- lint ---- */
@@ -769,9 +823,15 @@ async function check() {
  *   plan JSON           JSON (`terraform show -json`); each planned managed
  *                       resource is one unit
  *   Kubernetes YAML     YAML, by the `yaml` package; one unit per document
- *   Dockerfile          ENV and ARG settings only
+ *   Dockerfile          ENV and ARG settings only, from logical lines formed
+ *                       as the build forms them (continuations, comments,
+ *                       the escape directive)
  * Nothing is evaluated: variables, locals, modules and functions are not
- * resolved, and a setting that depends on one is reported as UNRESOLVED.
+ * resolved, and a setting that depends on one is reported as UNRESOLVED. A
+ * plan value Terraform marks unknown until apply is UNRESOLVED too. A shape
+ * the format does not allow at a declaration boundary (a List without an
+ * items array, a resource that is not an object, a repeated attribute) makes
+ * the file invalid, never an empty or complete read.
  *
  * COMPLETENESS. Every file the walk selects ends in exactly one bucket: read,
  * not applicable (a JSON or YAML file that is not a plan or a manifest),
@@ -991,7 +1051,7 @@ function lint() {
     diag(`${D}  lint reads .tf, .tf.json, Kubernetes YAML (apiVersion + kind), terraform plan`);
     diag(`  JSON and Dockerfiles. ${files.length} file(s) were selected and none held a declaration.${X}`);
     if (asJson) emitJson({ ok: false, error: msg, exit: EXIT.FINDING, root: rel(target), files_opened: files.length, coverage, coverage_details: details });
-    process.exit(EXIT.FINDING);
+    return EXIT.FINDING;
   }
 
   const topTypes = [...resourceTypes.entries()]
@@ -1037,7 +1097,7 @@ function lint() {
   };
 
   const code = exitFor();
-  if (asJson) { emitJson(doc); process.exit(code); }
+  if (asJson) { emitJson(doc); return code; }
 
   out(`\n${J}${B}trooth lint${X} ${D}// local · offline · declarations only //${X}`);
   out(`${D}${doc.root}   ${read} declaration file(s) read${X}`);
@@ -1086,14 +1146,14 @@ function lint() {
   out(`supposed to be public. Trooth issues no verdict here and checks nothing against`);
   out(`any standard. Nothing left this machine: lint opens files and opens no sockets.`);
   out(`Publish what you choose on your record at ${X}${C}https://trooth.co/dashboard${X}${D}.${X}\n`);
-  process.exit(code);
+  return code;
 }
 
 /* ---------------------------------------------------------------- main ---- */
 
-(async () => {
-  if (cmd === '--version' || cmd === '-v' || cmd === 'version') { out(VERSION); return; }
-  if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') { out(helpText()); return; }
+async function main() {
+  if (cmd === '--version' || cmd === '-v' || cmd === 'version') { out(VERSION); return EXIT.OK; }
+  if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') { out(helpText()); return EXIT.OK; }
   if (cmd === 'check') return check();
   if (cmd === 'lint') return lint();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
@@ -1102,6 +1162,33 @@ function lint() {
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
   fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint.`);
-})().catch((e) => {
-  fail(EXIT.UPSTREAM, `unexpected failure: ${e && e.message ? e.message : e}`);
-});
+}
+
+/** The one place the exit status is decided. The command's code stands only
+ *  when every byte it wrote was delivered; otherwise the status is 7. */
+async function dispatch() {
+  let code;
+  try {
+    code = await main();
+  } catch (e) {
+    if (e instanceof ExitWith) code = e.code;
+    else {
+      try { fail(EXIT.UPSTREAM, `unexpected failure: ${e && e.message ? e.message : e}`); }
+      catch (x) { code = x instanceof ExitWith ? x.code : EXIT.UPSTREAM; }
+    }
+  }
+  if (!Number.isInteger(code)) code = EXIT.UPSTREAM;
+  await drainOutput();
+  if (outputFailure) {
+    // Best effort, on the stream that did not fail; never retried.
+    const other = outputFailure.stream === 'stdout' ? process.stderr : process.stdout;
+    if (!other.destroyed && other.writable) {
+      try { other.write(`error output not delivered: ${outputFailure.stream} failed (${outputFailure.code}) before everything was written. Exit 7.\n`, () => {}); } catch {}
+    }
+    process.exitCode = EXIT.OUTPUT;
+    return;
+  }
+  process.exitCode = code;
+}
+
+dispatch();
