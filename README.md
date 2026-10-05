@@ -270,7 +270,7 @@ The same public Network powers Trooth's read-only MCP server, so ChatGPT, Claude
 https://api.trooth.co/public/mcp
 ```
 
-Five read-only tools on public data, no key. A sixth, for a signed-in company's own record, is not available on this deployment yet. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
+Five read-only tools on public data, no key. A sixth reads a signed-in company's own record with an OAuth access token from the authorization server the server's protected-resource metadata names; no scope is required, and the workspace is linked when that person signs in to trooth.co once with Continue with enterprise SSO. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
 
 ## Changed in 0.6.1
 
