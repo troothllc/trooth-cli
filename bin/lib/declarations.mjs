@@ -23,11 +23,20 @@ export class InvalidDeclaration extends Error {
   constructor(message) { super(message); this.name = 'InvalidDeclaration'; }
 }
 
-/** A string in Terraform's JSON syntax that holds a template is an expression. */
+/** A string in Terraform's JSON syntax is a template. One with a live ${ } or
+ *  %{ } is an expression; otherwise it is a constant, and its $${ and %%{
+ *  escapes decode to the literal text ${ and %{ (N03). */
 function tfJsonValue(v) {
   if (typeof v === 'string') {
-    if (/[$%]\{/.test(v)) return { $expr: v };
-    return v;
+    // Read left to right exactly as a quoted HCL string is (./hcl.mjs).
+    let out = '';
+    for (let i = 0; i < v.length; i++) {
+      const c = v[i];
+      if ((c === '$' || c === '%') && v[i + 1] === c && v[i + 2] === '{') { out += c + '{'; i += 2; continue; }
+      if ((c === '$' || c === '%') && v[i + 1] === '{') return { $expr: v };
+      out += c;
+    }
+    return out;
   }
   if (Array.isArray(v)) return v.map(tfJsonValue);
   if (v && typeof v === 'object') {
@@ -39,6 +48,52 @@ function tfJsonValue(v) {
 }
 
 const each = (v, fn) => { if (Array.isArray(v)) v.forEach((x) => each(x, fn)); else if (v && typeof v === 'object') fn(v); };
+
+/** A block level in Terraform's JSON syntax is an object, or an array of
+ *  objects (a repeated block). Anything else at a recognized declaration
+ *  boundary is a malformed declaration, never an empty one (N01). The reason
+ *  names the path of keys, never a value. */
+function eachBlock(v, where, fn) {
+  const objs = Array.isArray(v) ? v : [v];
+  if (Array.isArray(v) && !v.length) throw new InvalidDeclaration(`${where} is an empty array; Terraform JSON needs an object here`);
+  for (const o of objs) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw new InvalidDeclaration(`${where} must be an object${Array.isArray(v) ? ' or an array of objects' : ''}, found ${o === null ? 'null' : Array.isArray(o) ? 'an array' : typeof o}`);
+    fn(o);
+  }
+}
+const pathPart = (k) => (/^[A-Za-z0-9_-]{1,64}$/.test(k) ? k : '<key>');
+
+/** The keys repeated within one JSON object, found from the source text,
+ *  since JSON.parse silently keeps the last. Terraform rejects a repeated
+ *  argument; reading either copy could credit a setting the file also
+ *  switches off (N01). Returns the first repeated key, or null. */
+function repeatedJsonKey(text) {
+  const stack = [];
+  let i = 0;
+  const n = text.length;
+  let expectKey = false;
+  while (i < n) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1, raw = '';
+      while (j < n && text[j] !== '"') { if (text[j] === '\\') { raw += text[j]; j++; } raw += text[j]; j++; }
+      const top = stack[stack.length - 1];
+      if (top && expectKey) {
+        let key; try { key = JSON.parse(`"${raw}"`); } catch { key = raw; }
+        if (top.has(key)) return key;
+        top.add(key);
+        expectKey = false;
+      }
+      i = j + 1; continue;
+    }
+    if (c === '{') { stack.push(new Set()); expectKey = true; }
+    else if (c === '[') { stack.push(null); }
+    else if (c === '}' || c === ']') { stack.pop(); }
+    else if (c === ',') { expectKey = stack[stack.length - 1] instanceof Set; }
+    i++;
+  }
+  return null;
+}
 
 /**
  * One file's units. Each unit: { type, name, address, tree, typed }.
@@ -56,10 +111,10 @@ export function unitsOf(kind, text) {
       if (it.kind === 'block' && it.type === 'resource') {
         if (it.labels.length !== 2) throw new InvalidDeclaration(`line ${it.line}: a resource block needs a type and a name`);
         const [type, name] = it.labels;
-        units.push({ type, name, address: `${type}.${name}`, tree: bodyToTree(it.body), typed: true });
+        units.push({ type, name, address: `${type}.${name}`, tree: bodyToTree(it.body), typed: true, constants: true });
       } else rest.push(it);
     }
-    if (rest.length) units.push({ type: null, name: null, address: null, tree: bodyToTree(rest), typed: false });
+    if (rest.length) units.push({ type: null, name: null, address: null, tree: bodyToTree(rest), typed: false, constants: true });
     return units;
   }
   if (kind === 'terraform-json') {
@@ -68,40 +123,74 @@ export function unitsOf(kind, text) {
     // Terraform's JSON syntax requires an object at the root. An array is valid
     // JSON and not a valid declaration, so it is invalid, never read (T19).
     if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new InvalidDeclaration('Terraform JSON requires an object at the root');
+    const dup = repeatedJsonKey(text);
+    if (dup !== null) throw new InvalidDeclaration(`the key ${JSON.stringify(pathPart(dup))} is repeated in one object; Terraform rejects a repeated argument`);
     const units = [];
-    each(doc, (top) => each(top.resource, (byType) => {
-      for (const [type, byName] of Object.entries(byType)) {
-        if (!/^[a-z0-9_]+$/.test(type)) continue;
-        each(byName, (names) => {
-          for (const [name, body] of Object.entries(names)) {
-            each(body, (b) => units.push({ type, name, address: `${type}.${name}`, tree: tfJsonValue(b), typed: true }));
-          }
-        });
-      }
-    }));
+    // Every recognized boundary is checked for shape (N01): `resource`, each
+    // resource type and each resource body must be an object or an array of
+    // objects. A "//" key is a comment in Terraform JSON at any level.
+    if ('resource' in doc) {
+      eachBlock(doc.resource, 'resource', (byType) => {
+        for (const [type, byName] of Object.entries(byType)) {
+          if (type === '//') continue;
+          if (!/^[a-z0-9_]+$/.test(type)) continue;
+          eachBlock(byName, `resource.${pathPart(type)}`, (names) => {
+            for (const [name, body] of Object.entries(names)) {
+              if (name === '//') continue;
+              eachBlock(body, `resource.${pathPart(type)}.${pathPart(name)}`, (b) => units.push({ type, name, address: `${type}.${name}`, tree: tfJsonValue(b), typed: true, constants: true }));
+            }
+          });
+        }
+      });
+    }
     const rest = { ...doc }; delete rest.resource;
-    if (Object.keys(rest).length) units.push({ type: null, name: null, address: null, tree: tfJsonValue(rest), typed: false });
+    if (Object.keys(rest).length) units.push({ type: null, name: null, address: null, tree: tfJsonValue(rest), typed: false, constants: true });
     return units;
   }
   if (kind === 'terraform-plan') {
     let doc;
     try { doc = JSON.parse(text); } catch (e) { throw new InvalidDeclaration(`not valid JSON: ${e.message}`); }
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new InvalidDeclaration('a Terraform plan requires an object at the root');
+    // WHAT IS NOT YET KNOWN (N02). A plan omits a value Terraform will only
+    // learn at apply time from `after` and from planned_values, and marks it
+    // `true` in change.after_unknown (and in proposed_unknown, when present).
+    // Those marks are merged into each resource's tree as unresolved
+    // expressions BEFORE anything is classified, so an unknown setting reads
+    // as unresolved and never as not declared. Keyed by full address, so a
+    // resource in module.a and one in module.b stay two resources.
+    const unknownAt = new Map();
+    const addUnknown = (address, marks) => {
+      if (typeof address !== 'string' || marks === undefined || marks === null || marks === false) return;
+      unknownAt.set(address, mergeMarks(unknownAt.get(address), marks));
+    };
+    const changes = Array.isArray(doc.resource_changes) ? doc.resource_changes : [];
+    for (const rc of changes) if (rc && rc.change && typeof rc.change === 'object') addUnknown(rc.address, rc.change.after_unknown);
+    const walkMarks = (m) => {
+      if (!m || typeof m !== 'object') return;
+      for (const r of Array.isArray(m.resources) ? m.resources : []) if (r && typeof r === 'object') addUnknown(r.address, r.values);
+      for (const c of Array.isArray(m.child_modules) ? m.child_modules : []) walkMarks(c);
+    };
+    if (doc.proposed_unknown && typeof doc.proposed_unknown === 'object') walkMarks(doc.proposed_unknown.root_module);
+    const withUnknown = (address, tree) => overlayUnknown(tree, unknownAt.get(address));
+
     const units = [];
     const walkModule = (m) => {
       if (!m || typeof m !== 'object') return;
       for (const r of Array.isArray(m.resources) ? m.resources : []) {
         if (r && r.mode !== 'data' && typeof r.type === 'string') {
-          units.push({ type: r.type, name: String(r.name ?? ''), address: r.address || `${r.type}.${r.name}`, tree: r.values ?? {}, typed: true, plan: true });
+          const address = r.address || `${r.type}.${r.name}`;
+          units.push({ type: r.type, name: String(r.name ?? ''), address, tree: withUnknown(address, r.values ?? {}), typed: true, plan: true, constants: true });
         }
       }
       for (const c of Array.isArray(m.child_modules) ? m.child_modules : []) walkModule(c);
     };
-    if (doc && doc.planned_values && doc.planned_values.root_module) walkModule(doc.planned_values.root_module);
+    if (doc.planned_values && doc.planned_values.root_module) walkModule(doc.planned_values.root_module);
     else {
-      for (const rc of Array.isArray(doc && doc.resource_changes) ? doc.resource_changes : []) {
+      for (const rc of changes) {
         const after = rc && rc.change ? rc.change.after : null;
         if (rc && rc.mode !== 'data' && typeof rc.type === 'string' && after) {
-          units.push({ type: rc.type, name: String(rc.name ?? ''), address: rc.address || `${rc.type}.${rc.name}`, tree: after, typed: true, plan: true });
+          const address = rc.address || `${rc.type}.${rc.name}`;
+          units.push({ type: rc.type, name: String(rc.name ?? ''), address, tree: withUnknown(address, after), typed: true, plan: true, constants: true });
         }
       }
     }
@@ -140,7 +229,12 @@ export function unitsOf(kind, text) {
     const add = (v, where) => {
       // A List (kind List, or any kind ending in List that holds items) is a
       // container, not a resource: each member is read with its own identity.
-      if (/List$/.test(v.kind) && Array.isArray(v.items)) {
+      // `kind: List`, or a *List kind that carries `items`, must hold an
+      // array of items. Missing or non-array items is a malformed container,
+      // reported as invalid, never read as an empty or complete one (N01).
+      // An empty array is a valid, empty List.
+      if (v.kind === 'List' || (/List$/.test(v.kind) && 'items' in v)) {
+        if (!Array.isArray(v.items)) throw new InvalidDeclaration(`${where}: a ${pathPart(v.kind)} needs an items array, found ${v.items === undefined ? 'no items' : v.items === null ? 'null' : typeof v.items}`);
         v.items.forEach((it, i) => { if (isManifest(it)) add(it, `${where}.items[${i}]`); else membersNotRead++; });
         return;
       }
@@ -157,43 +251,195 @@ export function unitsOf(kind, text) {
   }
   if (kind === 'container') {
     const { tree, occurrences } = dockerfileTree(text);
-    return [{ type: null, name: null, address: null, tree, occurrences, typed: false }];
+    return [{ type: null, name: null, address: null, tree, occurrences, typed: false, constants: true }];
   }
   throw new Error(`unknown kind ${kind}`);
 }
+
+/** `true` marks from after_unknown or proposed_unknown, merged: a leaf is
+ *  unknown when either source says so. */
+function mergeMarks(a, b) {
+  if (a === true || b === true) return true;
+  if (a === undefined || a === null || a === false) return b;
+  if (b === undefined || b === null || b === false) return a;
+  if (Array.isArray(a) && Array.isArray(b)) return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => mergeMarks(a[i], b[i]));
+  if (typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+    const o = { ...a };
+    for (const [k, v] of Object.entries(b)) o[k] = mergeMarks(a[k], v);
+    return o;
+  }
+  return a;
+}
+
+const UNKNOWN = Object.freeze({ $expr: '(known after apply)' });
+
+/** A planned value with every `true` mark replaced by an unresolved
+ *  expression. Known values are kept as they are; nothing is evaluated. */
+function overlayUnknown(value, marks) {
+  if (marks === true) return UNKNOWN;
+  if (!marks || typeof marks !== 'object') return value;
+  if (Array.isArray(marks)) {
+    const base = Array.isArray(value) ? [...value] : [];
+    marks.forEach((m, i) => { const v = overlayUnknown(base[i], m); if (v !== undefined) base[i] = v; });
+    return base;
+  }
+  const base = value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : {};
+  for (const [k, m] of Object.entries(marks)) {
+    const v = overlayUnknown(base[k], m);
+    if (v !== undefined) base[k] = v;
+  }
+  return base;
+}
+
+/**
+ * A Dockerfile's logical lines, as BuildKit forms them (N04):
+ *   parser directives are read only at the very top; `# escape=` sets the
+ *   escape character to \ (the default) or `;
+ *   a line ending in the escape character (trailing blanks allowed)
+ *   continues on the next line, and the two are joined with NOTHING inserted;
+ *   a full comment line or an empty line inside a continuation is dropped;
+ *   CRLF and LF read the same.
+ * Each logical line carries the physical line it started on.
+ */
+function dockerLogicalLines(text) {
+  const physical = text.replace(/^﻿/, '').split(/\r?\n/);
+  let escape = '\\';
+  let k = 0;
+  // Directives: `# name=value` lines before anything else. The first line
+  // that is not one ends them, as BuildKit does.
+  const seenDirective = new Set();
+  for (; k < physical.length; k++) {
+    const m = /^#[ \t]*([A-Za-z][A-Za-z0-9]*)[ \t]*=[ \t]*(\S*)[ \t]*$/.exec(physical[k]);
+    if (!m) break;
+    const name = m[1].toLowerCase();
+    if (seenDirective.has(name)) throw new InvalidDeclaration(`line ${k + 1}: the parser directive ${name} is set twice`);
+    seenDirective.add(name);
+    if (name === 'escape') {
+      if (m[2] !== '\\' && m[2] !== '`') throw new InvalidDeclaration(`line ${k + 1}: the escape directive accepts only \\ or \``);
+      escape = m[2];
+    }
+  }
+  const cont = new RegExp(`${escape === '\\' ? '\\\\' : '`'}[ \\t]*$`);
+  const isComment = (l) => /^[ \t]*#/.test(l);
+  const logical = [];
+  for (let i = 0; i < physical.length; i++) {
+    let raw = physical[i];
+    if (i < k) continue; // a directive line
+    const start = raw.replace(/^[ \t]+/, '');
+    if (!start || start.startsWith('#')) continue;
+    let line = start;
+    const startLine = i + 1;
+    while (cont.test(line)) {
+      line = line.replace(cont, '');
+      // Join the following physical lines, skipping comment and empty lines.
+      let next = null;
+      while (i + 1 < physical.length) {
+        i++;
+        const l = physical[i];
+        if (isComment(l) || !l.trim()) continue;
+        next = l; break;
+      }
+      if (next === null) break;
+      line += next;
+    }
+    logical.push({ line, startLine });
+  }
+  return { logical, escape };
+}
+
+/** A Dockerfile word or value with its quotes and escapes removed, the way
+ *  the build reads it. `expr` is true when an unescaped $ outside single
+ *  quotes starts a variable reference, so the value is decided at build time.
+ *  Throws on an unterminated quote. */
+function dockerValue(s, escape, lineNo) {
+  let out = '', expr = false, q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q === "'") { if (c === "'") q = null; else out += c; continue; }
+    if (q === '"') {
+      if (c === '"') { q = null; continue; }
+      if (c === escape && i + 1 < s.length && ['"', '$', escape].includes(s[i + 1])) { out += s[++i]; continue; }
+      if (c === '$' && /[A-Za-z_{]/.test(s[i + 1] || '')) expr = true;
+      out += c; continue;
+    }
+    if (c === "'" || c === '"') { q = c; continue; }
+    if (c === escape) { if (i + 1 < s.length) out += s[++i]; continue; }
+    if (c === '$' && /[A-Za-z_{]/.test(s[i + 1] || '')) expr = true;
+    out += c;
+  }
+  if (q) throw new InvalidDeclaration(`line ${lineNo}: an unterminated ${q === '"' ? 'double' : 'single'} quote in an ENV or ARG value`);
+  return expr ? { $expr: s } : out;
+}
+
+/** Words split on unquoted, unescaped blanks, quotes and escapes kept. */
+function dockerWords(s, escape, lineNo) {
+  const words = [];
+  let cur = '', q = null, inWord = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { cur += c; if (c === escape && q === '"' && i + 1 < s.length) cur += s[++i]; else if (c === q) q = null; continue; }
+    if (c === ' ' || c === '\t') { if (inWord) { words.push(cur); cur = ''; inWord = false; } continue; }
+    inWord = true;
+    if (c === escape && i + 1 < s.length) { cur += c + s[++i]; continue; }
+    if (c === '"' || c === "'") q = c;
+    cur += c;
+  }
+  if (q) throw new InvalidDeclaration(`line ${lineNo}: an unterminated quote in an ENV or ARG instruction`);
+  if (inWord) words.push(cur);
+  return words;
+}
+
+const DOCKER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** A Dockerfile's ENV and ARG settings, twice: as a tree of effective values
  *  (the last assignment wins, as it does in a build) and as the ordered list of
  *  every assignment in the source. Credential literals are counted over the
  *  occurrences, so an earlier literal is not hidden by a later reference
- *  (T18); nothing else lint reports uses the occurrence list. Comment lines and
- *  line continuations are handled; a value that uses $ is unresolved. */
+ *  (T18); nothing else lint reports uses the occurrence list. Logical lines
+ *  are formed first (N04), so a one-line instruction and the same instruction
+ *  continued over several lines, with or without comments between, read the
+ *  same. A value that refers to a variable is unresolved. An instruction lint
+ *  cannot read as name=value pairs makes the file invalid, never silently
+ *  skipped. Values never appear in a reason. */
 function dockerfileTree(text) {
   const tree = {};
   const occurrences = [];
-  const logical = [];
-  let cur = '';
-  for (const raw of text.split(/\r?\n/)) {
-    if (/^\s*#/.test(raw) && !cur) continue;
-    if (/\\\s*$/.test(raw)) { cur += raw.replace(/\\\s*$/, ' '); continue; }
-    logical.push(cur + raw); cur = '';
-  }
-  if (cur) logical.push(cur);
-  const val = (s) => {
-    let v = s;
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-    return /\$/.test(v) ? { $expr: v } : v;
-  };
-  for (const l of logical) {
-    const m = /^\s*(ENV|ARG)\s+(.*)$/i.exec(l);
-    if (!m) continue;
-    const rest = m[2].trim();
-    const pairs = rest.match(/[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)/g);
-    if (pairs && pairs.join(' ').length >= rest.replace(/\s+/g, ' ').length - pairs.length) {
-      for (const p of pairs) { const i = p.indexOf('='); const k = p.slice(0, i), v = val(p.slice(i + 1)); tree[k] = v; occurrences.push([k, v]); }
-    } else {
-      const sp = /^([A-Za-z_][A-Za-z0-9_]*)(?:\s+(.*))?$/.exec(rest);
-      if (sp) { const v = sp[2] !== undefined ? val(sp[2].trim()) : { $expr: `ARG ${sp[1]}` }; tree[sp[1]] = v; occurrences.push([sp[1], v]); }
+  const { logical, escape } = dockerLogicalLines(text);
+  const record = (k, v) => { tree[k] = v; occurrences.push([k, v]); };
+  let heredoc = null;
+  for (const { line: l, startLine } of logical) {
+    if (heredoc) { if (l.trim() === heredoc) heredoc = null; continue; }
+    const m = /^(ENV|ARG)(?:[ \t]+(.*))?$/i.exec(l);
+    if (!m) {
+      // A heredoc body (RUN <<EOF ... EOF) is not instructions; skip to its end.
+      const h = /^[A-Za-z]+\b.*<<-?(["']?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(l);
+      if (h) heredoc = h[2];
+      continue;
+    }
+    const instr = m[1].toUpperCase();
+    const rest = (m[2] || '').trim();
+    if (!rest) throw new InvalidDeclaration(`line ${startLine}: ${instr} has no name`);
+    const words = dockerWords(rest, escape, startLine);
+    if (!words[0].includes('=')) {
+      // The legacy forms: `ENV NAME value with spaces` and `ARG NAME`.
+      if (!DOCKER_NAME.test(words[0])) throw new InvalidDeclaration(`line ${startLine}: ${instr} names a variable lint cannot read`);
+      if (instr === 'ARG') {
+        if (words.length !== 1) throw new InvalidDeclaration(`line ${startLine}: ARG takes name or name=value pairs`);
+        record(words[0], { $expr: `ARG ${words[0]}` });
+        continue;
+      }
+      const value = rest.slice(words[0].length).replace(/^[ \t]+/, '');
+      if (!value) throw new InvalidDeclaration(`line ${startLine}: ENV ${words[0]} has no value`);
+      record(words[0], dockerValue(value, escape, startLine));
+      continue;
+    }
+    for (const w of words) {
+      const i = w.indexOf('=');
+      const name = i < 0 ? w : w.slice(0, i);
+      if (i < 0 && instr === 'ARG' && DOCKER_NAME.test(name)) { record(name, { $expr: `ARG ${name}` }); continue; }
+      if (i < 0) throw new InvalidDeclaration(`line ${startLine}: ${instr} mixes name=value pairs with a word that has no =`);
+      if (!DOCKER_NAME.test(name)) throw new InvalidDeclaration(`line ${startLine}: ${instr} names a variable lint cannot read`);
+      record(name, dockerValue(w.slice(i + 1), escape, startLine));
     }
   }
   return { tree, occurrences };
@@ -246,11 +492,15 @@ const NOT_SECRET_KEY = /(url|uri|endpoint|_arn|arn$|_ids?$|_name$|_names$|_type$
  *  elsewhere. Empty strings, booleans, template and variable references are
  *  not literals. A URL is a literal credential only when it carries a password
  *  in its user information. */
-function isLiteral(v) {
+function isLiteral(v, constants = false) {
   if (typeof v !== 'string') return false;
   const s = v.trim();
   if (!s) return false;
-  if (/[$%]\{/.test(s) || /\$\(/.test(s) || /^\$[A-Za-z_]/.test(s)) return false;
+  // Where the parser already told a constant from an expression (HCL,
+  // Terraform JSON, a plan, a Dockerfile), a string IS a constant, even when
+  // its decoded text holds ${ or $ (N03). Only YAML strings, which carry no
+  // such distinction, are read by their shape.
+  if (!constants && (/[$%]\{/.test(s) || /\$\(/.test(s) || /^\$[A-Za-z_]/.test(s))) return false;
   if (/^(true|false|null|none|nil|undefined)$/i.test(s)) return false;
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return /^[a-z][a-z0-9+.-]*:\/\/[^/@\s:]*:[^/@\s]+@/i.test(s);
   return true;
@@ -270,23 +520,24 @@ const isSecretKey = (k) => SECRET_KEY.test(k) && !NOT_SECRET_KEY.test(k);
 export function credentialLiterals(unitOrTree) {
   const unit = unitOrTree && unitOrTree.tree !== undefined && ('typed' in unitOrTree) ? unitOrTree : { tree: unitOrTree };
   if (Array.isArray(unit.occurrences)) {
-    return unit.occurrences.filter(([k, v]) => isSecretKey(k) && isLiteral(v)).length;
+    return unit.occurrences.filter(([k, v]) => isSecretKey(k) && isLiteral(v, true)).length;
   }
   const tree = unit.tree;
+  const constants = unit.constants === true;
   let n = 0;
   const isSecret = tree && typeof tree === 'object' && tree.kind === 'Secret' && typeof tree.apiVersion === 'string';
   const scan = (node) => {
     if (Array.isArray(node)) { node.forEach(scan); return; }
     if (!node || typeof node !== 'object' || isExpr(node)) return;
     // env: [{ name: API_TOKEN, value: ... }] and the same shape elsewhere.
-    if (typeof node.name === 'string' && 'value' in node && isSecretKey(node.name) && isLiteral(node.value)) n++;
+    if (typeof node.name === 'string' && 'value' in node && isSecretKey(node.name) && isLiteral(node.value, constants)) n++;
     for (const [k, v] of Object.entries(node)) {
       if (META_KEY.test(k)) continue;
       if (isSecret && node === tree && (k === 'data' || k === 'stringData')) {
-        if (v && typeof v === 'object') for (const x of Object.values(v)) if (isLiteral(x)) n++;
+        if (v && typeof v === 'object') for (const x of Object.values(v)) if (isLiteral(x, constants)) n++;
         continue;
       }
-      if (isSecretKey(k) && isLiteral(v)) n++;
+      if (isSecretKey(k) && isLiteral(v, constants)) n++;
       scan(v);
     }
   };
@@ -392,6 +643,8 @@ function blockState(v) {
  * An explicit switch decides; keys and blocks decide only when no switch is set.
  */
 export function encryptionState(tree, inBlock = false) {
+  // A whole planned object that is unknown until apply decides nothing yet.
+  if (isExpr(tree)) return ENCRYPTION.UNRESOLVED;
   const sw = [], other = [];
   let unrecognized = false;
   for (const [k, v] of pairs(tree)) {
