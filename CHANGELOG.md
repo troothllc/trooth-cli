@@ -2,6 +2,17 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.7.0 (2026-10-06)
+
+### `trooth verify`: check the signed reading yourself
+
+- New command. It reads the record's witness statement, the published key list and the check mapping the statement names, and checks on your machine: the Ed25519 signature over the exact payload bytes; the key's lifecycle (active, retired before the statement's time, compromised, revoked, unknown); that the statement was signed for the domain asked about; the count identities; and for v2 the SHA-256 of the exact mapping bytes and of the canonical evidence manifest. It trusts no summary from Trooth.
+- `--file` reads a saved profile, `{statement, manifest}` or a bare statement; `--keys`, `--mapping` and `--manifest` read saved inputs; `--offline` sends nothing and requires `--file` and `--keys`.
+- Verdicts: `checked` and `checked_v1` exit 0; `partially_checked` (mapping or manifest not supplied) exits 4; a record with no statement exits 5; `signature_not_trusted` exits 8 (new); `mismatch` exits 9 (new).
+- The rules are written down in `docs/VERIFY.md`, shipped in the package. `tests/vectors/vectors.json` holds 18 cases (valid v1 and v2, hex and base64 keys, tampered and re-serialized payloads, wrong and unknown keys, compromised, revoked and retired keys, mapping, manifest, domain and count mismatches, malformed signatures and algorithms), signed with test keys whose seeds are public in `generate.mjs`. `generate.mjs --check` proves the file is reproduced byte for byte.
+- `tests/verify.test.mjs` runs every vector through the core and the CLI end to end in offline mode.
+- `check` is unchanged except its closing line, which now names `trooth verify`.
+
 ## 0.6.1 (2026-10-04)
 
 Fixes from the audit of 2026-10-04 (O04, N01, N02, N03, N04). Not yet published to npm.

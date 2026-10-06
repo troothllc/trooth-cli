@@ -1,0 +1,1 @@
+{"version":"test-1.0.0","note":"A DIFFERENT test check mapping: one definition changed. Used to show a mapping mismatch.","checks":{"S1":"The site answers over HTTP or HTTPS.","S2":"security.txt is published.","S3":"A private source was read."}}
