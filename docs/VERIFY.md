@@ -1,8 +1,8 @@
 # Checking a Trooth witness statement
 
-Version 1.1, October 6, 2026. Normative for `trooth verify`, the SDKs in `sdk/` and any other implementation. Version 1.1 adds statement v3 (RFC 8785 bytes, section 2.1), stable ids, verification bundles (section 7) and the published schemas (section 8); every v1 and v2 statement checks exactly as under 1.0.
+Version 1.2, October 6, 2026. Normative for `trooth verify`, the SDKs in `sdk/` and any other implementation. Version 1.2 adds the witness statement log and corrections (section 10, with the log itself in [LOG.md](LOG.md)) and the verdict `superseded`. Version 1.1 added statement v3 (RFC 8785 bytes, section 2.1), stable ids, verification bundles (section 7) and the published schemas (section 8). Every v1 and v2 statement checks exactly as under 1.0.
 
-Trooth signs one object: the **witness statement** for a reading it took of a company's public surface. Everything else on a Trooth profile is unsigned. This document says how to check a witness statement without trusting Trooth's website, API or any summary of the result. An implementation that follows it must reach the verdict given for every case in [`tests/vectors/vectors.json`](../tests/vectors/vectors.json) and [`tests/vectors/bundles.json`](../tests/vectors/bundles.json). The JavaScript core (`bin/lib/verify.mjs`), the Python package (`sdk/python`) and the Go package (`sdk/go`) all do, in their own test suites.
+Trooth signs one object: the **witness statement** for a reading it took of a company's public surface. Everything else on a Trooth profile is unsigned. This document says how to check a witness statement without trusting Trooth's website, API or any summary of the result. An implementation that follows it must reach the verdict given for every case in [`tests/vectors/vectors.json`](../tests/vectors/vectors.json) [`tests/vectors/bundles.json`](../tests/vectors/bundles.json) and [`tests/vectors/log.json`](../tests/vectors/log.json). The JavaScript core (`bin/lib/verify.mjs`), the Python package (`sdk/python`) and the Go package (`sdk/go`) all do, in their own test suites.
 
 The key words MUST, MUST NOT and SHOULD are used as in RFC 2119.
 
@@ -83,7 +83,8 @@ A v1 statement binds no mapping, manifest, evaluator or subject scope.
 | `checked_v1` | v1: signature valid, key trusted, counts hold, subject matches | 0 |
 | `partially_checked` | Everything checked held, but the mapping or the manifest was not supplied. Not supplied is never reported as a match | 4 |
 | `signature_not_trusted` | Malformed, invalid signature, or key not trusted | 8 |
-| `mismatch` | Signature trusted, but counts disagree, the domain differs, or a supplied mapping or manifest does not match | 9 |
+| `mismatch` | Signature trusted, but counts disagree, the domain differs, a supplied mapping or manifest does not match, or a log receipt was supplied and does not check | 9 |
+| `superseded` | Everything checked held, and a correction Trooth signed and logged withdraws or replaces the statement (section 10) | 10 |
 
 ## 6. What a `checked` verdict does and does not mean
 
@@ -97,6 +98,7 @@ A bundle (`trooth.verification-bundle.v1`, [schema](../schemas/verification-bund
 
 - The checker hashes the carried mapping bytes itself; the `digest` written beside them is for display and is never trusted.
 - A domain the reader gives replaces the one the bundle names (vector `bundle-asked-other-domain`).
+- A bundle written by `trooth` 0.9.0 or later also carries the log's answer (`log`: the log key used, the receipt or null, and every correction), so the log part is checked offline too. A log key the checker has pinned replaces the one the bundle carries.
 - A bundle is only as fresh as its key list. A compromise announced after `keys.list_read_at` is not in it, so refresh the list before relying on an old bundle for a decision.
 - A document whose `bundle` is not `trooth.verification-bundle.v1` is refused, not checked (vector `not-a-bundle`).
 
@@ -106,6 +108,17 @@ A bundle (`trooth.verification-bundle.v1`, [schema](../schemas/verification-bund
 
 ## 9. Limits of this version
 
-- Witness statements are not yet entered in a public transparency log, so there is no inclusion proof to check. That is the next phase of work, together with a COSE (RFC 9052) form of the statement for SCITT (RFC 9943) receipts.
+- The log has one operator and no independent witness co-signatures yet ([LOG.md](LOG.md) section 10).
+- Statements and receipts are JSON, not COSE (RFC 9052); a COSE form for SCITT (RFC 9943) receipts is planned.
 - There is no external timestamp.
 - The witness worker still signs v2; see section 2.1.
+
+## 10. The witness statement log
+
+When the checker can reach the log (or a bundle carries its answer), the result gains a `log` part: the log status (`included`, `not_logged`, `unavailable`, `checkpoint_invalid`, `proof_invalid`), the entry index and signed tree size, and each correction with whether it is relied on. The rules for receipts and corrections are in [LOG.md](LOG.md) sections 4 to 6.
+
+- `checkpoint_invalid` or `proof_invalid` makes the verdict `mismatch`: the log's answer about this statement does not check.
+- A correction that meets every rule in [LOG.md](LOG.md) section 6 makes the verdict `superseded` (exit 10), unless the verdict is already `signature_not_trusted` or `mismatch`. The statement's signature is still valid; Trooth has said it no longer stands behind it.
+- `not_logged` and `unavailable` change nothing in this version, and are reported.
+
+`trooth verify` asks the log unless `--offline` or `--no-log` is given, and checks checkpoints against the log key pinned in the release, or the key given with `--log-vkey`.

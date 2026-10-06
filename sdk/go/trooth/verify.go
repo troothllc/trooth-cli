@@ -70,6 +70,119 @@ type Inputs struct {
 	Mapping   []byte
 	Manifest  *EvidenceManifest
 	Domain    *string
+	// Log is what the witness statement log answered; nil means the log was not asked.
+	Log *LogInputs
+}
+
+// LogInputs is the log's answer for one statement (docs/LOG.md). A nil Receipt
+// means the log holds no entry for it. Unavailable, when set, says why the log
+// could not be read; it is reported and never turned into a verdict.
+type LogInputs struct {
+	Vkeys       []string
+	Receipt     *LogReceipt
+	Corrections []LoggedCorrection
+	Unavailable string
+}
+
+// CorrectionV1 is the payload type of a correction.
+const CorrectionV1 = "trooth.correction.v1"
+
+// CorrectionReasons are the reason codes a correction may carry.
+var CorrectionReasons = map[string]bool{"evaluator_defect": true, "mapping_defect": true, "source_misread": true, "signing_key_compromised": true, "dispute_upheld": true, "withdrawn_by_trooth": true}
+
+var sidRe = regexp.MustCompile(`^trooth:statement:[0-9a-f]{64}$`)
+
+// VerifyCorrection checks one correction against the statement id it may supersede.
+func VerifyCorrection(c WitnessStatement, r *LogReceipt, keys []PublicKey, vkeys []string, statementID string) CorrectionCheck {
+	res := CorrectionCheck{}
+	fail := func(why string) CorrectionCheck { res.Reason = sp(why); return res }
+	if c.Payload == "" {
+		return fail("no correction payload")
+	}
+	res.CorrectionStatementID = sp(StatementID(c.Payload))
+	p := decodePayload(c.Payload)
+	if st, _ := p.str("statement"); st != CorrectionV1 {
+		return fail("not a trooth.correction.v1 payload")
+	}
+	if c.Alg != "Ed25519" || c.Canonicalization != JCSLabel || !IsCanonical(c.Payload) {
+		return fail("the correction is not RFC 8785 bytes signed with Ed25519")
+	}
+	signer := p.obj("signer")
+	if kid, _ := signer["key_id"].(string); kid != c.KeyID {
+		return fail("the signer inside the correction is not the envelope key")
+	}
+	if iss, _ := signer["issuer"].(string); iss != "trooth.co" {
+		return fail("the signer inside the correction is not the envelope key")
+	}
+	reason := p.obj("reason")
+	code, _ := reason["code"].(string)
+	effect, _ := p.str("effect")
+	issued, hasIssued := p.str("issued_at")
+	res.Code, res.Effect = sp(code), sp(effect)
+	if hasIssued {
+		res.IssuedAt = sp(issued)
+	}
+	repl, replIsString := p["replacement"].(string)
+	if replIsString {
+		res.Replacement = sp(repl)
+	}
+	if sup, _ := p.str("supersedes"); sup != statementID {
+		return fail("the correction supersedes another statement")
+	}
+	if !CorrectionReasons[code] {
+		return fail("the correction reason code is not known")
+	}
+	_, replPresent := p["replacement"]
+	if !((effect == "withdrawn" && replPresent && p["replacement"] == nil) || (effect == "replaced" && replIsString && sidRe.MatchString(repl))) {
+		return fail("the correction effect and replacement disagree")
+	}
+	m := sigRe.FindStringSubmatch(c.Signature)
+	k := findKey(keys, c.KeyID)
+	if m == nil || k == nil {
+		return fail("the correction signature does not check")
+	}
+	sig, err := b64(m[1])
+	pub := KeyBytes(k)
+	if err != nil || len(pub) != ed25519.PublicKeySize || len(sig) != ed25519.SignatureSize || !ed25519.Verify(ed25519.PublicKey(pub), []byte(c.Payload), sig) {
+		return fail("the correction signature does not check")
+	}
+	var at *string
+	if hasIssued {
+		at = sp(issued)
+	}
+	if kt := KeyTrustAt(c.KeyID, keys, at); !kt.Trusted {
+		return fail("the correction key is not trusted: " + kt.Reason)
+	}
+	rc := CheckReceipt("correction", c, r, vkeys)
+	if rc.Status != "included" {
+		return fail("the correction is not shown in the log: " + rc.Reason)
+	}
+	res.Valid = true
+	res.Reason = sp(rc.Reason)
+	return res
+}
+
+func checkLog(st WitnessStatement, l *LogInputs, keys []PublicKey, sid string) *LogCheck {
+	out := &LogCheck{Status: "not_logged", Corrections: []CorrectionCheck{}}
+	if l.Unavailable != "" {
+		out.Status, out.Reason = "unavailable", sp(l.Unavailable)
+		return out
+	}
+	if l.Receipt != nil {
+		rc := CheckReceipt("witness_statement", st, l.Receipt, l.Vkeys)
+		out.Status, out.Index, out.TreeSize, out.Reason = rc.Status, rc.Index, rc.TreeSize, sp(rc.Reason)
+	} else {
+		out.Reason = sp("The log holds no entry for this statement.")
+	}
+	for _, c := range l.Corrections {
+		rec := c.Receipt
+		v := VerifyCorrection(c.Statement, &rec, keys, l.Vkeys, sid)
+		out.Corrections = append(out.Corrections, v)
+		if v.Valid && out.SupersededBy == nil {
+			out.SupersededBy = v.CorrectionStatementID
+		}
+	}
+	return out
 }
 
 // SHA256Digest returns sha256:<lowercase hex> over the exact bytes.
@@ -444,9 +557,16 @@ func VerifyStatement(in Inputs) VerifyResult {
 		}
 		r.Binding = Binding{Status: status, Mapping: mapping, Manifest: man}
 	}
+	if in.Log != nil {
+		r.Log = checkLog(st, in.Log, in.Keys, *r.StatementID)
+	}
 	switch {
 	case !r.Counts.IdentitiesHold || r.Subject.Status == "mismatch" || r.Binding.Status == "mismatch":
 		r.Verdict = "mismatch"
+	case r.Log != nil && (r.Log.Status == "proof_invalid" || r.Log.Status == "checkpoint_invalid"):
+		r.Verdict = "mismatch"
+	case r.Log != nil && r.Log.SupersededBy != nil:
+		r.Verdict = "superseded"
 	case version == "v1":
 		r.Verdict = "checked_v1"
 	case r.Binding.Status == "bound":
@@ -460,6 +580,12 @@ func VerifyStatement(in Inputs) VerifyResult {
 // VerifyBundle checks a trooth.verification-bundle.v1 document with no network.
 // A non-nil domain overrides the domain the bundle names.
 func VerifyBundle(doc []byte, domain *string) (VerifyResult, error) {
+	return VerifyBundleWithLogKeys(doc, domain, nil)
+}
+
+// VerifyBundleWithLogKeys is VerifyBundle with pinned log keys, which replace
+// the log key a bundle carries when non-empty.
+func VerifyBundleWithLogKeys(doc []byte, domain *string, vkeys []string) (VerifyResult, error) {
 	var b VerificationBundle
 	if err := json.Unmarshal(doc, &b); err != nil {
 		return VerifyResult{}, fmt.Errorf("%w: %v", ErrBundle, err)
@@ -491,7 +617,15 @@ func VerifyBundle(doc []byte, domain *string) (VerifyResult, error) {
 	if asked == nil {
 		asked = b.Domain
 	}
-	r := VerifyStatement(Inputs{Statement: b.Statement, Keys: b.Keys.Keys, Mapping: mapping, Manifest: b.Manifest, Domain: asked})
+	var log *LogInputs
+	if b.Log != nil {
+		keys := vkeys
+		if len(keys) == 0 && b.Log.Vkey != "" {
+			keys = []string{b.Log.Vkey}
+		}
+		log = &LogInputs{Vkeys: keys, Receipt: b.Log.Receipt, Corrections: b.Log.Corrections}
+	}
+	r := VerifyStatement(Inputs{Statement: b.Statement, Keys: b.Keys.Keys, Mapping: mapping, Manifest: b.Manifest, Domain: asked, Log: log})
 	r.KeysReadAt = b.Keys.ListReadAt
 	return r, nil
 }

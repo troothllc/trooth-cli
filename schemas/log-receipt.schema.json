@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/log-receipt.schema.json",
+  "title": "LogReceipt",
+  "description": "A receipt from Trooth's witness statement log (docs/LOG.md): the entry index, a checkpoint signed by the log key, and an RFC 9162 inclusion proof from the entry to the checkpoint root. The entry is RFC 8785 JSON of {kind, statement}; its leaf hash is SHA-256(0x00 || entry).",
+  "type": "object",
+  "required": [
+    "log",
+    "index",
+    "tree_size",
+    "root_hash",
+    "inclusion_proof",
+    "checkpoint"
+  ],
+  "properties": {
+    "log": {
+      "type": "string",
+      "description": "The log origin, which the checkpoint must also name.",
+      "const": "trooth.co/witness-log/v1"
+    },
+    "index": {
+      "type": "integer",
+      "description": "The zero-based entry index.",
+      "minimum": 0
+    },
+    "tree_size": {
+      "type": "integer",
+      "description": "The size of the signed tree the proof is against. Equals the checkpoint size.",
+      "minimum": 1
+    },
+    "root_hash": {
+      "type": "string",
+      "description": "Standard base64 of the 32-byte root at tree_size. Equals the checkpoint root.",
+      "pattern": "^[A-Za-z0-9+/]{43}=$"
+    },
+    "inclusion_proof": {
+      "type": "array",
+      "description": "The RFC 9162 audit path, leaf to root, each a 32-byte hash in standard base64.",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9+/]{43}=$"
+      }
+    },
+    "checkpoint": {
+      "type": "string",
+      "description": "A C2SP checkpoint (origin, size, base64 root, each on its own line) followed by a blank line and C2SP signed-note signature lines; the log key's line is an em dash, the key name and base64 of the 4-byte key hash and the 64-byte Ed25519 signature.",
+      "minLength": 10
+    }
+  }
+}

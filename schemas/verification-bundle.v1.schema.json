@@ -59,9 +59,66 @@
         }
       ],
       "description": "The exact mapping bytes, or null when none were saved."
+    },
+    "log": {
+      "$ref": "#/$defs/BundleLog",
+      "description": "What the witness statement log answered when the bundle was written: the log key used, the receipt or null, and every correction. Absent in a bundle written before the log, or when the log was not read."
     }
   },
   "$defs": {
+    "BundleLog": {
+      "title": "BundleLog",
+      "type": "object",
+      "description": "The log answer, carried so the log part can be checked offline too.",
+      "required": [
+        "vkey",
+        "receipt",
+        "corrections"
+      ],
+      "properties": {
+        "vkey": {
+          "type": "string",
+          "description": "The log verifier key the receipt was checked against, as a signed-note key (name+hash+key). A pinned key, when the checker has one, replaces it."
+        },
+        "receipt": {
+          "oneOf": [
+            {
+              "$ref": "log-receipt.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The receipt for the statement, or null when the log held no entry for it."
+        },
+        "corrections": {
+          "type": "array",
+          "description": "Every logged correction naming this statement, each with its own receipt.",
+          "items": {
+            "$ref": "#/$defs/LoggedCorrection"
+          }
+        }
+      }
+    },
+    "LoggedCorrection": {
+      "title": "LoggedCorrection",
+      "type": "object",
+      "description": "A correction envelope and its receipt.",
+      "required": [
+        "statement",
+        "receipt"
+      ],
+      "properties": {
+        "statement": {
+          "$ref": "witness-statement.schema.json",
+          "description": "The correction envelope: its payload is a trooth.correction.v1 document in RFC 8785 bytes."
+        },
+        "receipt": {
+          "$ref": "log-receipt.schema.json",
+          "description": "The receipt for the correction."
+        }
+      }
+    },
     "BundleKeys": {
       "title": "BundleKeys",
       "type": "object",

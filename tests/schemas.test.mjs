@@ -20,7 +20,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 8);
+  assert.equal(Object.keys(schemas).length, 10);
   for (const [f, s] of Object.entries(schemas)) {
     assert.equal(s.$id, `https://trooth.co/schemas/${f}`);
     assert.equal(s.$schema, 'https://json-schema.org/draft/2020-12/schema');
@@ -69,6 +69,19 @@ test('a reason-less v2 check, a v3 payload without subject_id and a manifest ent
   assert.notDeepEqual(validate('evidence-manifest.schema.json', [{ check_id: 'S1', source: 'https://a.example/', commitment: `sha256:${'0'.repeat(64)}` }]), []);
 });
 
+test('log receipts, correction payloads and logged bundles validate (docs/LOG.md)', () => {
+  const log = JSON.parse(readFileSync(new URL('./vectors/log.json', import.meta.url), 'utf8'));
+  let receipts = 0, corrections = 0;
+  for (const c of log.cases) {
+    if (['proof-tampered', 'checkpoint-forged', 'checkpoint-other-origin'].includes(c.name)) continue;
+    if (c.log.receipt) { ok('log-receipt.schema.json', c.log.receipt, c.name); receipts++; }
+    for (const x of c.log.corrections) { ok('witness-statement.schema.json', x.statement, c.name); if (!['correction-bad-signature'].includes(c.name)) ok('correction-payload.v1.schema.json', JSON.parse(x.statement.payload), c.name); corrections++; }
+  }
+  assert.ok(receipts >= 8 && corrections >= 4, `${receipts} receipts, ${corrections} corrections`);
+  assert.notDeepEqual(validate('correction-payload.v1.schema.json', { ...JSON.parse(log.entries[3].statement.payload), effect: 'deleted' }), []);
+  assert.notDeepEqual(validate('log-receipt.schema.json', { ...log.cases[0].log.receipt, root_hash: 'short' }), []);
+});
+
 test('bundles validate, including a real one saved from trooth.co', () => {
   for (const b of bundles) if (!b.expect.error) ok('verification-bundle.v1.schema.json', b.bundle, b.name);
   ok('verification-bundle.v1.schema.json', live, 'trooth.co bundle');
@@ -83,6 +96,24 @@ test('trooth verify --json output validates against verify-result', () => {
   ok('verify-result.schema.json', doc, 'cli output');
   assert.equal(doc.verdict, 'checked');
   assert.equal(doc.statement_id, statementId(live.statement.payload));
+});
+
+test('trooth verify --json with a log answer validates against verify-result', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const cli = new URL('../bin/trooth.mjs', import.meta.url).pathname;
+  for (const name of ['bundle-superseded', 'bundle-v3-logged', 'bundle-forged-checkpoint']) {
+    const b = bundles.find((x) => x.name === name);
+    const f = join(mkdtempSync(join(tmpdir(), 'trooth-schema-')), 'b.json');
+    writeFileSync(f, JSON.stringify(b.bundle));
+    const logVkey = JSON.parse(readFileSync(new URL('./vectors/log.json', import.meta.url), 'utf8')).vkey;
+    const r = spawnSync(process.execPath, [cli, 'verify', '--bundle', f, '--json', '--log-vkey', logVkey], { encoding: 'utf8', env: { ...process.env, TROOTH_WEB: 'http://127.0.0.1:9', TROOTH_API: 'http://127.0.0.1:9' } });
+    const doc = JSON.parse(r.stdout);
+    ok('verify-result.schema.json', doc, name);
+    assert.equal(doc.verdict, b.expect.verdict, name);
+    assert.ok(doc.log, `${name} carries the log part`);
+  }
 });
 
 test('stable ids: format, parse and refuse', () => {

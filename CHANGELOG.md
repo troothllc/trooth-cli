@@ -2,6 +2,19 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.9.0 (2026-10-06)
+
+### The witness statement log, corrections and monitoring
+
+- Trooth now enters every published witness statement, and every correction it issues, in one append-only log at `https://api.trooth.co/scan/log/v1`: an RFC 9162 tree (SHA-256, 0x00 leaves, 0x01 nodes), a C2SP checkpoint signed as a C2SP signed note with an Ed25519 key that signs nothing else, and C2SP tlog-tiles. A reading that was never published is never logged. `docs/LOG.md` is the normative text.
+- `trooth verify` asks the log for the statement by its statement id and for corrections naming it, checks the receipt against a checkpoint signed by the log key pinned in `bin/lib/log-trust.mjs`, and reports `included`, `not_logged`, `unavailable`, `checkpoint_invalid` or `proof_invalid`. The last two make the verdict `mismatch`. `not_logged` and `unavailable` change nothing in this version.
+- Corrections: `trooth.correction.v1`, signed like a v3 statement and logged. A correction that names the statement, is signed by a key trusted at `issued_at` and is itself included in the log makes the verdict `superseded` (new exit code 10). Others are reported and not relied on.
+- `--no-log` skips the log; `--log-vkey <key>` checks checkpoints against another key. `--save-bundle` writes the log's answer into the bundle, and `--bundle` checks it offline, with the pinned key replacing the key the bundle carries.
+- New `trooth log checkpoint` and `trooth log monitor --state <file>`: the monitor saves the checkpoint it saw and, on each later run, verifies a consistency proof from it; a log that shrank, forked or cannot prove it grew exits 9 and the saved state is kept. `.github/workflows/log-monitor.yml` runs it hourly in public.
+- `docs/KEY-CEREMONY.md`: how the statement key and the log key are made, held, rotated and revoked, what is in place now and what is planned.
+- `docs/VERIFY.md` 1.2. Schemas: `log-receipt`, `correction-payload.v1`; `verification-bundle.v1` gains an optional `log`; `verify-result` gains `log` and `superseded`. The package exports `trooth/tlog`.
+- Python `trooth-verify` 0.2.0 and the Go package check receipts, consistency proofs and corrections, and run every log vector. `tests/vectors/log.json` holds 13 statement cases with a log answer and 7 consistency cases; Go's `golang.org/x/mod/sumdb/note` and `sumdb/tlog` agree with its checkpoints, roots and proofs.
+
 ## 0.8.0 (2026-10-06)
 
 ### Bundles, statement v3, schemas and SDKs

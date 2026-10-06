@@ -1,0 +1,1105 @@
+{
+  "description": "Test vectors for docs/LOG.md. A five-entry test log signed with a test key whose seed is public in generate.mjs. Each case is a statement check with a log answer (vkeys, receipt or null, corrections) and the verdict and log status it must reach; `keys` defaults to the key list of vectors.json. The consistency cases are RFC 9162 consistency proofs between two signed sizes. `checkpoints` are the two signed notes.",
+  "origin": "trooth.co/witness-log/v1",
+  "vkey": "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK",
+  "impostor_vkey": "trooth.co/witness-log/v1+ec0801bb+AVyq2enQIRhddeiUhYP6iYyrJLJ5tky/jI3b40c7KzJY",
+  "checkpoints": {
+    "3": "trooth.co/witness-log/v1\n3\nK7yfTiThvcyFyMwokOVm+8xqFGuT+7cTe+c59dXHYLo=\n\n— trooth.co/witness-log/v1 NCvDVlNrG9XukPkME3Z6lreiu8ed9u38ZpwTE0EQDZLE0a5hWMgHXpWS0lPXYIFbjAy6QoyJ3g82XJXm6m+HyIruzAU=\n",
+    "5": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+  },
+  "entries": [
+    {
+      "index": 0,
+      "kind": "witness_statement",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "leaf_hash": "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM="
+    },
+    {
+      "index": 1,
+      "kind": "witness_statement",
+      "statement": {
+        "payload": "{\"statement\":\"trooth.witness-statement.v2\",\"reading_id\":\"scan_vectors_1\",\"domain\":\"acme-vectors.com\",\"read_at\":\"2026-10-01T12:00:00.000Z\",\"subject_scope\":{\"domain\":\"acme-vectors.com\",\"surface\":\"public\",\"checks_in_scope\":3},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"test-1.0.0\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"withheld\":false,\"withheld_reason\":null}},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"private source\"}}],\"counts\":{\"read\":2,\"as_expected\":1,\"not_as_expected\":1,\"not_read\":1,\"in_reading\":3}}",
+        "signature": "ed25519:qgRiOkqrf1kT3oO0VZ2IFtR29CK4o5e+1MmZe9x7kn74Szw5y+UB9Ol/iaR7Vh9U0UHr9Ixio3uApF3bflMTCw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+      },
+      "leaf_hash": "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg="
+    },
+    {
+      "index": 2,
+      "kind": "witness_statement",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-other.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-other.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-other.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:wMrIhALXksvd1qM+v8XCFTQXI+ZhCCq3OHr5H8VU0BaCRP7hfxUWToXxNXn4wfLUMywGay5W8LCnc3V9LY+8AA==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "leaf_hash": "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4="
+    },
+    {
+      "index": 3,
+      "kind": "correction",
+      "statement": {
+        "payload": "{\"correction_id\":\"corr_vectors_1\",\"effect\":\"withdrawn\",\"issued_at\":\"2026-10-07T12:00:00.000Z\",\"reason\":{\"code\":\"evaluator_defect\",\"explanation\":\"A check read the wrong page; the reading is withdrawn.\"},\"replacement\":null,\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.correction.v1\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"supersedes\":\"trooth:statement:230735b7619cf84040305e757fef003680d6b8ee686596095d88a29c04d73bf6\"}",
+        "signature": "ed25519:uEdxDCND62iN4+hpMb4dB7J+QnV7iOBRfx9vHuy534QpQlZ7q0Kb54aPdX1NKvMcg+LtrKW2oenzwYfhNlHOCw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "leaf_hash": "OCQ8XodcY7Fjt1YrI+5Xso/L1InI9onlKiSyqeknx+Q="
+    },
+    {
+      "index": 4,
+      "kind": "witness_statement",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-third.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-third.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-third.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:Id5CUu4Btf/iQa6Ef7Tz6R8Wfwgaj8EBRZvoAlnDaiTt08lATQ9299coF3CoQDq3Z6mZvSe+S4d3oUSst9r6Aw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "leaf_hash": "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+    }
+  ],
+  "cases": [
+    {
+      "name": "logged-v3",
+      "note": "A v3 statement with a receipt that checks.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 0,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "checked",
+        "log": "included"
+      }
+    },
+    {
+      "name": "not-logged",
+      "note": "The log holds no entry: reported, never a failure in this version.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": null,
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "checked",
+        "log": "not_logged"
+      }
+    },
+    {
+      "name": "proof-tampered",
+      "note": "One proof hash changed.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 0,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7HQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "mismatch",
+        "log": "proof_invalid"
+      }
+    },
+    {
+      "name": "proof-wrong-index",
+      "note": "The right proof for another position.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 1,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "mismatch",
+        "log": "proof_invalid"
+      }
+    },
+    {
+      "name": "receipt-for-other-statement",
+      "note": "Another statement's receipt.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 1,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "mismatch",
+        "log": "proof_invalid"
+      }
+    },
+    {
+      "name": "checkpoint-forged",
+      "note": "A checkpoint signed by a key that is not the log key.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 0,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 7AgBux9HZtkoG5PjLIFpwwqvKMsAo/bbh/6cUPznY1HvDp1ZM9osnPBgrDNqnVmlMLAyvb663Q3FSJdGYl3xQM7JtQM=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "mismatch",
+        "log": "checkpoint_invalid"
+      }
+    },
+    {
+      "name": "checkpoint-other-origin",
+      "note": "Signed by the log key, but naming another log.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 0,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "example.org/other-log\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVstEIwDGXCiFtKULADfi40beLQ5TQVTxiT3iNYYj1AV7JoQsivDCmRTze0FwlxhhAk3Cy6E43fvvznjoQRH1ZAU=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "mismatch",
+        "log": "checkpoint_invalid"
+      }
+    },
+    {
+      "name": "size-not-checkpoint",
+      "note": "The receipt claims a size the checkpoint does not sign.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 0,
+          "tree_size": 3,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": []
+      },
+      "expect": {
+        "verdict": "mismatch",
+        "log": "proof_invalid"
+      }
+    },
+    {
+      "name": "superseded",
+      "note": "A logged correction signed by a trusted key withdraws this statement.",
+      "statement": {
+        "payload": "{\"statement\":\"trooth.witness-statement.v2\",\"reading_id\":\"scan_vectors_1\",\"domain\":\"acme-vectors.com\",\"read_at\":\"2026-10-01T12:00:00.000Z\",\"subject_scope\":{\"domain\":\"acme-vectors.com\",\"surface\":\"public\",\"checks_in_scope\":3},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"test-1.0.0\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"withheld\":false,\"withheld_reason\":null}},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"private source\"}}],\"counts\":{\"read\":2,\"as_expected\":1,\"not_as_expected\":1,\"not_read\":1,\"in_reading\":3}}",
+        "signature": "ed25519:qgRiOkqrf1kT3oO0VZ2IFtR29CK4o5e+1MmZe9x7kn74Szw5y+UB9Ol/iaR7Vh9U0UHr9Ixio3uApF3bflMTCw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 1,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": [
+          {
+            "statement": {
+              "payload": "{\"correction_id\":\"corr_vectors_1\",\"effect\":\"withdrawn\",\"issued_at\":\"2026-10-07T12:00:00.000Z\",\"reason\":{\"code\":\"evaluator_defect\",\"explanation\":\"A check read the wrong page; the reading is withdrawn.\"},\"replacement\":null,\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.correction.v1\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"supersedes\":\"trooth:statement:230735b7619cf84040305e757fef003680d6b8ee686596095d88a29c04d73bf6\"}",
+              "signature": "ed25519:uEdxDCND62iN4+hpMb4dB7J+QnV7iOBRfx9vHuy534QpQlZ7q0Kb54aPdX1NKvMcg+LtrKW2oenzwYfhNlHOCw==",
+              "key_id": "test-key-a",
+              "alg": "Ed25519",
+              "canonicalization": "RFC8785"
+            },
+            "receipt": {
+              "log": "trooth.co/witness-log/v1",
+              "index": 3,
+              "tree_size": 5,
+              "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+              "inclusion_proof": [
+                "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+                "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+                "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+              ],
+              "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "verdict": "superseded",
+        "log": "included"
+      }
+    },
+    {
+      "name": "correction-for-other",
+      "note": "A correction aimed at another statement is ignored.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 0,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": [
+          {
+            "statement": {
+              "payload": "{\"correction_id\":\"corr_vectors_1\",\"effect\":\"withdrawn\",\"issued_at\":\"2026-10-07T12:00:00.000Z\",\"reason\":{\"code\":\"evaluator_defect\",\"explanation\":\"A check read the wrong page; the reading is withdrawn.\"},\"replacement\":null,\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.correction.v1\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"supersedes\":\"trooth:statement:230735b7619cf84040305e757fef003680d6b8ee686596095d88a29c04d73bf6\"}",
+              "signature": "ed25519:uEdxDCND62iN4+hpMb4dB7J+QnV7iOBRfx9vHuy534QpQlZ7q0Kb54aPdX1NKvMcg+LtrKW2oenzwYfhNlHOCw==",
+              "key_id": "test-key-a",
+              "alg": "Ed25519",
+              "canonicalization": "RFC8785"
+            },
+            "receipt": {
+              "log": "trooth.co/witness-log/v1",
+              "index": 3,
+              "tree_size": 5,
+              "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+              "inclusion_proof": [
+                "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+                "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+                "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+              ],
+              "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "verdict": "checked",
+        "log": "included"
+      }
+    },
+    {
+      "name": "correction-not-shown",
+      "note": "A correction whose receipt does not check is ignored.",
+      "statement": {
+        "payload": "{\"statement\":\"trooth.witness-statement.v2\",\"reading_id\":\"scan_vectors_1\",\"domain\":\"acme-vectors.com\",\"read_at\":\"2026-10-01T12:00:00.000Z\",\"subject_scope\":{\"domain\":\"acme-vectors.com\",\"surface\":\"public\",\"checks_in_scope\":3},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"test-1.0.0\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"withheld\":false,\"withheld_reason\":null}},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"private source\"}}],\"counts\":{\"read\":2,\"as_expected\":1,\"not_as_expected\":1,\"not_read\":1,\"in_reading\":3}}",
+        "signature": "ed25519:qgRiOkqrf1kT3oO0VZ2IFtR29CK4o5e+1MmZe9x7kn74Szw5y+UB9Ol/iaR7Vh9U0UHr9Ixio3uApF3bflMTCw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 1,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": [
+          {
+            "statement": {
+              "payload": "{\"correction_id\":\"corr_vectors_1\",\"effect\":\"withdrawn\",\"issued_at\":\"2026-10-07T12:00:00.000Z\",\"reason\":{\"code\":\"evaluator_defect\",\"explanation\":\"A check read the wrong page; the reading is withdrawn.\"},\"replacement\":null,\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.correction.v1\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"supersedes\":\"trooth:statement:230735b7619cf84040305e757fef003680d6b8ee686596095d88a29c04d73bf6\"}",
+              "signature": "ed25519:uEdxDCND62iN4+hpMb4dB7J+QnV7iOBRfx9vHuy534QpQlZ7q0Kb54aPdX1NKvMcg+LtrKW2oenzwYfhNlHOCw==",
+              "key_id": "test-key-a",
+              "alg": "Ed25519",
+              "canonicalization": "RFC8785"
+            },
+            "receipt": {
+              "log": "trooth.co/witness-log/v1",
+              "index": 4,
+              "tree_size": 5,
+              "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+              "inclusion_proof": [
+                "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+                "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+                "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+              ],
+              "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "verdict": "checked",
+        "log": "included"
+      }
+    },
+    {
+      "name": "correction-bad-signature",
+      "note": "A correction signed by the wrong key is ignored.",
+      "statement": {
+        "payload": "{\"statement\":\"trooth.witness-statement.v2\",\"reading_id\":\"scan_vectors_1\",\"domain\":\"acme-vectors.com\",\"read_at\":\"2026-10-01T12:00:00.000Z\",\"subject_scope\":{\"domain\":\"acme-vectors.com\",\"surface\":\"public\",\"checks_in_scope\":3},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"test-1.0.0\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"withheld\":false,\"withheld_reason\":null}},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"private source\"}}],\"counts\":{\"read\":2,\"as_expected\":1,\"not_as_expected\":1,\"not_read\":1,\"in_reading\":3}}",
+        "signature": "ed25519:qgRiOkqrf1kT3oO0VZ2IFtR29CK4o5e+1MmZe9x7kn74Szw5y+UB9Ol/iaR7Vh9U0UHr9Ixio3uApF3bflMTCw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 1,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": [
+          {
+            "statement": {
+              "payload": "{\"correction_id\":\"corr_vectors_1\",\"effect\":\"withdrawn\",\"issued_at\":\"2026-10-07T12:00:00.000Z\",\"reason\":{\"code\":\"evaluator_defect\",\"explanation\":\"A check read the wrong page; the reading is withdrawn.\"},\"replacement\":null,\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.correction.v1\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"supersedes\":\"trooth:statement:230735b7619cf84040305e757fef003680d6b8ee686596095d88a29c04d73bf6\"}",
+              "signature": "ed25519:V1elf/u+etsurnjrk7yPEEXbx/RA6uIgy9ri/OVvoNApF4Cbk2qmeYT1/QEnSRsBR8KLOc/qNna6wvl1fmT1AQ==",
+              "key_id": "test-key-a",
+              "alg": "Ed25519",
+              "canonicalization": "RFC8785"
+            },
+            "receipt": {
+              "log": "trooth.co/witness-log/v1",
+              "index": 3,
+              "tree_size": 5,
+              "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+              "inclusion_proof": [
+                "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+                "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+                "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+              ],
+              "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "verdict": "checked",
+        "log": "included"
+      }
+    },
+    {
+      "name": "key-compromised",
+      "note": "Key A is compromised: neither the statement nor its correction is relied on.",
+      "statement": {
+        "payload": "{\"statement\":\"trooth.witness-statement.v2\",\"reading_id\":\"scan_vectors_1\",\"domain\":\"acme-vectors.com\",\"read_at\":\"2026-10-01T12:00:00.000Z\",\"subject_scope\":{\"domain\":\"acme-vectors.com\",\"surface\":\"public\",\"checks_in_scope\":3},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"test-1.0.0\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"withheld\":false,\"withheld_reason\":null}},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"private source\"}}],\"counts\":{\"read\":2,\"as_expected\":1,\"not_as_expected\":1,\"not_read\":1,\"in_reading\":3}}",
+        "signature": "ed25519:qgRiOkqrf1kT3oO0VZ2IFtR29CK4o5e+1MmZe9x7kn74Szw5y+UB9Ol/iaR7Vh9U0UHr9Ixio3uApF3bflMTCw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "compromised",
+          "compromised_at": "2026-10-02T00:00:00.000Z"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "log": {
+        "vkeys": [
+          "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK"
+        ],
+        "receipt": {
+          "log": "trooth.co/witness-log/v1",
+          "index": 1,
+          "tree_size": 5,
+          "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+          "inclusion_proof": [
+            "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM=",
+            "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+            "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+          ],
+          "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+        },
+        "corrections": [
+          {
+            "statement": {
+              "payload": "{\"correction_id\":\"corr_vectors_1\",\"effect\":\"withdrawn\",\"issued_at\":\"2026-10-07T12:00:00.000Z\",\"reason\":{\"code\":\"evaluator_defect\",\"explanation\":\"A check read the wrong page; the reading is withdrawn.\"},\"replacement\":null,\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.correction.v1\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"supersedes\":\"trooth:statement:230735b7619cf84040305e757fef003680d6b8ee686596095d88a29c04d73bf6\"}",
+              "signature": "ed25519:uEdxDCND62iN4+hpMb4dB7J+QnV7iOBRfx9vHuy534QpQlZ7q0Kb54aPdX1NKvMcg+LtrKW2oenzwYfhNlHOCw==",
+              "key_id": "test-key-a",
+              "alg": "Ed25519",
+              "canonicalization": "RFC8785"
+            },
+            "receipt": {
+              "log": "trooth.co/witness-log/v1",
+              "index": 3,
+              "tree_size": 5,
+              "root_hash": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+              "inclusion_proof": [
+                "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+                "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+                "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+              ],
+              "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "verdict": "signature_not_trusted",
+        "log": null
+      }
+    }
+  ],
+  "consistency": [
+    {
+      "name": "3-to-5",
+      "first": 3,
+      "second": 5,
+      "first_root": "K7yfTiThvcyFyMwokOVm+8xqFGuT+7cTe+c59dXHYLo=",
+      "second_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "proof": [
+        "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+        "OCQ8XodcY7Fjt1YrI+5Xso/L1InI9onlKiSyqeknx+Q=",
+        "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+        "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+      ],
+      "expect": true
+    },
+    {
+      "name": "1-to-5",
+      "first": 1,
+      "second": 5,
+      "first_root": "/Rm5PiTgvPRNvkY6rH1YpCI5dIWMWfb6dJ9/edGIHhM=",
+      "second_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "proof": [
+        "7XQyH3xaA6Z+fIEZ6GpZlu7lCuNjsw0mHZX5Her4KVg=",
+        "AkE6A/Vb6ENwkbf9U6hxLhGHh/u95TpVY3SrFCym5cM=",
+        "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+      ],
+      "expect": true
+    },
+    {
+      "name": "4-to-5",
+      "first": 4,
+      "second": 5,
+      "first_root": "MSvqXCqEOrWmJfgEMZRnPSbEbMKCXFoV7X9an/1WW3Q=",
+      "second_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "proof": [
+        "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+      ],
+      "expect": true
+    },
+    {
+      "name": "same-size",
+      "first": 5,
+      "second": 5,
+      "first_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "second_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "proof": [],
+      "expect": true
+    },
+    {
+      "name": "tampered",
+      "first": 3,
+      "second": 5,
+      "first_root": "K7yfTiThvcyFyMwokOVm+8xqFGuT+7cTe+c59dXHYLo=",
+      "second_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "proof": [
+        "hLZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+        "OCQ8XodcY7Fjt1YrI+5Xso/L1InI9onlKiSyqeknx+Q=",
+        "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+        "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+      ],
+      "expect": false
+    },
+    {
+      "name": "history-rewritten",
+      "first": 3,
+      "second": 5,
+      "first_root": "6uHA0Nq19Pnq1z7x2Sd+Z7a1fOEprxZHpGeYBLoWIJo=",
+      "second_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "proof": [
+        "hbZSzK+ss7lkpoLvnpy33hB6spOiGb85d14XwsW6Ul4=",
+        "OCQ8XodcY7Fjt1YrI+5Xso/L1InI9onlKiSyqeknx+Q=",
+        "id2evp3PT93HJUHBIkj5JZ1ga4EucyvZxEtBSBB/Zws=",
+        "sDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAs="
+      ],
+      "expect": false
+    },
+    {
+      "name": "shrunk",
+      "first": 5,
+      "second": 3,
+      "first_root": "AhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=",
+      "second_root": "K7yfTiThvcyFyMwokOVm+8xqFGuT+7cTe+c59dXHYLo=",
+      "proof": [],
+      "expect": false
+    }
+  ]
+}
