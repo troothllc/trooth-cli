@@ -25,6 +25,15 @@
 //   trooth lint [path]      Read the infrastructure THIS repository declares and print
 //                           the declared facts plus an aggregate digest of them.
 //                           Fully local. Offline. Your source never leaves the machine.
+//   trooth verify <domain>  Check the record's signed witness statement yourself: the
+//                           Ed25519 signature over the exact payload bytes, the key's
+//                           lifecycle on api.trooth.co/public/keys, the domain it was
+//                           signed for, the count identities, and for v2 the sha256 of
+//                           the exact check mapping and of the evidence manifest. It
+//                           trusts no summary from Trooth. --file reads a saved
+//                           statement; --offline with --keys sends nothing at all.
+//                           The rules are in docs/VERIFY.md; tests/vectors/ holds the
+//                           cases any other implementation must agree on.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
@@ -33,7 +42,7 @@
 //   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
-// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1):
+// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
 //   1  finding                 (check: not listed, or revoked; lint: nothing to read)
@@ -53,6 +62,13 @@
 //                               example EPIPE from a reader that stopped early, before
 //                               everything was written; the result was not delivered,
 //                               whatever it would have been)
+//   8  not trusted             (new in 0.7.0, verify: the statement is malformed, its
+//                               signature does not check, or its key is not trusted)
+//   9  mismatch                (new in 0.7.0, verify: the signature checks, but the domain,
+//                               the check mapping, the evidence manifest or the signed
+//                               counts do not match what was signed)
+//   verify also uses 4 (a mapping or manifest was not supplied, so the binding is only
+//   partially checked) and 5 (the record carries no signed statement).
 //
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
@@ -60,6 +76,7 @@
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
+import { verifyStatement } from './lib/verify.mjs';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -75,10 +92,10 @@ const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, 
 const PROJECTION_CONTRACT = 2;
 const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.6.1';
+let VERSION = '0.7.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -173,6 +190,7 @@ function scrub(value) {
 const FLAGS = {
   check: { bool: ['--json', '--no-fallback'], value: [] },
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
+  verify: { bool: ['--json', '--offline'], value: ['--file', '--keys', '--mapping', '--manifest'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -221,6 +239,7 @@ ${J}${B}trooth${X} ${D}v${VERSION} · the terminal interface to the Trooth Netwo
 ${B}Usage${X}
   trooth check <domain>     Read a company's record on the Trooth Network
   trooth lint [path]        Read what your infrastructure declares, locally. Offline.
+  trooth verify <domain>    Check the record's signed witness statement yourself
   trooth --help | --version
 
 ${B}Examples${X}
@@ -228,24 +247,34 @@ ${B}Examples${X}
   trooth check trooth.co --json          ${D}# one JSON document on stdout, for scripting${X}
   trooth lint ./infra                    ${D}# read declared facts, with a coverage report${X}
   trooth lint --json > trooth-lint.json  ${D}# the same facts as one JSON document, for a CI artifact${X}
+  trooth verify trooth.co                ${D}# check the signature, key, domain and bindings locally${X}
+  trooth verify --file saved.json --offline --keys keys.json --mapping 1.0.1.json
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
   --allow-incomplete        lint: exit 0 even when a file was skipped, invalid or unreadable
   --no-fallback             check: exit 3 when the record projection cannot be reached,
                             instead of reading the directory feed as a labelled fallback
+  --file <path>             verify: a saved profile, statement, or {statement, manifest}
+  --keys <path>             verify: a saved copy of api.trooth.co/public/keys
+  --mapping <path>          verify: the exact check mapping document the statement names
+  --manifest <path>         verify: the evidence manifest (a JSON list)
+  --offline                 verify: send nothing; needs --file and --keys
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
   4 lint read incomplete   5 listed, but no witnessed reading in the record   6 withheld
   7 output not delivered: stdout or stderr failed or closed before everything was written
+  8 verify: signature does not check, or the key is not trusted
+  9 verify: signature checks, but the domain, mapping, manifest or counts do not match
 
 ${D}check reads only public, already-published records. No key, no account. It reads
 the one record projection, trooth.co/api/network/profile, the same body the website,
 the API and the MCP connector read, and sends the domain you ask about in the request
 URL, with your IP address and a user agent naming this CLI; see
 https://trooth.co/privacy for what is kept. When that projection cannot be reached it
-reads api.trooth.co's directory feed instead and says so. It checks no signature.
+reads api.trooth.co's directory feed instead and says so. check reads; verify checks
+the one signed object, the witness statement, on your machine.
 lint is entirely local: it opens files, and opens no sockets. Your source never leaves.
 Trooth publishes facts and counts, never one number that sums a company up.
 Trooth signs what it witnessed. It never signs on a company's behalf.${X}
@@ -691,7 +720,7 @@ function printProjection(rec) {
       + `\nreading's checks and counts. The profile, its facts and the company's text are not signed.${X}`
     : `${D}What is signed: nothing in this record. The profile is not signed, and the last reading`
       + `\ncarries no witness statement.${X}`);
-  out(`${D}This command did not check any signature. To check it yourself:${X} ${C}${rec.verify_how}${X}`);
+  out(`${D}This command did not check any signature. To check it yourself:${X} ${C}trooth verify ${rec.domain}${X}${D} (how it works: ${rec.verify_how})${X}`);
   out(`${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
   out(`Full record: ${X}${C}${rec.record_url}${X}${D}   ·   Signing keys: ${rec.verify_keys}${X}\n`);
 }
@@ -729,7 +758,7 @@ function printDirectory(rec) {
   }
 
   out(`\n${D}This command did not check the record's signature. The signature covers the`);
-  out(`reading, not every fact on the company's profile. To check it yourself:${X} ${C}${rec.verify_how}${X}`);
+  out(`reading, not every fact on the company's profile. To check it yourself:${X} ${C}trooth verify ${rec.domain}${X}${D} (how it works: ${rec.verify_how})${X}`);
   out(`${D}A dated, point-in-time record. Trooth issues no verdict and no single number.`);
   out(`Full record: ${X}${C}${rec.record_url}${X}${D}   ·   Signing keys: ${rec.verify_keys}${X}\n`);
 }
@@ -1151,17 +1180,155 @@ function lint() {
 
 /* ---------------------------------------------------------------- main ---- */
 
+/* -------------------------------------------------------------- verify ---- */
+
+/** GET exact bytes (a mapping document must be hashed as published, not re-encoded). */
+async function getBytes(url, maxBody) {
+  let res;
+  try {
+    res = await fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'user-agent': `trooth-cli/${VERSION}` } });
+  } catch (e) {
+    throw new Upstream(`could not read ${url}: ${e && e.message ? e.message : e}`, {}, true);
+  }
+  if (res.status < 200 || res.status > 299) throw new Upstream(`${url} answered HTTP ${res.status}`, { http_status: res.status });
+  const len = Number(res.headers.get('content-length'));
+  if (Number.isFinite(len) && len > maxBody) throw new Upstream(`${url} is ${len} bytes, over the ${maxBody}-byte limit`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > maxBody) throw new Upstream(`${url} passed the ${maxBody}-byte limit`);
+  return buf;
+}
+
+function readJsonFile(path, what) {
+  if (!existsSync(path)) fail(EXIT.USAGE, `${what} not found: ${path}`);
+  try { return JSON.parse(readFileSync(path, 'utf8')); }
+  catch (e) { fail(EXIT.USAGE, `${what} is not valid JSON: ${path}`); }
+}
+
+/** A saved file may be a whole profile, {statement, manifest}, or a bare statement. */
+function statementFrom(doc) {
+  if (doc && typeof doc === 'object') {
+    if (doc.witnessStatement) return { statement: doc.witnessStatement, manifest: Array.isArray(doc.witnessEvidenceManifest) ? doc.witnessEvidenceManifest : undefined, domain: typeof doc.domain === 'string' ? doc.domain : undefined };
+    if (doc.statement && typeof doc.statement === 'object') return { statement: doc.statement, manifest: Array.isArray(doc.manifest) ? doc.manifest : undefined, domain: undefined };
+    if (typeof doc.payload === 'string') return { statement: doc, manifest: undefined, domain: undefined };
+  }
+  return null;
+}
+
+const MAPPING_PREFIX = `${WEB}/standard/check-mapping/`;
+const MAX_BODY_SMALL = 1024 * 1024;
+
+async function verifyCmd() {
+  const { flags, positional } = parseArgs('verify');
+  if (positional.length > 1) fail(EXIT.USAGE, `verify takes at most one <domain>, got: ${positional.join(' ')}`);
+  const offline = !!flags['--offline'];
+  if (offline && !flags['--file']) fail(EXIT.USAGE, '--offline needs --file: with no network there is no record to read.');
+  if (offline && !flags['--keys']) fail(EXIT.USAGE, '--offline needs --keys: a saved copy of https://api.trooth.co/public/keys.');
+  let domain;
+  if (positional[0]) {
+    const norm = normalizeDomain(positional[0]);
+    if (norm.error) fail(EXIT.USAGE, norm.error.replace('trooth check', 'trooth verify'));
+    domain = norm.domain;
+  }
+  if (!domain && !flags['--file']) fail(EXIT.USAGE, 'missing <domain>. Try: trooth verify trooth.co');
+
+  const sources = { statement: null, keys: null, mapping: null, manifest: null };
+  let found;
+  try {
+    if (flags['--file']) {
+      found = statementFrom(readJsonFile(flags['--file'], 'the statement file'));
+      if (!found) fail(EXIT.USAGE, `${flags['--file']} holds no witness statement (expected a profile, {statement, manifest} or a statement with a payload).`);
+      sources.statement = flags['--file'];
+      if (!domain && found.domain) domain = normalizeDomain(found.domain).domain;
+    } else {
+      const read = await readProjection(domain);
+      if (read.kind === 'absent') { printNotListed(domain, read.source); return EXIT.FINDING; }
+      if (read.kind === 'withheld') fail(EXIT.WITHHELD, `the record for ${domain} is withheld while a report about it is reviewed.`, { state: 'withheld' });
+      if (!read.body.witnessStatement) {
+        const doc = { domain, verdict: 'no_statement', note: 'The record is listed but carries no signed witness statement; there is nothing to check.' };
+        if (asJson) emitJson(doc); else out(`${B}${domain}${X}  ${A}no signed witness statement in this record${X}\n${D}Nothing to check: the record is listed, but Trooth has not published a signed reading for it.${X}`);
+        return EXIT.NOT_WITNESSED;
+      }
+      found = { statement: read.body.witnessStatement, manifest: Array.isArray(read.body.witnessEvidenceManifest) ? read.body.witnessEvidenceManifest : undefined };
+      sources.statement = read.source.url;
+    }
+
+    let keys, keysReadAt = null;
+    if (flags['--keys']) {
+      const k = readJsonFile(flags['--keys'], 'the key list');
+      keys = Array.isArray(k) ? k : k.keys;
+      keysReadAt = Array.isArray(k) ? null : (k.list_read_at || null);
+      sources.keys = flags['--keys'];
+    } else {
+      const r = await getFrom(API, '/public/keys', MAX_BODY_SMALL);
+      if (r.status !== 200) throw new Upstream(`api.trooth.co/public/keys answered HTTP ${r.status}`, { http_status: r.status });
+      const k = parseJsonBody(r);
+      keys = k.keys; keysReadAt = k.list_read_at || new Date().toISOString();
+      sources.keys = `${API}/public/keys`;
+    }
+    if (!Array.isArray(keys)) fail(EXIT.USAGE, 'the key list has no keys array.');
+
+    let manifest = found.manifest;
+    if (flags['--manifest']) { manifest = readJsonFile(flags['--manifest'], 'the manifest'); sources.manifest = flags['--manifest']; }
+    else if (manifest) sources.manifest = sources.statement;
+
+    let mappingBytes;
+    let payload = null;
+    try { payload = JSON.parse(String(found.statement.payload)); } catch {}
+    const mappingUrl = payload?.methodology?.mapping_url;
+    if (flags['--mapping']) {
+      if (!existsSync(flags['--mapping'])) fail(EXIT.USAGE, `the mapping file not found: ${flags['--mapping']}`);
+      mappingBytes = readFileSync(flags['--mapping']);
+      sources.mapping = flags['--mapping'];
+    } else if (!offline && typeof mappingUrl === 'string' && mappingUrl.startsWith(MAPPING_PREFIX) && /\.json$/.test(mappingUrl)) {
+      mappingBytes = await getBytes(mappingUrl, MAX_BODY_SMALL);
+      sources.mapping = mappingUrl;
+    }
+
+    const r = verifyStatement({ statement: found.statement, keys, mappingBytes, manifest, domain });
+    const doc = { domain: domain ?? r.subject.signed, verdict: r.verdict, version: r.version, read_at: r.read_at, reading_id: r.reading_id, signature: r.signature, key: r.key, subject: r.subject, binding: r.binding, counts: r.counts, assurance: r.assurance, keys_read_at: keysReadAt, sources };
+    if (asJson) emitJson(doc);
+    else printVerify(doc, payload);
+    return { checked: EXIT.OK, checked_v1: EXIT.OK, partially_checked: EXIT.INCOMPLETE, signature_not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH }[r.verdict] ?? EXIT.UPSTREAM;
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+}
+
+function printVerify(d, payload) {
+  const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
+  const when = d.read_at ? `, read ${fmtDate(d.read_at)}` : '';
+  out(`${B}${d.domain || '(no domain)'}${X}  ${D}witness statement ${d.version}${when}${X}`);
+  out(`  signature  ${d.signature === 'valid' ? ok('valid') : bad(d.signature)} ${D}(Ed25519, key ${d.key.kid}, ${d.key.state})${X}`);
+  if (!d.key.trusted) out(`             ${bad(d.key.reason)}`);
+  if (d.verdict === 'signature_not_trusted') {
+    out(`\n${bad('Not trusted.')} Nothing in this statement is relied on.`);
+    return;
+  }
+  const subj = d.subject.status === 'match' ? ok(`${d.subject.signed}, the domain asked about`) : d.subject.status === 'mismatch' ? bad(`signed for ${d.subject.signed}, not ${d.subject.asked}`) : warn(`${d.subject.signed} (no domain given to compare)`);
+  out(`  subject    ${subj}`);
+  const part = (name, st, extra) => out(`  ${name.padEnd(9)}  ${st === 'match' ? ok('matches') : st === 'mismatch' ? bad('does not match') : st === 'absent' ? warn('not bound by a v1 statement') : warn('not supplied')} ${D}${extra}${X}`);
+  part('mapping', d.binding.mapping, payload?.methodology ? `(check mapping ${payload.methodology.mapping_version}, ${payload.methodology.mapping_digest})` : '');
+  part('manifest', d.binding.manifest, payload?.evidence_manifest ? `(${payload.evidence_manifest.entries} entries, ${payload.evidence_manifest.digest})` : '');
+  const c = payload?.counts || {};
+  out(`  counts     ${d.counts.identities_hold ? ok('hold') : bad('disagree')} ${D}(${c.read} read, ${c.as_expected} as expected${c.not_read !== undefined ? `, ${c.not_read} not read` : ''})${X}`);
+  for (const p of d.counts.problems.slice(0, 5)) out(`             ${bad(p)}`);
+  const head = { checked: ok('Checked.'), checked_v1: ok('Checked (v1).'), partially_checked: warn('Partially checked.'), mismatch: bad('Mismatch.') }[d.verdict];
+  out(`\n${head} ${D}${d.assurance}${X}`);
+}
+
 async function main() {
   if (cmd === '--version' || cmd === '-v' || cmd === 'version') { out(VERSION); return EXIT.OK; }
   if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') { out(helpText()); return EXIT.OK; }
   if (cmd === 'check') return check();
   if (cmd === 'lint') return lint();
+  if (cmd === 'verify') return verifyCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only
