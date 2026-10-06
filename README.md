@@ -31,14 +31,13 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 | Command | What it does |
 |---|---|
 | `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
-| `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 18 cases any other implementation must agree on. New in 0.7.0. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, and `verify` takes `--file`, `--keys`, `--mapping`, `--manifest` and `--offline`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag both commands take; `lint` also takes `--allow-incomplete`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 Any other flag is a usage error. The message names the flag, and for a `--` flag given to `check` or `lint` it also lists the ones that exist.
 
@@ -50,11 +49,9 @@ Any other flag is a usage error. The message names the flag, and for a `--` flag
 | 1 | `check`: not listed, or revoked. `lint`: nothing to read. |
 | 2 | Usage error: a missing argument, an unknown flag or command, input that is not one domain, or a path that does not exist. |
 | 3 | Service or contract error: Trooth unreachable or slower than 15 seconds, a status other than 2xx or the documented not-listed 404, a body over 1 MiB, a body that is not JSON, or a record for a different domain. Never an answer about a company. An unexpected failure inside the CLI also exits 3. |
-| 4 | `verify`: everything checked held, but the mapping or the manifest was not supplied, so the binding is only partially checked. `lint`: the read was incomplete. A selected file was over the size limit, did not parse or could not be read, or the walk stopped at its file limit. `--allow-incomplete` reports the same and exits 0 (or 1 when nothing was read). New in 0.5.0. |
-| 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. `verify`: the record carries no signed statement to check. New in 0.5.0. |
+| 4 | `lint`: the read was incomplete. A selected file was over the size limit, did not parse or could not be read, or the walk stopped at its file limit. `--allow-incomplete` reports the same and exits 0 (or 1 when nothing was read). New in 0.5.0. |
+| 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. New in 0.5.0. |
 | 6 | `check`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
-| 8 | `verify`: the statement is malformed, its signature does not check, or its key is not trusted (compromised, revoked, retired before the statement's time, or not on the list). New in 0.7.0. |
-| 9 | `verify`: the signature checks and the key is trusted, but the domain, the check mapping, the evidence manifest or the signed counts do not match what was signed. New in 0.7.0. |
 | 7 | Output not delivered: stdout or stderr failed or was closed before everything was written, for example a reader that stopped early (EPIPE) or a full disk. The command's own result was not delivered, whatever it would have been, so this code replaces it. Nothing is retried. New in 0.6.1. |
 
 A company with no record, a listed company without a witnessed reading, and a Network that could not be read are different answers, so they exit differently. A pipeline can tell them apart without parsing prose, and a Trooth outage never reads as a company with no record.
@@ -274,29 +271,6 @@ https://api.trooth.co/public/mcp
 ```
 
 Five read-only tools on public data, no key. A sixth reads a signed-in company's own record with an OAuth access token from the authorization server the server's protected-resource metadata names; no scope is required, and the workspace is linked when that person signs in to trooth.co once with Continue with enterprise SSO. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
-
-## `trooth verify`
-
-```
-$ trooth verify trooth.co
-trooth.co  witness statement v2, read 2026-10-06
-  signature  valid (Ed25519, key trooth-master-2026-09, active)
-  subject    trooth.co, the domain asked about
-  mapping    matches (check mapping 1.0.1, sha256:6fea8a0f…)
-  manifest   matches (100 entries, sha256:726b6edc…)
-  counts     hold (65 read, 65 as expected, 35 not read)
-
-Checked. A valid v2 signature shows that Trooth's key signed these outcome bytes together with the digest of the exact check mapping, the evaluator version, the subject scope and the digest of the evidence manifest. It does not establish the company's identity, an independently established time, or anything the reading did not read.
-```
-
-It reads three things: the record (`trooth.co/api/network/profile`), the key list (`api.trooth.co/public/keys`) and the check mapping the statement names (only from `trooth.co/standard/check-mapping/`). Then it decides for itself. To check with no network at all, save those three and run `trooth verify <domain> --file profile.json --keys keys.json --mapping 1.0.1.json --offline`.
-
-A checked statement means Trooth's key signed that reading for that domain. It does not mean the company is safe, compliant or authorized for anything; what to do with it is your decision.
-
-## Changed in 0.7.0
-
-- New command `trooth verify <domain>`, with the normative rules in [docs/VERIFY.md](docs/VERIFY.md) and 18 test vectors in [tests/vectors](tests/vectors/vectors.json), reproducible byte for byte with `node tests/vectors/generate.mjs --check`. Exit codes 8 and 9 are new.
-- `check` still checks no signature and still prints `signature_checked: false`; its closing line now names `trooth verify` as the way to check.
 
 ## Changed in 0.6.1
 
