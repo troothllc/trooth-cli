@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/correction-payload.v1.schema.json",
+  "title": "CorrectionPayload",
+  "description": "The JSON a trooth.correction.v1 payload holds: Trooth withdrawing or replacing a statement it signed. Signed like a v3 statement (RFC 8785 bytes, Ed25519, the signer inside the signed bytes) and entered in the witness statement log. The statement it corrects stays in the log; nothing is deleted.",
+  "type": "object",
+  "required": [
+    "statement",
+    "correction_id",
+    "supersedes",
+    "subject_id",
+    "effect",
+    "replacement",
+    "reason",
+    "issued_at",
+    "signer"
+  ],
+  "properties": {
+    "statement": {
+      "type": "string",
+      "description": "The payload type.",
+      "const": "trooth.correction.v1"
+    },
+    "correction_id": {
+      "type": "string",
+      "description": "An identifier for this correction, unique in the log.",
+      "pattern": "^corr_[A-Za-z0-9_]{6,64}$"
+    },
+    "supersedes": {
+      "type": "string",
+      "description": "The statement id this correction withdraws or replaces. It must already be in the log.",
+      "pattern": "^trooth:statement:[0-9a-f]{64}$"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "The subject of the statement it corrects.",
+      "pattern": "^trooth:domain:[a-z0-9.-]+$"
+    },
+    "effect": {
+      "type": "string",
+      "description": "withdrawn: no statement takes its place. replaced: the replacement statement does.",
+      "enum": [
+        "withdrawn",
+        "replaced"
+      ]
+    },
+    "replacement": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The replacing statement id, which must already be in the log; null for withdrawn.",
+      "pattern": "^trooth:statement:[0-9a-f]{64}$"
+    },
+    "reason": {
+      "$ref": "#/$defs/CorrectionReason",
+      "description": "Why."
+    },
+    "issued_at": {
+      "type": "string",
+      "description": "When Trooth issued it, as Trooth asserts. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "signer": {
+      "$ref": "witness-payload.v3.schema.json#/$defs/Signer",
+      "description": "The signing key, inside the signed bytes."
+    }
+  },
+  "$defs": {
+    "CorrectionReason": {
+      "title": "CorrectionReason",
+      "type": "object",
+      "description": "The reason for a correction.",
+      "required": [
+        "code",
+        "explanation"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "evaluator_defect: the evaluator read wrongly. mapping_defect: the check mapping was wrong. source_misread: a source was misread. signing_key_compromised: the key that signed it is compromised. dispute_upheld: a dispute about the reading was upheld. withdrawn_by_trooth: withdrawn for another stated reason.",
+          "enum": [
+            "evaluator_defect",
+            "mapping_defect",
+            "source_misread",
+            "signing_key_compromised",
+            "dispute_upheld",
+            "withdrawn_by_trooth"
+          ]
+        },
+        "explanation": {
+          "type": "string",
+          "description": "The reason in words, 10 to 1000 characters.",
+          "minLength": 10
+        }
+      }
+    }
+  }
+}

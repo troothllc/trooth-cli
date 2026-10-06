@@ -25,13 +25,14 @@
     },
     "verdict": {
       "type": "string",
-      "description": "checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping or the manifest disagrees.",
+      "description": "checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping, the manifest or a log receipt disagrees. superseded: everything held, and a correction Trooth signed and logged withdraws or replaces the statement.",
       "enum": [
         "checked",
         "checked_v1",
         "partially_checked",
         "signature_not_trusted",
-        "mismatch"
+        "mismatch",
+        "superseded"
       ]
     },
     "version": {
@@ -90,6 +91,10 @@
     "counts": {
       "$ref": "#/$defs/CountCheck",
       "description": "Whether the signed counts agree with the signed checks."
+    },
+    "log": {
+      "$ref": "#/$defs/LogCheck",
+      "description": "The witness statement log part of the check. Absent when the log was not asked (offline from saved files, --no-log) or the signature was not trusted."
     },
     "assurance": {
       "type": "string",
@@ -225,6 +230,137 @@
             "not_supplied",
             "absent"
           ]
+        }
+      }
+    },
+    "LogCheck": {
+      "title": "LogCheck",
+      "type": "object",
+      "description": "What the log showed about the statement.",
+      "required": [
+        "status",
+        "index",
+        "tree_size",
+        "reason",
+        "corrections",
+        "superseded_by"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "included: the receipt checks against a checkpoint signed by the log key. not_logged: the log holds no entry for it (reported, not a failure in this version). unavailable: the log could not be read. checkpoint_invalid: the checkpoint is not signed by the log key or names another log. proof_invalid: the receipt does not take this statement to the signed root.",
+          "enum": [
+            "included",
+            "not_logged",
+            "unavailable",
+            "checkpoint_invalid",
+            "proof_invalid"
+          ]
+        },
+        "index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "The entry index the receipt names, or null."
+        },
+        "tree_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "The signed tree size the receipt is against, or null."
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why, in words."
+        },
+        "corrections": {
+          "type": "array",
+          "description": "Each correction the log returned and whether it checked.",
+          "items": {
+            "$ref": "#/$defs/CorrectionCheck"
+          }
+        },
+        "superseded_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The statement id of the first correction that checked, or null.",
+          "pattern": "^trooth:statement:[0-9a-f]{64}$"
+        },
+        "vkey_source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the log key came from: pinned in this release, --log-vkey, carried in a bundle, or served by the log."
+        }
+      }
+    },
+    "CorrectionCheck": {
+      "title": "CorrectionCheck",
+      "type": "object",
+      "description": "One correction and whether it is relied on.",
+      "required": [
+        "valid",
+        "correction_statement_id",
+        "code",
+        "effect",
+        "replacement",
+        "issued_at",
+        "reason"
+      ],
+      "properties": {
+        "valid": {
+          "type": "boolean",
+          "description": "True when it is signed by a trusted key, in RFC 8785 bytes, names this statement, and is included in the log."
+        },
+        "correction_statement_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The statement id of the correction itself."
+        },
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The reason code it carries."
+        },
+        "effect": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "withdrawn or replaced."
+        },
+        "replacement": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The replacing statement id, for replaced."
+        },
+        "issued_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When Trooth issued it, as Trooth asserts. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why it is or is not relied on, in words."
         }
       }
     },

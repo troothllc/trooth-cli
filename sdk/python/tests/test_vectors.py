@@ -48,6 +48,35 @@ class Vectors(unittest.TestCase):
         self.assertEqual(canonicalize({"\U0001F600": 1, "דּ": 2, "b": 0}), '{"b":0,"\U0001F600":1,"דּ":2}')
 
 
+class Log(unittest.TestCase):
+    def test_log_cases(self):
+        from trooth_verify import verify_statement
+        doc = json.loads((VEC / "log.json").read_text("utf-8"))
+        v = json.loads((VEC / "vectors.json").read_text("utf-8"))
+        mapping = (VEC / v["mapping_file"]).read_bytes()
+        for c in doc["cases"]:
+            with self.subTest(c["name"]):
+                r = verify_statement(c["statement"], c["keys"], mapping, c["manifest"], c["domain"], c["log"])
+                self.assertEqual(r["verdict"], c["expect"]["verdict"], c["note"])
+                self.assertEqual(r["log"]["status"] if r.get("log") else None, c["expect"]["log"], c["note"])
+
+    def test_consistency(self):
+        import base64
+        from trooth_verify import verify_consistency
+        doc = json.loads((VEC / "log.json").read_text("utf-8"))
+        for c in doc["consistency"]:
+            with self.subTest(c["name"]):
+                d = lambda s: base64.b64decode(s)
+                self.assertEqual(verify_consistency(c["first"], c["second"], d(c["first_root"]), d(c["second_root"]), [d(p) for p in c["proof"]]), c["expect"])
+
+    def test_checkpoints(self):
+        from trooth_verify import open_checkpoint
+        doc = json.loads((VEC / "log.json").read_text("utf-8"))
+        self.assertEqual(open_checkpoint(doc["checkpoints"]["5"], doc["vkey"])["size"], 5)
+        with self.assertRaises(ValueError):
+            open_checkpoint(doc["checkpoints"]["5"], doc["impostor_vkey"])
+
+
 class Models(unittest.TestCase):
     def test_models_load_vectors(self):
         try:

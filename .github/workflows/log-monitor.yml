@@ -1,0 +1,52 @@
+name: Witness log monitor
+
+# A public monitor of Trooth's witness statement log (docs/LOG.md section 7).
+# Every hour it fetches the log's signed checkpoint, checks the signature
+# against the log key pinned in this repository (bin/lib/log-trust.mjs), and
+# checks a consistency proof from the checkpoint it saw last time. If the log
+# shrank, showed two roots for one size, or cannot prove it only grew, the run
+# fails and GitHub notifies the repository's watchers. The last checkpoint
+# seen is kept in the Actions cache between runs; it is only replaced after a
+# run that found the log consistent.
+#
+# Anyone can run the same check: trooth log monitor --state <file>.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: log-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: The log only grew
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install from the lock, scripts off
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: The last checkpoint seen
+        uses: actions/cache/restore@v6
+        with:
+          path: .log-state
+          key: log-state-${{ github.run_id }}
+          restore-keys: log-state-
+      - name: Check the log against it
+        run: |
+          mkdir -p .log-state
+          node bin/trooth.mjs log monitor --state .log-state/state.json
+      - name: Keep the new checkpoint
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: .log-state
+          key: log-state-${{ github.run_id }}

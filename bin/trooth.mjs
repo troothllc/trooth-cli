@@ -37,6 +37,10 @@
 //                           Statements v1, v2 and v3 (RFC 8785 bytes) are checked.
 //                           The rules are in docs/VERIFY.md; tests/vectors/ holds the
 //                           cases any other implementation must agree on.
+//   trooth log checkpoint   Read and check the signed checkpoint of Trooth's witness
+//                           statement log (docs/LOG.md). trooth log monitor --state
+//                           <file> checks the log only grew since the checkpoint saved
+//                           in <file>, and saves the new one. Anyone can run a monitor.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
@@ -45,7 +49,7 @@
 //   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
-// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0):
+// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0, 10 in 0.9.0):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
 //   1  finding                 (check: not listed, or revoked; lint: nothing to read)
@@ -69,7 +73,11 @@
 //                               signature does not check, or its key is not trusted)
 //   9  mismatch                (new in 0.7.0, verify: the signature checks, but the domain,
 //                               the check mapping, the evidence manifest or the signed
-//                               counts do not match what was signed)
+//                               counts do not match what was signed; since 0.9.0 also a
+//                               log receipt that does not check, and `log monitor` when
+//                               the log is not an extension of the saved checkpoint)
+//  10  superseded              (new in 0.9.0, verify: everything held, and a correction
+//                               Trooth signed and logged withdraws or replaces the statement)
 //   verify also uses 4 (a mapping or manifest was not supplied, so the binding is only
 //   partially checked) and 5 (the record carries no signed statement).
 //
@@ -80,6 +88,8 @@ import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from '
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
 import { verifyStatement, bundleInputs, makeBundle, BundleError } from './lib/verify.mjs';
+import { openCheckpoint, verifyConsistency, fromB64, toB64, parseVkey, LOG_ORIGIN } from './lib/tlog.mjs';
+import { PINNED_LOG_VKEYS } from './lib/log-trust.mjs';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -95,10 +105,10 @@ const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, 
 const PROJECTION_CONTRACT = 2;
 const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.8.0';
+let VERSION = '0.9.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -193,7 +203,8 @@ function scrub(value) {
 const FLAGS = {
   check: { bool: ['--json', '--no-fallback'], value: [] },
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
-  verify: { bool: ['--json', '--offline'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle'] },
+  verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
+  log: { bool: ['--json'], value: ['--state', '--log-vkey'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -243,6 +254,8 @@ ${B}Usage${X}
   trooth check <domain>     Read a company's record on the Trooth Network
   trooth lint [path]        Read what your infrastructure declares, locally. Offline.
   trooth verify <domain>    Check the record's signed witness statement yourself
+  trooth log checkpoint     Read and check the witness statement log's signed checkpoint
+  trooth log monitor --state <file>   Check the log only grew since the checkpoint in <file>
   trooth --help | --version
 
 ${B}Examples${X}
@@ -268,13 +281,18 @@ ${B}Flags${X}
   --save-bundle <path>      verify: also write the statement, manifest, key list and exact
                             mapping bytes to one file (refuses to overwrite)
   --bundle <path>           verify: check a saved bundle; sends nothing
+  --no-log                  verify: do not ask the witness statement log
+  --log-vkey <key>          verify, log: check checkpoints against this log key, not the pinned one
+  --state <path>            log monitor: the last checkpoint seen; written when the log only grew
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
   4 lint read incomplete   5 listed, but no witnessed reading in the record   6 withheld
   7 output not delivered: stdout or stderr failed or closed before everything was written
   8 verify: signature does not check, or the key is not trusted
-  9 verify: signature checks, but the domain, mapping, manifest or counts do not match
+  9 verify: signature checks, but the domain, mapping, manifest, counts or log proof do not match
+    log monitor: the log is not an extension of the checkpoint in --state
+  10 verify: a correction Trooth signed and logged withdraws or replaces the statement
 
 ${D}check reads only public, already-published records. No key, no account. It reads
 the one record projection, trooth.co/api/network/profile, the same body the website,
@@ -1228,6 +1246,7 @@ const MAX_BODY_SMALL = 1024 * 1024;
 async function verifyCmd() {
   const { flags, positional } = parseArgs('verify');
   if (positional.length > 1) fail(EXIT.USAGE, `verify takes at most one <domain>, got: ${positional.join(' ')}`);
+  if (flags['--log-vkey']) { try { parseVkey(flags['--log-vkey']); } catch (e) { fail(EXIT.USAGE, `--log-vkey: ${e.message}`); } }
   if (flags['--bundle']) {
     for (const f of ['--file', '--keys', '--mapping', '--manifest', '--save-bundle']) if (flags[f]) fail(EXIT.USAGE, `--bundle carries every input; it cannot be combined with ${f}.`);
   }
@@ -1249,7 +1268,12 @@ async function verifyCmd() {
     catch (e) { if (e instanceof BundleError) fail(EXIT.USAGE, `${flags['--bundle']}: ${e.message}.`); throw e; }
     if (!domain && i.domain) domain = normalizeDomain(i.domain).domain;
     const p = flags['--bundle'];
-    return reportVerify({ statement: i.statement, keys: i.keys, keysReadAt: i.keysReadAt, mappingBytes: i.mappingBytes, manifest: i.manifest, domain, sources: { statement: p, keys: p, mapping: i.mappingBytes === undefined ? null : p, manifest: i.manifest ? p : null } });
+    let log;
+    if (i.log && !flags['--no-log']) {
+      const pinned = logVkeys(flags);
+      log = { ...i.log, vkeys: pinned.vkeys.length ? pinned.vkeys : i.log.vkeys, vkey_source: pinned.vkeys.length ? pinned.source : 'carried in the bundle (not pinned)' };
+    }
+    return reportVerify({ statement: i.statement, keys: i.keys, keysReadAt: i.keysReadAt, mappingBytes: i.mappingBytes, manifest: i.manifest, domain, log, sources: { statement: p, keys: p, mapping: i.mappingBytes === undefined ? null : p, manifest: i.manifest ? p : null, log: log ? p : null } });
   }
 
   const sources = { statement: null, keys: null, mapping: null, manifest: null };
@@ -1305,27 +1329,141 @@ async function verifyCmd() {
       sources.mapping = mappingUrl;
     }
 
+    let log;
+    if (!offline && !flags['--no-log'] && typeof found.statement?.payload === 'string') {
+      log = await readLog(found.statement.payload, flags);
+      sources.log = `${LOG_BASE}/lookup`;
+    }
+
     if (flags['--save-bundle']) {
-      const b = makeBundle({ domain, statement: found.statement, manifest, keys, keysReadAt, keysSource: sources.keys, mappingUrl: sources.mapping, mappingBytes });
+      const b = makeBundle({ domain, statement: found.statement, manifest, keys, keysReadAt, keysSource: sources.keys, mappingUrl: sources.mapping, mappingBytes, log: log && !log.unavailable ? { vkey: log.vkeys[0], receipt: log.receipt, corrections: log.corrections } : undefined });
       try { writeFileSync(flags['--save-bundle'], JSON.stringify(b, null, 2) + '\n', { flag: 'wx' }); }
       catch (e) { fail(EXIT.USAGE, `could not write the bundle to ${flags['--save-bundle']}: ${e && e.code ? e.code : e}`); }
       sources.bundle_written = flags['--save-bundle'];
     }
-    return reportVerify({ statement: found.statement, keys, keysReadAt, mappingBytes, manifest, domain, sources });
+    return reportVerify({ statement: found.statement, keys, keysReadAt, mappingBytes, manifest, domain, log, sources });
   } catch (e) {
     if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
     throw e;
   }
 }
 
-function reportVerify({ statement, keys, keysReadAt, mappingBytes, manifest, domain, sources }) {
+function reportVerify({ statement, keys, keysReadAt, mappingBytes, manifest, domain, log, sources }) {
   let payload = null;
   try { payload = JSON.parse(String(statement.payload)); } catch {}
-  const r = verifyStatement({ statement, keys, mappingBytes, manifest, domain });
-  const doc = { domain: domain ?? r.subject.signed, verdict: r.verdict, version: r.version, read_at: r.read_at, reading_id: r.reading_id, statement_id: r.statement_id, signature: r.signature, key: r.key, subject: r.subject, binding: r.binding, counts: r.counts, assurance: r.assurance, keys_read_at: keysReadAt, sources };
+  const r = verifyStatement({ statement, keys, mappingBytes, manifest, domain, log });
+  const doc = { domain: domain ?? r.subject.signed, verdict: r.verdict, version: r.version, read_at: r.read_at, reading_id: r.reading_id, statement_id: r.statement_id, signature: r.signature, key: r.key, subject: r.subject, binding: r.binding, counts: r.counts, ...(r.log ? { log: { ...r.log, vkey_source: log?.vkey_source ?? null } } : {}), assurance: r.assurance, keys_read_at: keysReadAt, sources };
   if (asJson) emitJson(doc);
   else printVerify(doc, payload);
-  return { checked: EXIT.OK, checked_v1: EXIT.OK, partially_checked: EXIT.INCOMPLETE, signature_not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH }[r.verdict] ?? EXIT.UPSTREAM;
+  return { checked: EXIT.OK, checked_v1: EXIT.OK, partially_checked: EXIT.INCOMPLETE, signature_not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH, superseded: EXIT.SUPERSEDED }[r.verdict] ?? EXIT.UPSTREAM;
+}
+
+/* ----------------------------------------------------------------- log ---- */
+
+const LOG_BASE = `${API}/scan/log/v1`;
+
+/** The log keys to check checkpoints against: --log-vkey, else the pinned keys, else none. */
+function logVkeys(flags) {
+  if (flags['--log-vkey']) {
+    try { parseVkey(flags['--log-vkey']); } catch (e) { fail(EXIT.USAGE, `--log-vkey: ${e.message}`); }
+    return { vkeys: [flags['--log-vkey']], source: '--log-vkey' };
+  }
+  return { vkeys: PINNED_LOG_VKEYS, source: PINNED_LOG_VKEYS.length ? `pinned in trooth ${VERSION}` : null };
+}
+
+/** Ask the log about one statement. Never throws: a log that cannot be read is reported, not fatal. */
+async function readLog(payload, flags) {
+  const { createHash } = await import('node:crypto');
+  const sid = `trooth:statement:${createHash('sha256').update(Buffer.from(payload, 'utf8')).digest('hex')}`;
+  try {
+    let { vkeys, source } = logVkeys(flags);
+    if (!vkeys.length) {
+      const v = await getFrom(LOG_BASE, '/vkey', 4096);
+      if (v.status !== 200) throw new Error(`the log key answered HTTP ${v.status}`);
+      vkeys = [v.text.trim()];
+      source = 'served by the log (not pinned in this release)';
+    }
+    const look = await getFrom(LOG_BASE, `/lookup?statement_id=${encodeURIComponent(sid)}`, MAX_BODY_SMALL);
+    let receipt = null;
+    if (look.status === 200) receipt = parseJsonBody(look).receipt ?? null;
+    else if (look.status !== 404) throw new Error(`the log answered HTTP ${look.status}`);
+    let corrections = [];
+    if (receipt) {
+      const c = await getFrom(LOG_BASE, `/corrections?statement_id=${encodeURIComponent(sid)}`, MAX_BODY_SMALL);
+      if (c.status !== 200) throw new Error(`the log's corrections answered HTTP ${c.status}`);
+      corrections = parseJsonBody(c).corrections ?? [];
+    }
+    return { vkeys, vkey_source: source, receipt, corrections };
+  } catch (e) {
+    return { vkeys: [], vkey_source: null, receipt: null, corrections: [], unavailable: e && e.message ? e.message : String(e) };
+  }
+}
+
+async function readCheckpoint(flags) {
+  let { vkeys, source } = logVkeys(flags);
+  if (!vkeys.length) {
+    const v = await getFrom(LOG_BASE, '/vkey', 4096);
+    if (v.status !== 200) throw new Upstream(`the log key answered HTTP ${v.status}`, { http_status: v.status });
+    vkeys = [v.text.trim()];
+    source = 'served by the log (not pinned in this release)';
+  }
+  const r = await getFrom(LOG_BASE, '/checkpoint', 64 * 1024);
+  if (r.status !== 200) throw new Upstream(`the log checkpoint answered HTTP ${r.status}`, { http_status: r.status });
+  let cp = null, why = '';
+  for (const k of vkeys) { try { cp = openCheckpoint(r.text, k); break; } catch (e) { why = e.message; } }
+  return { cp, why, note: r.text, vkeys, source };
+}
+
+async function logCmd() {
+  const sub = argv[1];
+  const { flags, positional } = parseArgs('log');
+  if (sub !== 'checkpoint' && sub !== 'monitor') fail(EXIT.USAGE, 'trooth log takes checkpoint or monitor. Try: trooth log checkpoint');
+  if (positional.length > 1) fail(EXIT.USAGE, `unexpected argument: ${positional.slice(1).join(' ')}`);
+  if (sub === 'monitor' && !flags['--state']) fail(EXIT.USAGE, 'trooth log monitor needs --state <file>: where the last checkpoint seen is kept.');
+  try {
+    const { cp, why, note, source } = await readCheckpoint(flags);
+    if (!cp) {
+      const doc = { log: LOG_ORIGIN, consistent: false, problem: `the checkpoint does not check: ${why}` };
+      if (asJson) emitJson(doc); else out(`${R}The log's checkpoint does not check.${X} ${why}`);
+      return EXIT.MISMATCH;
+    }
+    const now = { size: Number(cp.size), root: toB64(cp.root), checkpoint: note };
+    if (sub === 'checkpoint') {
+      const doc = { log: LOG_ORIGIN, tree_size: now.size, root_hash: now.root, vkey_source: source, checkpoint: note };
+      if (asJson) emitJson(doc); else out(`${B}${LOG_ORIGIN}${X}  ${J}checkpoint checks${X}
+  tree size  ${now.size}
+  root hash  ${now.root}
+  ${D}log key ${source}${X}`);
+      return EXIT.OK;
+    }
+    const path = flags['--state'];
+    let prior = null;
+    if (existsSync(path)) {
+      try { prior = JSON.parse(readFileSync(path, 'utf8')); } catch { fail(EXIT.USAGE, `${path} is not a state file this command wrote.`); }
+      if (!Number.isSafeInteger(prior?.size) || !fromB64(prior?.root)) fail(EXIT.USAGE, `${path} is not a state file this command wrote.`);
+    }
+    let consistent = true, problem = null;
+    if (prior) {
+      if (now.size < prior.size) { consistent = false; problem = `the log shrank from ${prior.size} to ${now.size}`; }
+      else if (now.size === prior.size) { if (now.root !== prior.root) { consistent = false; problem = `two different roots at size ${now.size}`; } }
+      else {
+        const pr = await getFrom(LOG_BASE, `/proof/consistency?first=${prior.size}&second=${now.size}`, MAX_BODY_SMALL);
+        if (pr.status !== 200) throw new Upstream(`the log's consistency proof answered HTTP ${pr.status}`, { http_status: pr.status });
+        const proof = (parseJsonBody(pr).consistency_proof || []).map(fromB64);
+        if (proof.some((h) => !h) || !verifyConsistency(prior.size, now.size, fromB64(prior.root), cp.root, proof)) { consistent = false; problem = `the tree of ${now.size} is not an extension of the tree of ${prior.size}`; }
+      }
+    }
+    if (consistent) writeFileSync(path, JSON.stringify({ log: LOG_ORIGIN, size: now.size, root: now.root, checkpoint: now.checkpoint, seen_at: new Date().toISOString() }, null, 2) + '\n');
+    const doc = { log: LOG_ORIGIN, consistent, previous_size: prior?.size ?? null, tree_size: now.size, root_hash: now.root, problem, vkey_source: source };
+    if (asJson) emitJson(doc);
+    else if (!prior) out(`${B}${LOG_ORIGIN}${X}  first checkpoint recorded: size ${now.size}\n  ${D}saved to ${path}; the next run checks the log only grew from here${X}`);
+    else if (consistent) out(`${B}${LOG_ORIGIN}${X}  ${J}consistent${X}: size ${prior.size} to ${now.size}, append-only`);
+    else out(`${B}${LOG_ORIGIN}${X}  ${R}NOT CONSISTENT${X}: ${problem}. The state file was left as it was.`);
+    return consistent ? EXIT.OK : EXIT.MISMATCH;
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
 }
 
 function printVerify(d, payload) {
@@ -1347,7 +1485,16 @@ function printVerify(d, payload) {
   const c = payload?.counts || {};
   out(`  counts     ${d.counts.identities_hold ? ok('hold') : bad('disagree')} ${D}(${c.read} read, ${c.as_expected} as expected${c.not_read !== undefined ? `, ${c.not_read} not read` : ''})${X}`);
   for (const p of d.counts.problems.slice(0, 5)) out(`             ${bad(p)}`);
-  const head = { checked: ok('Checked.'), checked_v1: ok('Checked (v1).'), partially_checked: warn('Partially checked.'), mismatch: bad('Mismatch.') }[d.verdict];
+  if (d.log) {
+    const l = d.log;
+    const line = l.status === 'included' ? ok(`included, entry ${l.index} of a signed tree of ${l.tree_size}`) : l.status === 'not_logged' ? warn('not in the log') : l.status === 'unavailable' ? warn(`not read: ${l.reason}`) : bad(`${l.status.replace('_', ' ')}: ${l.reason}`);
+    out(`  log        ${line}${l.vkey_source ? ` ${D}(log key ${l.vkey_source})${X}` : ''}`);
+    const valid = l.corrections.filter((x) => x.valid);
+    for (const x of valid) out(`             ${bad(`${x.effect} by a correction (${x.code}) issued ${x.issued_at}`)}${x.replacement ? ` ${D}replacement ${x.replacement}${X}` : ''}`);
+    const ignored = l.corrections.length - valid.length;
+    if (ignored) out(`             ${warn(`${ignored} correction${ignored === 1 ? '' : 's'} in the log did not check and ${ignored === 1 ? 'is' : 'are'} not relied on`)}`);
+  }
+  const head = { checked: ok('Checked.'), checked_v1: ok('Checked (v1).'), partially_checked: warn('Partially checked.'), mismatch: bad('Mismatch.'), superseded: bad('Superseded.') }[d.verdict];
   out(`\n${head} ${D}${d.assurance}${X}`);
   if (d.statement_id) out(`${D}Statement id: ${d.statement_id}${X}`);
   if (d.keys_read_at && d.sources.keys && !/^https?:/.test(String(d.sources.keys))) out(`${D}The key list was saved at ${d.keys_read_at}; a compromise announced after that is not in it. Refresh it before relying on this for a decision.${X}`);
@@ -1360,12 +1507,13 @@ async function main() {
   if (cmd === 'check') return check();
   if (cmd === 'lint') return lint();
   if (cmd === 'verify') return verifyCmd();
+  if (cmd === 'log') return logCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only

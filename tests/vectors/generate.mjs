@@ -13,6 +13,8 @@ import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto
 import { readFileSync, writeFileSync } from 'node:fs';
 import { canonicalManifest, sha256Digest, makeBundle } from '../../bin/lib/verify.mjs';
 import { canonicalize } from '../../bin/lib/jcs.mjs';
+import { statementId } from '../../bin/lib/ids.mjs';
+import { LOG_ORIGIN, entryBytes, leafHash, rootOf, inclusionPath, consistencyPath, formatVkey, noteKeyHash, toB64 } from '../../bin/lib/tlog.mjs';
 
 const here = new URL('.', import.meta.url);
 const seedOf = (label) => createHash('sha256').update(`trooth test vectors v1 / ${label} / NOT A TROOTH KEY`).digest();
@@ -142,6 +144,91 @@ const bundles = [
   { name: 'not-a-bundle', note: 'A document that is not a bundle is refused, not checked.', bundle: { bundle: 'something.else', statement: st(good) }, expect: { error: 'not_a_bundle' } },
 ];
 
+// ------------------------------------------------------------------ log ----
+// A test log (docs/LOG.md) with its own test key, holding five entries:
+// a v3 statement, a v2 statement, a statement for another domain, a
+// correction withdrawing the v2 statement, and a statement for a third
+// domain logged after the correction. A log refuses a correction aimed at a
+// statement it does not hold, so every correction here has its target. Receipts are against the size-5 checkpoint;
+// the size-3 checkpoint exists for the consistency cases.
+const L = keyPair('log-key');
+const LX = keyPair('log-key-impostor');
+const VKEY = formatVkey(LOG_ORIGIN, L.pub);
+const VKEY_X = formatVkey(LOG_ORIGIN, LX.pub);
+function signNote(text, name, kp) {
+  const s = sign(null, Buffer.from(text, 'utf8'), kp.priv);
+  return `${text}\n\u2014 ${name} ${Buffer.concat([noteKeyHash(name, kp.pub), s]).toString('base64')}\n`;
+}
+const checkpointText = (size, root, origin = LOG_ORIGIN) => `${origin}\n${size}\n${toB64(root)}\n`;
+
+const S3 = st3(v3());
+const S2 = st(good);
+const SOTHER = st3(v3({ domain: 'acme-other.com' }));
+function correction(over = {}) {
+  const payload = canonicalize({
+    statement: 'trooth.correction.v1',
+    correction_id: over.id ?? 'corr_vectors_1',
+    supersedes: over.supersedes ?? statementId(S2.payload),
+    subject_id: 'trooth:domain:acme-vectors.com',
+    effect: over.effect ?? 'withdrawn',
+    replacement: over.replacement ?? null,
+    reason: { code: over.code ?? 'evaluator_defect', explanation: 'A check read the wrong page; the reading is withdrawn.' },
+    issued_at: '2026-10-07T12:00:00.000Z',
+    signer: { key_id: 'test-key-a', issuer: 'trooth.co' },
+  });
+  return { payload, signature: sig(over.kp ?? A, payload), key_id: 'test-key-a', alg: 'Ed25519', canonicalization: 'RFC8785' };
+}
+const C1 = correction();
+const STHIRD = st3(v3({ domain: 'acme-third.com' }));
+const ENTRIES = [['witness_statement', S3], ['witness_statement', S2], ['witness_statement', SOTHER], ['correction', C1], ['witness_statement', STHIRD]];
+const LEAVES = ENTRIES.map(([k, s]) => leafHash(entryBytes(k, s)));
+const ROOT5 = rootOf(LEAVES), ROOT3 = rootOf(LEAVES.slice(0, 3));
+const CP5 = signNote(checkpointText(5, ROOT5), LOG_ORIGIN, L);
+const CP3 = signNote(checkpointText(3, ROOT3), LOG_ORIGIN, L);
+const receipt = (i, over = {}) => ({ log: LOG_ORIGIN, index: i, tree_size: 5, root_hash: toB64(ROOT5), inclusion_proof: inclusionPath(i, LEAVES).map(toB64), checkpoint: CP5, ...over });
+const flip = (b64s) => { const b = Buffer.from(b64s, 'base64'); b[0] ^= 1; return b.toString('base64'); };
+const R0 = receipt(0), R1 = receipt(1), R3 = receipt(3);
+const logCase = (name, note, statement, log, expect, extra = {}) => ({ name, note, statement, keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', log, expect, ...extra });
+const logCases = [
+  logCase('logged-v3', 'A v3 statement with a receipt that checks.', S3, { vkeys: [VKEY], receipt: R0, corrections: [] }, { verdict: 'checked', log: 'included' }),
+  logCase('not-logged', 'The log holds no entry: reported, never a failure in this version.', S3, { vkeys: [VKEY], receipt: null, corrections: [] }, { verdict: 'checked', log: 'not_logged' }),
+  logCase('proof-tampered', 'One proof hash changed.', S3, { vkeys: [VKEY], receipt: { ...R0, inclusion_proof: [flip(R0.inclusion_proof[0]), ...R0.inclusion_proof.slice(1)] }, corrections: [] }, { verdict: 'mismatch', log: 'proof_invalid' }),
+  logCase('proof-wrong-index', 'The right proof for another position.', S3, { vkeys: [VKEY], receipt: { ...R0, index: 1 }, corrections: [] }, { verdict: 'mismatch', log: 'proof_invalid' }),
+  logCase('receipt-for-other-statement', "Another statement's receipt.", S3, { vkeys: [VKEY], receipt: R1, corrections: [] }, { verdict: 'mismatch', log: 'proof_invalid' }),
+  logCase('checkpoint-forged', 'A checkpoint signed by a key that is not the log key.', S3, { vkeys: [VKEY], receipt: { ...R0, checkpoint: signNote(checkpointText(5, ROOT5), LOG_ORIGIN, LX) }, corrections: [] }, { verdict: 'mismatch', log: 'checkpoint_invalid' }),
+  logCase('checkpoint-other-origin', 'Signed by the log key, but naming another log.', S3, { vkeys: [VKEY], receipt: { ...R0, checkpoint: signNote(checkpointText(5, ROOT5, 'example.org/other-log'), LOG_ORIGIN, L) }, corrections: [] }, { verdict: 'mismatch', log: 'checkpoint_invalid' }),
+  logCase('size-not-checkpoint', 'The receipt claims a size the checkpoint does not sign.', S3, { vkeys: [VKEY], receipt: { ...R0, tree_size: 3 }, corrections: [] }, { verdict: 'mismatch', log: 'proof_invalid' }),
+  logCase('superseded', 'A logged correction signed by a trusted key withdraws this statement.', S2, { vkeys: [VKEY], receipt: R1, corrections: [{ statement: C1, receipt: R3 }] }, { verdict: 'superseded', log: 'included' }),
+  logCase('correction-for-other', 'A correction aimed at another statement is ignored.', S3, { vkeys: [VKEY], receipt: R0, corrections: [{ statement: C1, receipt: R3 }] }, { verdict: 'checked', log: 'included' }),
+  logCase('correction-not-shown', "A correction whose receipt does not check is ignored.", S2, { vkeys: [VKEY], receipt: R1, corrections: [{ statement: C1, receipt: { ...R3, index: 4 } }] }, { verdict: 'checked', log: 'included' }),
+  logCase('correction-bad-signature', 'A correction signed by the wrong key is ignored.', S2, { vkeys: [VKEY], receipt: R1, corrections: [{ statement: { ...C1, signature: sig(B, C1.payload) }, receipt: R3 }] }, { verdict: 'checked', log: 'included' }),
+  logCase('key-compromised', 'Key A is compromised: neither the statement nor its correction is relied on.', S2, { vkeys: [VKEY], receipt: R1, corrections: [{ statement: C1, receipt: R3 }] }, { verdict: 'signature_not_trusted', log: null }, { keys: [keyA({ status: 'compromised', compromised_at: '2026-10-02T00:00:00.000Z' }), keyB] }),
+];
+const consistency = [
+  { name: '3-to-5', first: 3, second: 5, first_root: toB64(ROOT3), second_root: toB64(ROOT5), proof: consistencyPath(3, LEAVES).map(toB64), expect: true },
+  { name: '1-to-5', first: 1, second: 5, first_root: toB64(rootOf(LEAVES.slice(0, 1))), second_root: toB64(ROOT5), proof: consistencyPath(1, LEAVES).map(toB64), expect: true },
+  { name: '4-to-5', first: 4, second: 5, first_root: toB64(rootOf(LEAVES.slice(0, 4))), second_root: toB64(ROOT5), proof: consistencyPath(4, LEAVES).map(toB64), expect: true },
+  { name: 'same-size', first: 5, second: 5, first_root: toB64(ROOT5), second_root: toB64(ROOT5), proof: [], expect: true },
+  { name: 'tampered', first: 3, second: 5, first_root: toB64(ROOT3), second_root: toB64(ROOT5), proof: consistencyPath(3, LEAVES).map(toB64).map((h, i) => (i === 0 ? flip(h) : h)), expect: false },
+  { name: 'history-rewritten', first: 3, second: 5, first_root: toB64(rootOf([LEAVES[0], LEAVES[2], LEAVES[1]])), second_root: toB64(ROOT5), proof: consistencyPath(3, LEAVES).map(toB64), expect: false },
+  { name: 'shrunk', first: 5, second: 3, first_root: toB64(ROOT5), second_root: toB64(ROOT3), proof: [], expect: false },
+];
+const logDoc = {
+  description: 'Test vectors for docs/LOG.md. A five-entry test log signed with a test key whose seed is public in generate.mjs. Each case is a statement check with a log answer (vkeys, receipt or null, corrections) and the verdict and log status it must reach; `keys` defaults to the key list of vectors.json. The consistency cases are RFC 9162 consistency proofs between two signed sizes. `checkpoints` are the two signed notes.',
+  origin: LOG_ORIGIN,
+  vkey: VKEY,
+  impostor_vkey: VKEY_X,
+  checkpoints: { '3': CP3, '5': CP5 },
+  entries: ENTRIES.map(([kind, statement], i) => ({ index: i, kind, statement, leaf_hash: toB64(LEAVES[i]) })),
+  cases: logCases,
+  consistency,
+};
+bundles.push(
+  { name: 'bundle-v3-logged', note: 'A bundle carrying the log key, a receipt and no correction.', bundle: bundleOf(S3, { log: { vkey: VKEY, receipt: R0, corrections: [] } }), expect: { verdict: 'checked', signature: 'valid' } },
+  { name: 'bundle-superseded', note: 'A bundle carrying the correction that withdrew its statement.', bundle: bundleOf(S2, { log: { vkey: VKEY, receipt: R1, corrections: [{ statement: C1, receipt: R3 }] } }), expect: { verdict: 'superseded', signature: 'valid' } },
+  { name: 'bundle-forged-checkpoint', note: 'A bundle whose receipt checkpoint was signed by another key.', bundle: bundleOf(S3, { log: { vkey: VKEY, receipt: { ...R0, checkpoint: signNote(checkpointText(5, ROOT5), LOG_ORIGIN, LX) }, corrections: [] } }), expect: { verdict: 'mismatch', signature: 'valid' } },
+);
+
 const write = (file, value, count, what) => {
   const text = JSON.stringify(value, null, 2) + '\n';
   const target = new URL(file, here);
@@ -154,4 +241,5 @@ const write = (file, value, count, what) => {
   }
 };
 write('vectors.json', doc, vectors.length, 'cases');
+write('log.json', logDoc, logCases.length + consistency.length, 'log cases');
 write('bundles.json', { description: 'Verification bundles (trooth.verification-bundle.v1) and the verdict each must reach when checked with no network. `domain`, when present, is the domain the reader asks about in place of the one the bundle names. The keys are the same test keys as vectors.json.', bundles }, bundles.length, 'bundles');

@@ -15,7 +15,8 @@
 
 import { createHash, createPublicKey, verify as edVerify } from 'node:crypto';
 import { isCanonical } from './jcs.mjs';
-import { formatId, statementId } from './ids.mjs';
+import { formatId, statementId, parseId } from './ids.mjs';
+import { checkReceipt } from './tlog.mjs';
 
 export const WITNESS_STATEMENT_V1 = 'trooth.witness-statement.v1';
 export const WITNESS_STATEMENT_V2 = 'trooth.witness-statement.v2';
@@ -23,6 +24,9 @@ export const WITNESS_STATEMENT_V3 = 'trooth.witness-statement.v3';
 export const VERIFICATION_BUNDLE_V1 = 'trooth.verification-bundle.v1';
 /** The canonicalization label a v3 envelope carries. */
 export const JCS_LABEL = 'RFC8785';
+export const CORRECTION_V1 = 'trooth.correction.v1';
+/** Why Trooth withdrew or replaced a statement. */
+export const CORRECTION_REASONS = ['evaluator_defect', 'mapping_defect', 'source_misread', 'signing_key_compromised', 'dispute_upheld', 'withdrawn_by_trooth'];
 
 /** Reason codes a v2 check may carry, and the one outcome each may go with. */
 export const REASONS = {
@@ -162,9 +166,12 @@ export function countProblems(p) {
  *                         or the manifest was not supplied
  *   signature_not_trusted malformed, signature invalid, or key not trusted
  *   mismatch              a supplied mapping, manifest or domain does not match what was
- *                         signed, or the signed counts disagree with the signed checks
+ *                         signed, the signed counts disagree with the signed checks, or a
+ *                         log receipt was supplied and does not check
+ *   superseded            everything held, and a correction Trooth signed and logged
+ *                         withdraws or replaces this statement (docs/LOG.md)
  */
-export function verifyStatement({ statement, keys, mappingBytes, manifest, domain }) {
+export function verifyStatement({ statement, keys, mappingBytes, manifest, domain, log }) {
   let payload = null;
   try { payload = JSON.parse(String(statement?.payload ?? '')); } catch { payload = null; }
   const version = payload?.statement === WITNESS_STATEMENT_V1 ? 'v1' : payload?.statement === WITNESS_STATEMENT_V2 ? 'v2' : payload?.statement === WITNESS_STATEMENT_V3 ? 'v3' : 'unknown';
@@ -216,11 +223,67 @@ export function verifyStatement({ statement, keys, mappingBytes, manifest, domai
     result.binding = { status: mapping === 'mismatch' || man === 'mismatch' ? 'mismatch' : mapping === 'match' && man === 'match' ? 'bound' : 'partially_checked', mapping, manifest: man };
   }
 
+  if (log !== undefined) result.log = checkLog({ statement, log, keys, statementIdValue: result.statement_id });
+
   if (!result.counts.identities_hold || result.subject.status === 'mismatch' || result.binding.status === 'mismatch') result.verdict = 'mismatch';
+  else if (result.log && (result.log.status === 'proof_invalid' || result.log.status === 'checkpoint_invalid')) result.verdict = 'mismatch';
+  else if (result.log && result.log.superseded_by) result.verdict = 'superseded';
   else if (version === 'v1') result.verdict = 'checked_v1';
   else if (result.binding.status === 'bound') result.verdict = 'checked';
   else result.verdict = 'partially_checked';
   return result;
+}
+
+/**
+ * The log part of a check (docs/LOG.md). `log` is
+ *   { vkeys: [verifier keys], receipt: receipt|null, corrections: [{statement, receipt}] }
+ * receipt null means the log answered that it holds no such statement.
+ */
+function checkLog({ statement, log, keys, statementIdValue }) {
+  const vkeys = Array.isArray(log.vkeys) ? log.vkeys : [];
+  const out = { status: 'not_logged', index: null, tree_size: null, reason: null, corrections: [], superseded_by: null };
+  if (log.unavailable) { out.status = 'unavailable'; out.reason = String(log.unavailable); return out; }
+  if (log.receipt) {
+    const r = checkReceipt({ kind: 'witness_statement', statement, receipt: log.receipt, vkeys });
+    Object.assign(out, { status: r.status, index: r.index, tree_size: r.tree_size, reason: r.reason });
+  } else {
+    out.reason = 'The log holds no entry for this statement.';
+  }
+  for (const c of Array.isArray(log.corrections) ? log.corrections : []) {
+    const v = verifyCorrection({ correction: c?.statement, receipt: c?.receipt, keys, vkeys, statementIdValue });
+    out.corrections.push(v);
+    if (v.valid && !out.superseded_by) out.superseded_by = v.correction_statement_id;
+  }
+  return out;
+}
+
+/**
+ * Check one correction: a trooth.correction.v1 envelope, signed like a v3
+ * statement (RFC 8785 bytes, signer inside), by a key trusted at issued_at,
+ * naming this statement in `supersedes`, and itself included in the log.
+ */
+export function verifyCorrection({ correction, receipt, keys, vkeys, statementIdValue }) {
+  const res = { valid: false, correction_statement_id: null, code: null, effect: null, replacement: null, issued_at: null, reason: null };
+  const fail = (why) => ({ ...res, reason: why });
+  if (!correction || typeof correction.payload !== 'string') return fail('no correction payload');
+  res.correction_statement_id = statementId(correction.payload);
+  let p;
+  try { p = JSON.parse(correction.payload); } catch { return fail('the correction payload is not JSON'); }
+  if (p?.statement !== CORRECTION_V1) return fail('not a trooth.correction.v1 payload');
+  if (correction.alg !== 'Ed25519' || correction.canonicalization !== JCS_LABEL || !isCanonical(correction.payload)) return fail('the correction is not RFC 8785 bytes signed with Ed25519');
+  if (p.signer?.key_id !== correction.key_id || p.signer?.issuer !== 'trooth.co') return fail('the signer inside the correction is not the envelope key');
+  Object.assign(res, { code: p.reason?.code ?? null, effect: p.effect ?? null, replacement: p.replacement ?? null, issued_at: p.issued_at ?? null });
+  if (p.supersedes !== statementIdValue) return fail('the correction supersedes another statement');
+  if (!CORRECTION_REASONS.includes(p.reason?.code)) return fail('the correction reason code is not known');
+  if (!(p.effect === 'withdrawn' && p.replacement === null) && !(p.effect === 'replaced' && parseId(p.replacement)?.type === 'statement')) return fail('the correction effect and replacement disagree');
+  const m = /^ed25519:([A-Za-z0-9+/]+={0,2})$/.exec(String(correction.signature));
+  const published = (keys || []).find((k) => k && k.kid === correction.key_id);
+  if (!m || !published || !ed25519Valid(keyBytes(published), Buffer.from(m[1], 'base64'), Buffer.from(correction.payload, 'utf8'))) return fail('the correction signature does not check');
+  const kt = keyTrust(correction.key_id, keys, typeof p.issued_at === 'string' ? p.issued_at : null);
+  if (!kt.trusted) return fail(`the correction key is not trusted: ${kt.reason}`);
+  const r = checkReceipt({ kind: 'correction', statement: correction, receipt, vkeys });
+  if (r.status !== 'included') return fail(`the correction is not shown in the log: ${r.reason}`);
+  return { ...res, valid: true, reason: `entry ${r.index} of the log` };
 }
 
 export class BundleError extends Error {}
@@ -244,19 +307,22 @@ export function bundleInputs(bundle) {
     mappingBytes,
     manifest: Array.isArray(bundle.manifest) ? bundle.manifest : undefined,
     domain: typeof bundle.domain === 'string' ? bundle.domain : undefined,
+    log: bundle.log && typeof bundle.log === 'object' ? { vkeys: typeof bundle.log.vkey === 'string' ? [bundle.log.vkey] : [], receipt: bundle.log.receipt ?? null, corrections: Array.isArray(bundle.log.corrections) ? bundle.log.corrections : [] } : undefined,
   };
 }
 
 /** Check a bundle entirely offline. `domain` overrides the domain the bundle names. */
-export function verifyBundle(bundle, { domain } = {}) {
+export function verifyBundle(bundle, { domain, vkeys } = {}) {
   const i = bundleInputs(bundle);
-  const result = verifyStatement({ statement: i.statement, keys: i.keys, mappingBytes: i.mappingBytes, manifest: i.manifest, domain: domain ?? i.domain });
+  // A pinned log key, when the caller has one, is used in place of the key the bundle carries.
+  const log = i.log && vkeys ? { ...i.log, vkeys } : i.log;
+  const result = verifyStatement({ statement: i.statement, keys: i.keys, mappingBytes: i.mappingBytes, manifest: i.manifest, domain: domain ?? i.domain, log });
   return { ...result, keys_read_at: i.keysReadAt };
 }
 
 /** Assemble a bundle from inputs already read. The mapping bytes are carried exactly. */
-export function makeBundle({ domain, statement, manifest, keys, keysReadAt, keysSource, mappingUrl, mappingBytes, createdAt }) {
-  return {
+export function makeBundle({ domain, statement, manifest, keys, keysReadAt, keysSource, mappingUrl, mappingBytes, createdAt, log }) {
+  const b = {
     bundle: VERIFICATION_BUNDLE_V1,
     created_at: createdAt ?? new Date().toISOString(),
     domain: domain ?? null,
@@ -265,4 +331,7 @@ export function makeBundle({ domain, statement, manifest, keys, keysReadAt, keys
     keys: { keys, list_read_at: keysReadAt ?? null, source: keysSource ?? null },
     mapping: mappingBytes === undefined ? null : { url: mappingUrl ?? null, digest: sha256Digest(mappingBytes), bytes_base64: Buffer.from(mappingBytes).toString('base64') },
   };
+  // Additive: a bundle saved before the log existed, or with no log answer, has no log field.
+  if (log && typeof log.vkey === 'string') b.log = { vkey: log.vkey, receipt: log.receipt ?? null, corrections: Array.isArray(log.corrections) ? log.corrections : [] };
+  return b;
 }

@@ -9,6 +9,29 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class CorrectionPayload(BaseModel):
+    "The JSON a trooth.correction.v1 payload holds: Trooth withdrawing or replacing a statement it signed. Signed like a v3 statement (RFC 8785 bytes, Ed25519, the signer inside the signed bytes) and entered in the witness statement log. The statement it corrects stays in the log; nothing is deleted."
+
+    model_config = ConfigDict(extra="allow")
+
+    statement: Literal["trooth.correction.v1"] = Field(..., description="The payload type.")
+    correction_id: str = Field(..., description="An identifier for this correction, unique in the log.")
+    supersedes: str = Field(..., description="The statement id this correction withdraws or replaces. It must already be in the log.")
+    subject_id: str = Field(..., description="The subject of the statement it corrects.")
+    effect: Literal["withdrawn", "replaced"] = Field(..., description="withdrawn: no statement takes its place. replaced: the replacement statement does.")
+    replacement: Optional[str] = Field(..., description="The replacing statement id, which must already be in the log; null for withdrawn.")
+    reason: CorrectionReason = Field(..., description="Why.")
+    issued_at: str = Field(..., description="When Trooth issued it, as Trooth asserts. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    signer: Signer = Field(..., description="The signing key, inside the signed bytes.")
+
+class CorrectionReason(BaseModel):
+    "The reason for a correction."
+
+    model_config = ConfigDict(extra="allow")
+
+    code: Literal["evaluator_defect", "mapping_defect", "source_misread", "signing_key_compromised", "dispute_upheld", "withdrawn_by_trooth"] = Field(..., description="evaluator_defect: the evaluator read wrongly. mapping_defect: the check mapping was wrong. source_misread: a source was misread. signing_key_compromised: the key that signed it is compromised. dispute_upheld: a dispute about the reading was upheld. withdrawn_by_trooth: withdrawn for another stated reason.")
+    explanation: str = Field(..., description="The reason in words, 10 to 1000 characters.")
+
 class ManifestEntry(BaseModel):
     "One check and the evidence behind it: a public `source`, or a `commitment` to a private one. Exactly one of the two."
 
@@ -59,6 +82,18 @@ class KeyEvent(BaseModel):
     at: str = Field(..., description="When. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
     note: Optional[str] = Field(None, description="A note, or null.")
 
+class LogReceipt(BaseModel):
+    "A receipt from Trooth's witness statement log (docs/LOG.md): the entry index, a checkpoint signed by the log key, and an RFC 9162 inclusion proof from the entry to the checkpoint root. The entry is RFC 8785 JSON of {kind, statement}; its leaf hash is SHA-256(0x00 || entry)."
+
+    model_config = ConfigDict(extra="allow")
+
+    log: Literal["trooth.co/witness-log/v1"] = Field(..., description="The log origin, which the checkpoint must also name.")
+    index: int = Field(..., description="The zero-based entry index.")
+    tree_size: int = Field(..., description="The size of the signed tree the proof is against. Equals the checkpoint size.")
+    root_hash: str = Field(..., description="Standard base64 of the 32-byte root at tree_size. Equals the checkpoint root.")
+    inclusion_proof: List[str] = Field(..., description="The RFC 9162 audit path, leaf to root, each a 32-byte hash in standard base64.")
+    checkpoint: str = Field(..., description="A C2SP checkpoint (origin, size, base64 root, each on its own line) followed by a blank line and C2SP signed-note signature lines; the log key's line is an em dash, the key name and base64 of the 4-byte key hash and the 64-byte Ed25519 signature.")
+
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
 
@@ -71,6 +106,24 @@ class VerificationBundle(BaseModel):
     manifest: Optional[EvidenceManifest] = Field(..., description="The evidence manifest, or null when none was saved.")
     keys: BundleKeys = Field(..., description="The key list as read when the bundle was written.")
     mapping: Optional[BundleMapping] = Field(..., description="The exact mapping bytes, or null when none were saved.")
+    log: Optional[BundleLog] = Field(None, description="What the witness statement log answered when the bundle was written: the log key used, the receipt or null, and every correction. Absent in a bundle written before the log, or when the log was not read.")
+
+class BundleLog(BaseModel):
+    "The log answer, carried so the log part can be checked offline too."
+
+    model_config = ConfigDict(extra="allow")
+
+    vkey: str = Field(..., description="The log verifier key the receipt was checked against, as a signed-note key (name+hash+key). A pinned key, when the checker has one, replaces it.")
+    receipt: Optional[LogReceipt] = Field(..., description="The receipt for the statement, or null when the log held no entry for it.")
+    corrections: List[LoggedCorrection] = Field(..., description="Every logged correction naming this statement, each with its own receipt.")
+
+class LoggedCorrection(BaseModel):
+    "A correction envelope and its receipt."
+
+    model_config = ConfigDict(extra="allow")
+
+    statement: WitnessStatement = Field(..., description="The correction envelope: its payload is a trooth.correction.v1 document in RFC 8785 bytes.")
+    receipt: LogReceipt = Field(..., description="The receipt for the correction.")
 
 class BundleKeys(BaseModel):
     "The key list as read."
@@ -96,7 +149,7 @@ class VerifyResult(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     domain: Optional[str] = Field(..., description="The domain asked about, or the signed domain when none was asked.")
-    verdict: Literal["checked", "checked_v1", "partially_checked", "signature_not_trusted", "mismatch"] = Field(..., description="checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping or the manifest disagrees.")
+    verdict: Literal["checked", "checked_v1", "partially_checked", "signature_not_trusted", "mismatch", "superseded"] = Field(..., description="checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping, the manifest or a log receipt disagrees. superseded: everything held, and a correction Trooth signed and logged withdraws or replaces the statement.")
     version: Literal["v1", "v2", "v3", "unknown"] = Field(..., description="The statement version, or unknown.")
     read_at: Optional[str] = Field(None, description="The read_at the payload carries. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
     reading_id: Optional[str] = Field(None, description="The reading id the payload carries.")
@@ -106,6 +159,7 @@ class VerifyResult(BaseModel):
     subject: Subject = Field(..., description="The signed domain against the domain asked about.")
     binding: Binding = Field(..., description="The mapping and manifest against their signed digests.")
     counts: CountCheck = Field(..., description="Whether the signed counts agree with the signed checks.")
+    log: Optional[LogCheck] = Field(None, description="The witness statement log part of the check. Absent when the log was not asked (offline from saved files, --no-log) or the signature was not trusted.")
     assurance: str = Field(..., description="What a valid signature of this version shows and does not show, in words.")
     keys_read_at: Optional[str] = Field(None, description="When the key list used was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
     sources: Optional[Dict[str, Optional[str]]] = Field(None, description="Where each input came from: a URL, a file path, or null when not supplied.")
@@ -137,6 +191,32 @@ class Binding(BaseModel):
     status: Literal["bound", "partially_checked", "mismatch", "absent", "unchecked"] = Field(..., description="bound, partially_checked, mismatch, absent (v1 binds neither) or unchecked (signature not trusted).")
     mapping: Literal["match", "mismatch", "not_supplied", "absent"] = Field(..., description="The mapping result.")
     manifest: Literal["match", "mismatch", "not_supplied", "absent"] = Field(..., description="The manifest result.")
+
+class LogCheck(BaseModel):
+    "What the log showed about the statement."
+
+    model_config = ConfigDict(extra="allow")
+
+    status: Literal["included", "not_logged", "unavailable", "checkpoint_invalid", "proof_invalid"] = Field(..., description="included: the receipt checks against a checkpoint signed by the log key. not_logged: the log holds no entry for it (reported, not a failure in this version). unavailable: the log could not be read. checkpoint_invalid: the checkpoint is not signed by the log key or names another log. proof_invalid: the receipt does not take this statement to the signed root.")
+    index: Optional[int] = Field(..., description="The entry index the receipt names, or null.")
+    tree_size: Optional[int] = Field(..., description="The signed tree size the receipt is against, or null.")
+    reason: Optional[str] = Field(..., description="Why, in words.")
+    corrections: List[CorrectionCheck] = Field(..., description="Each correction the log returned and whether it checked.")
+    superseded_by: Optional[str] = Field(..., description="The statement id of the first correction that checked, or null.")
+    vkey_source: Optional[str] = Field(None, description="Where the log key came from: pinned in this release, --log-vkey, carried in a bundle, or served by the log.")
+
+class CorrectionCheck(BaseModel):
+    "One correction and whether it is relied on."
+
+    model_config = ConfigDict(extra="allow")
+
+    valid: bool = Field(..., description="True when it is signed by a trusted key, in RFC 8785 bytes, names this statement, and is included in the log.")
+    correction_statement_id: Optional[str] = Field(..., description="The statement id of the correction itself.")
+    code: Optional[str] = Field(..., description="The reason code it carries.")
+    effect: Optional[str] = Field(..., description="withdrawn or replaced.")
+    replacement: Optional[str] = Field(..., description="The replacing statement id, for replaced.")
+    issued_at: Optional[str] = Field(..., description="When Trooth issued it, as Trooth asserts. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    reason: Optional[str] = Field(..., description="Why it is or is not relied on, in words.")
 
 class CountCheck(BaseModel):
     "The count decision."
@@ -302,17 +382,24 @@ EvidenceManifest = List[ManifestEntry]
 """The evidence manifest a v2 or v3 statement binds by digest, published beside the statement as `witnessEvidenceManifest`. Canonical bytes: entries sorted by check_id, each as {"check_id":..,"source":..} or {"check_id":..,"commitment":..}, no whitespace, UTF-8."""
 
 
+CorrectionPayload.model_rebuild()
+CorrectionReason.model_rebuild()
 ManifestEntry.model_rebuild()
 KeyList.model_rebuild()
 PublicKey.model_rebuild()
 KeyEvent.model_rebuild()
+LogReceipt.model_rebuild()
 VerificationBundle.model_rebuild()
+BundleLog.model_rebuild()
+LoggedCorrection.model_rebuild()
 BundleKeys.model_rebuild()
 BundleMapping.model_rebuild()
 VerifyResult.model_rebuild()
 KeyTrust.model_rebuild()
 Subject.model_rebuild()
 Binding.model_rebuild()
+LogCheck.model_rebuild()
+CorrectionCheck.model_rebuild()
 CountCheck.model_rebuild()
 WitnessPayloadV1.model_rebuild()
 CheckV1.model_rebuild()

@@ -31,14 +31,14 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 | Command | What it does |
 |---|---|
 | `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
-| `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all; `--save-bundle` keeps every input in one file and `--bundle` checks it later with no network. Statements v1, v2 and v3 (RFC 8785 bytes) are checked. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 27 cases plus 7 bundles any other implementation must agree on. New in 0.7.0; bundles and v3 new in 0.8.0. |
+| `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all; `--save-bundle` keeps every input in one file and `--bundle` checks it later with no network. Statements v1, v2 and v3 (RFC 8785 bytes) are checked. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 27 cases plus 7 bundles any other implementation must agree on. New in 0.7.0; bundles and v3 new in 0.8.0; the witness statement log and corrections new in 0.9.0. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, and `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle` and `--bundle`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, and `log monitor` takes `--state`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 Any other flag is a usage error. The message names the flag, and for a `--` flag given to `check` or `lint` it also lists the ones that exist.
 
@@ -54,7 +54,8 @@ Any other flag is a usage error. The message names the flag, and for a `--` flag
 | 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. `verify`: the record carries no signed statement to check. New in 0.5.0. |
 | 6 | `check`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
 | 8 | `verify`: the statement is malformed, its signature does not check, or its key is not trusted (compromised, revoked, retired before the statement's time, or not on the list). New in 0.7.0. |
-| 9 | `verify`: the signature checks and the key is trusted, but the domain, the check mapping, the evidence manifest or the signed counts do not match what was signed. New in 0.7.0. |
+| 9 | `verify`: the signature checks and the key is trusted, but the domain, the check mapping, the evidence manifest or the signed counts do not match what was signed, or the log's receipt does not check. `log monitor`: the log is not an extension of the checkpoint you saved. New in 0.7.0. |
+| 10 | `verify`: everything held, and a correction Trooth signed and entered in the log withdraws or replaces the statement. New in 0.9.0. |
 | 7 | Output not delivered: stdout or stderr failed or was closed before everything was written, for example a reader that stopped early (EPIPE) or a full disk. The command's own result was not delivered, whatever it would have been, so this code replaces it. Nothing is retried. New in 0.6.1. |
 
 A company with no record, a listed company without a witnessed reading, and a Network that could not be read are different answers, so they exit differently. A pipeline can tell them apart without parsing prose, and a Trooth outage never reads as a company with no record.
@@ -303,6 +304,22 @@ trooth verify --bundle trooth.co.bundle.json
 
 A bundle carries the statement, the evidence manifest, the key list with the time it was read, and the exact mapping bytes. It is only as fresh as its key list. You can also save the inputs separately and run `trooth verify <domain> --file profile.json --keys keys.json --mapping 1.0.1.json --offline`.
 
+### The witness statement log
+
+Every statement Trooth publishes, and every correction it issues, is entered in one public append-only log ([docs/LOG.md](docs/LOG.md)): an RFC 9162 Merkle tree with a C2SP checkpoint signed by a log key that signs nothing else ([docs/KEY-CEREMONY.md](docs/KEY-CEREMONY.md)). `trooth verify` asks the log for the statement and adds a line:
+
+```
+  log        included, entry 41 of a signed tree of 42 (log key pinned in trooth 0.9.0)
+```
+
+If Trooth has signed and logged a correction withdrawing or replacing the statement, the verdict is **Superseded** and the exit code is 10. Anyone can check the log only ever grows:
+
+```
+trooth log monitor --state trooth-log-state.json
+```
+
+This repository runs that check every hour (`.github/workflows/log-monitor.yml`).
+
 ### In your own code
 
 The same checks, passing the same test vectors, in three languages:
@@ -313,9 +330,16 @@ The same checks, passing the same test vectors, in three languages:
 | Python 3.9+ | `pip install "git+https://github.com/troothllc/trooth-cli#subdirectory=sdk/python"` | `from trooth_verify import verify_bundle` ([sdk/python](sdk/python)) |
 | Go 1.21+ | `go get github.com/troothllc/trooth-cli/sdk/go@latest` | `trooth.VerifyBundle(doc, nil)` ([sdk/go](sdk/go)) |
 
-[schemas/](schemas) holds JSON Schema for every document involved (statement, payload v1 to v3, key list, evidence manifest, bundle, result), each served at `https://trooth.co/schemas/<file>`, with TypeScript, Pydantic and Go types generated from them.
+[schemas/](schemas) holds JSON Schema for every document involved (statement, payload v1 to v3, key list, evidence manifest, bundle, result, log receipt, correction), each served at `https://trooth.co/schemas/<file>`, with TypeScript, Pydantic and Go types generated from them.
 
 A checked statement means Trooth's key signed that reading for that domain. It does not mean the company is safe, compliant or authorized for anything; what to do with it is your decision.
+
+## Changed in 0.9.0
+
+- `trooth verify` checks the statement against Trooth's witness statement log: a receipt that checks against a checkpoint signed by the pinned log key, and any logged correction. New verdict `superseded`, exit 10. `--no-log` skips the log; `--log-vkey` checks against another key. Bundles carry the log's answer, so the log part is checked offline too.
+- New `trooth log checkpoint` and `trooth log monitor --state <file>`.
+- [docs/LOG.md](docs/LOG.md) (the log, receipts, corrections, monitoring) and [docs/KEY-CEREMONY.md](docs/KEY-CEREMONY.md); [docs/VERIFY.md](docs/VERIFY.md) is version 1.2.
+- Two new schemas (log receipt, correction), the package exports `trooth/tlog`, and the Python (0.2.0) and Go verifiers check receipts and corrections too. 20 new log vectors, checked by Go's `golang.org/x/mod/sumdb` as well.
 
 ## Changed in 0.8.0
 

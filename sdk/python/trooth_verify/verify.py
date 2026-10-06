@@ -19,12 +19,16 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from .jcs import is_canonical
+from .tlog import check_receipt
 
 WITNESS_STATEMENT_V1 = "trooth.witness-statement.v1"
 WITNESS_STATEMENT_V2 = "trooth.witness-statement.v2"
 WITNESS_STATEMENT_V3 = "trooth.witness-statement.v3"
 VERIFICATION_BUNDLE_V1 = "trooth.verification-bundle.v1"
 JCS_LABEL = "RFC8785"
+CORRECTION_V1 = "trooth.correction.v1"
+CORRECTION_REASONS = ("evaluator_defect", "mapping_defect", "source_misread", "signing_key_compromised", "dispute_upheld", "withdrawn_by_trooth")
+_SID = re.compile(r"^trooth:statement:[0-9a-f]{64}$")
 
 REASONS = {
     "source_unavailable": "not read",
@@ -216,8 +220,77 @@ def count_problems(p: Dict[str, Any]) -> List[str]:
     return problems
 
 
+def verify_correction(correction: Any, receipt: Any, keys: List[Dict[str, Any]], vkeys: List[str], statement_id_value: Optional[str]) -> Dict[str, Any]:
+    """Check one trooth.correction.v1 envelope against the statement it may supersede."""
+    res: Dict[str, Any] = {"valid": False, "correction_statement_id": None, "code": None, "effect": None, "replacement": None, "issued_at": None, "reason": None}
+
+    def fail(why: str) -> Dict[str, Any]:
+        return {**res, "reason": why}
+
+    if not isinstance(correction, dict) or not isinstance(correction.get("payload"), str):
+        return fail("no correction payload")
+    res["correction_statement_id"] = statement_id(correction["payload"])
+    try:
+        p = json.loads(correction["payload"])
+    except ValueError:
+        return fail("the correction payload is not JSON")
+    if not isinstance(p, dict) or p.get("statement") != CORRECTION_V1:
+        return fail("not a trooth.correction.v1 payload")
+    if correction.get("alg") != "Ed25519" or correction.get("canonicalization") != JCS_LABEL or not is_canonical(correction["payload"]):
+        return fail("the correction is not RFC 8785 bytes signed with Ed25519")
+    signer = p.get("signer") if isinstance(p.get("signer"), dict) else {}
+    if signer.get("key_id") != correction.get("key_id") or signer.get("issuer") != "trooth.co":
+        return fail("the signer inside the correction is not the envelope key")
+    reason = p.get("reason") if isinstance(p.get("reason"), dict) else {}
+    res.update({"code": reason.get("code"), "effect": p.get("effect"), "replacement": p.get("replacement"), "issued_at": p.get("issued_at")})
+    if p.get("supersedes") != statement_id_value:
+        return fail("the correction supersedes another statement")
+    if reason.get("code") not in CORRECTION_REASONS:
+        return fail("the correction reason code is not known")
+    ok_effect = (p.get("effect") == "withdrawn" and p.get("replacement") is None) or (
+        p.get("effect") == "replaced" and isinstance(p.get("replacement"), str) and bool(_SID.match(p["replacement"])))
+    if not ok_effect:
+        return fail("the correction effect and replacement disagree")
+    m = _SIG.match(str(correction.get("signature") or ""))
+    published = next((k for k in keys or [] if isinstance(k, dict) and k.get("kid") == correction.get("key_id")), None)
+    try:
+        sig = _b64(m.group(1)) if m else b""
+    except (ValueError, binascii.Error):
+        sig = b""
+    if not m or not published or not _ed25519_valid(key_bytes(published), sig, correction["payload"].encode("utf-8")):
+        return fail("the correction signature does not check")
+    kt = key_trust(str(correction.get("key_id")), keys, p.get("issued_at") if isinstance(p.get("issued_at"), str) else None)
+    if not kt["trusted"]:
+        return fail(f"the correction key is not trusted: {kt['reason']}")
+    r = check_receipt("correction", correction, receipt, vkeys)
+    if r["status"] != "included":
+        return fail(f"the correction is not shown in the log: {r['reason']}")
+    return {**res, "valid": True, "reason": f"entry {r['index']} of the log"}
+
+
+def _check_log(statement: Dict[str, Any], log: Dict[str, Any], keys: List[Dict[str, Any]], sid: Optional[str]) -> Dict[str, Any]:
+    vkeys = log.get("vkeys") if isinstance(log.get("vkeys"), list) else []
+    out: Dict[str, Any] = {"status": "not_logged", "index": None, "tree_size": None, "reason": None, "corrections": [], "superseded_by": None}
+    if log.get("unavailable"):
+        out.update({"status": "unavailable", "reason": str(log["unavailable"])})
+        return out
+    if log.get("receipt"):
+        r = check_receipt("witness_statement", statement, log["receipt"], vkeys)
+        out.update({"status": r["status"], "index": r["index"], "tree_size": r["tree_size"], "reason": r["reason"]})
+    else:
+        out["reason"] = "The log holds no entry for this statement."
+    for c in log.get("corrections") or []:
+        c = c if isinstance(c, dict) else {}
+        v = verify_correction(c.get("statement"), c.get("receipt"), keys, vkeys, sid)
+        out["corrections"].append(v)
+        if v["valid"] and not out["superseded_by"]:
+            out["superseded_by"] = v["correction_statement_id"]
+    return out
+
+
 def verify_statement(statement: Dict[str, Any], keys: List[Dict[str, Any]], mapping_bytes: Optional[bytes] = None,
-                     manifest: Optional[List[Dict[str, Any]]] = None, domain: Optional[str] = None) -> Dict[str, Any]:
+                     manifest: Optional[List[Dict[str, Any]]] = None, domain: Optional[str] = None,
+                     log: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Check one statement. Returns a dict shaped like schemas/verify-result.schema.json."""
     statement = statement or {}
     raw = statement.get("payload")
@@ -290,8 +363,15 @@ def verify_statement(statement: Dict[str, Any], keys: List[Dict[str, Any]], mapp
         status = "mismatch" if "mismatch" in (mapping, man) else ("bound" if mapping == man == "match" else "partially_checked")
         result["binding"] = {"status": status, "mapping": mapping, "manifest": man}
 
+    if log is not None:
+        result["log"] = _check_log(statement, log, keys, result["statement_id"])
+    lg = result.get("log")
     if not result["counts"]["identities_hold"] or result["subject"]["status"] == "mismatch" or result["binding"]["status"] == "mismatch":
         result["verdict"] = "mismatch"
+    elif lg and lg["status"] in ("proof_invalid", "checkpoint_invalid"):
+        result["verdict"] = "mismatch"
+    elif lg and lg["superseded_by"]:
+        result["verdict"] = "superseded"
     elif version == "v1":
         result["verdict"] = "checked_v1"
     elif result["binding"]["status"] == "bound":
@@ -301,7 +381,7 @@ def verify_statement(statement: Dict[str, Any], keys: List[Dict[str, Any]], mapp
     return result
 
 
-def verify_bundle(bundle: Dict[str, Any], domain: Optional[str] = None) -> Dict[str, Any]:
+def verify_bundle(bundle: Dict[str, Any], domain: Optional[str] = None, vkeys: Optional[List[str]] = None) -> Dict[str, Any]:
     """Check a trooth.verification-bundle.v1 document with no network. Raises BundleError."""
     if not isinstance(bundle, dict) or bundle.get("bundle") != VERIFICATION_BUNDLE_V1:
         raise BundleError(f"not a {VERIFICATION_BUNDLE_V1} document")
@@ -322,6 +402,11 @@ def verify_bundle(bundle: Dict[str, Any], domain: Optional[str] = None) -> Dict[
             raise BundleError("the bundle mapping is not standard base64")
         mapping_bytes = base64.b64decode(b64)
     asked = domain if domain is not None else (bundle.get("domain") if isinstance(bundle.get("domain"), str) else None)
-    r = verify_statement(st, keys["keys"], mapping_bytes, manifest, asked)
+    log = None
+    bl = bundle.get("log")
+    if isinstance(bl, dict):
+        log = {"vkeys": vkeys if vkeys else ([bl["vkey"]] if isinstance(bl.get("vkey"), str) else []),
+               "receipt": bl.get("receipt"), "corrections": bl.get("corrections") if isinstance(bl.get("corrections"), list) else []}
+    r = verify_statement(st, keys["keys"], mapping_bytes, manifest, asked, log)
     r["keys_read_at"] = keys.get("list_read_at") if isinstance(keys.get("list_read_at"), str) else None
     return r

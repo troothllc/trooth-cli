@@ -3,6 +3,36 @@
 
 package trooth
 
+// CorrectionPayload: The JSON a trooth.correction.v1 payload holds: Trooth withdrawing or replacing a statement it signed. Signed like a v3 statement (RFC 8785 bytes, Ed25519, the signer inside the signed bytes) and entered in the witness statement log. The statement it corrects stays in the log; nothing is deleted.
+type CorrectionPayload struct {
+	// The payload type. One of: trooth.correction.v1.
+	Statement string `json:"statement"`
+	// An identifier for this correction, unique in the log.
+	CorrectionID string `json:"correction_id"`
+	// The statement id this correction withdraws or replaces. It must already be in the log.
+	Supersedes string `json:"supersedes"`
+	// The subject of the statement it corrects.
+	SubjectID string `json:"subject_id"`
+	// withdrawn: no statement takes its place. replaced: the replacement statement does. One of: withdrawn, replaced.
+	Effect string `json:"effect"`
+	// The replacing statement id, which must already be in the log; null for withdrawn.
+	Replacement *string `json:"replacement"`
+	// Why.
+	Reason CorrectionReason `json:"reason"`
+	// When Trooth issued it, as Trooth asserts. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	IssuedAt string `json:"issued_at"`
+	// The signing key, inside the signed bytes.
+	Signer Signer `json:"signer"`
+}
+
+// CorrectionReason: The reason for a correction.
+type CorrectionReason struct {
+	// evaluator_defect: the evaluator read wrongly. mapping_defect: the check mapping was wrong. source_misread: a source was misread. signing_key_compromised: the key that signed it is compromised. dispute_upheld: a dispute about the reading was upheld. withdrawn_by_trooth: withdrawn for another stated reason. One of: evaluator_defect, mapping_defect, source_misread, signing_key_compromised, dispute_upheld, withdrawn_by_trooth.
+	Code string `json:"code"`
+	// The reason in words, 10 to 1000 characters.
+	Explanation string `json:"explanation"`
+}
+
 // EvidenceManifest: The evidence manifest a v2 or v3 statement binds by digest, published beside the statement as `witnessEvidenceManifest`. Canonical bytes: entries sorted by check_id, each as {"check_id":..,"source":..} or {"check_id":..,"commitment":..}, no whitespace, UTF-8.
 type EvidenceManifest []ManifestEntry
 
@@ -74,6 +104,22 @@ type KeyEvent struct {
 	Note *string `json:"note,omitempty"`
 }
 
+// LogReceipt: A receipt from Trooth's witness statement log (docs/LOG.md): the entry index, a checkpoint signed by the log key, and an RFC 9162 inclusion proof from the entry to the checkpoint root. The entry is RFC 8785 JSON of {kind, statement}; its leaf hash is SHA-256(0x00 || entry).
+type LogReceipt struct {
+	// The log origin, which the checkpoint must also name. One of: trooth.co/witness-log/v1.
+	Log string `json:"log"`
+	// The zero-based entry index.
+	Index int64 `json:"index"`
+	// The size of the signed tree the proof is against. Equals the checkpoint size.
+	TreeSize int64 `json:"tree_size"`
+	// Standard base64 of the 32-byte root at tree_size. Equals the checkpoint root.
+	RootHash string `json:"root_hash"`
+	// The RFC 9162 audit path, leaf to root, each a 32-byte hash in standard base64.
+	InclusionProof []string `json:"inclusion_proof"`
+	// A C2SP checkpoint (origin, size, base64 root, each on its own line) followed by a blank line and C2SP signed-note signature lines; the log key's line is an em dash, the key name and base64 of the 4-byte key hash and the 64-byte Ed25519 signature.
+	Checkpoint string `json:"checkpoint"`
+}
+
 // VerificationBundle: Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list.
 type VerificationBundle struct {
 	// The bundle format. One of: trooth.verification-bundle.v1.
@@ -90,6 +136,26 @@ type VerificationBundle struct {
 	Keys BundleKeys `json:"keys"`
 	// The exact mapping bytes, or null when none were saved.
 	Mapping *BundleMapping `json:"mapping"`
+	// What the witness statement log answered when the bundle was written: the log key used, the receipt or null, and every correction. Absent in a bundle written before the log, or when the log was not read.
+	Log *BundleLog `json:"log,omitempty"`
+}
+
+// BundleLog: The log answer, carried so the log part can be checked offline too.
+type BundleLog struct {
+	// The log verifier key the receipt was checked against, as a signed-note key (name+hash+key). A pinned key, when the checker has one, replaces it.
+	Vkey string `json:"vkey"`
+	// The receipt for the statement, or null when the log held no entry for it.
+	Receipt *LogReceipt `json:"receipt"`
+	// Every logged correction naming this statement, each with its own receipt.
+	Corrections []LoggedCorrection `json:"corrections"`
+}
+
+// LoggedCorrection: A correction envelope and its receipt.
+type LoggedCorrection struct {
+	// The correction envelope: its payload is a trooth.correction.v1 document in RFC 8785 bytes.
+	Statement WitnessStatement `json:"statement"`
+	// The receipt for the correction.
+	Receipt LogReceipt `json:"receipt"`
 }
 
 // BundleKeys: The key list as read.
@@ -116,7 +182,7 @@ type BundleMapping struct {
 type VerifyResult struct {
 	// The domain asked about, or the signed domain when none was asked.
 	Domain *string `json:"domain"`
-	// checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping or the manifest disagrees. One of: checked, checked_v1, partially_checked, signature_not_trusted, mismatch.
+	// checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping, the manifest or a log receipt disagrees. superseded: everything held, and a correction Trooth signed and logged withdraws or replaces the statement. One of: checked, checked_v1, partially_checked, signature_not_trusted, mismatch, superseded.
 	Verdict string `json:"verdict"`
 	// The statement version, or unknown. One of: v1, v2, v3, unknown.
 	Version string `json:"version"`
@@ -136,6 +202,8 @@ type VerifyResult struct {
 	Binding Binding `json:"binding"`
 	// Whether the signed counts agree with the signed checks.
 	Counts CountCheck `json:"counts"`
+	// The witness statement log part of the check. Absent when the log was not asked (offline from saved files, --no-log) or the signature was not trusted.
+	Log *LogCheck `json:"log,omitempty"`
 	// What a valid signature of this version shows and does not show, in words.
 	Assurance string `json:"assurance"`
 	// When the key list used was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
@@ -174,6 +242,42 @@ type Binding struct {
 	Mapping string `json:"mapping"`
 	// The manifest result. One of: match, mismatch, not_supplied, absent.
 	Manifest string `json:"manifest"`
+}
+
+// LogCheck: What the log showed about the statement.
+type LogCheck struct {
+	// included: the receipt checks against a checkpoint signed by the log key. not_logged: the log holds no entry for it (reported, not a failure in this version). unavailable: the log could not be read. checkpoint_invalid: the checkpoint is not signed by the log key or names another log. proof_invalid: the receipt does not take this statement to the signed root. One of: included, not_logged, unavailable, checkpoint_invalid, proof_invalid.
+	Status string `json:"status"`
+	// The entry index the receipt names, or null.
+	Index *int64 `json:"index"`
+	// The signed tree size the receipt is against, or null.
+	TreeSize *int64 `json:"tree_size"`
+	// Why, in words.
+	Reason *string `json:"reason"`
+	// Each correction the log returned and whether it checked.
+	Corrections []CorrectionCheck `json:"corrections"`
+	// The statement id of the first correction that checked, or null.
+	SupersededBy *string `json:"superseded_by"`
+	// Where the log key came from: pinned in this release, --log-vkey, carried in a bundle, or served by the log.
+	VkeySource *string `json:"vkey_source,omitempty"`
+}
+
+// CorrectionCheck: One correction and whether it is relied on.
+type CorrectionCheck struct {
+	// True when it is signed by a trusted key, in RFC 8785 bytes, names this statement, and is included in the log.
+	Valid bool `json:"valid"`
+	// The statement id of the correction itself.
+	CorrectionStatementID *string `json:"correction_statement_id"`
+	// The reason code it carries.
+	Code *string `json:"code"`
+	// withdrawn or replaced.
+	Effect *string `json:"effect"`
+	// The replacing statement id, for replaced.
+	Replacement *string `json:"replacement"`
+	// When Trooth issued it, as Trooth asserts. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	IssuedAt *string `json:"issued_at"`
+	// Why it is or is not relied on, in words.
+	Reason *string `json:"reason"`
 }
 
 // CountCheck: The count decision.

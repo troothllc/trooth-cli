@@ -16,6 +16,8 @@ fmt.Println(r.Verdict) // checked, checked_v1, partially_checked, signature_not_
 
 `trooth.VerifyStatement(trooth.Inputs{...})` checks inputs you read yourself; a nil `Mapping` or `Manifest` means not supplied, which is never reported as a match. The types in `types.go` are generated from [schemas/](../../schemas).
 
+Bundles written by `trooth` 0.9.0 and later carry the witness statement log's answer; the receipt and any correction are checked too, and a valid correction gives the verdict `superseded` ([docs/LOG.md](../../docs/LOG.md)). Pass your own pinned log key to replace the one a bundle carries.
+
 A `checked` verdict means Trooth's key signed these outcome bytes for this domain, bound to the exact check mapping and evidence manifest. It does not establish the company's identity, an independent time, or that the company is safe, compliant or authorized for anything.
 
 Run the tests from this folder: `go test ./...`. Licensed under the Apache License 2.0.
