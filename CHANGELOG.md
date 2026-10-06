@@ -2,6 +2,18 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.8.0 (2026-10-06)
+
+### Bundles, statement v3, schemas and SDKs
+
+- `trooth verify <domain> --save-bundle <file>` writes a `trooth.verification-bundle.v1` file: the statement as published, the evidence manifest, the key list with the time it was read, and the mapping document as base64 of its exact bytes. It refuses to overwrite an existing file. `trooth verify --bundle <file>` checks such a file and sends nothing; it cannot be combined with `--file`, `--keys`, `--mapping`, `--manifest` or `--save-bundle`. A domain given on the command line replaces the one the bundle names. Output from a saved key list says when it was read.
+- Every result carries `statement_id`, `trooth:statement:` plus the SHA-256 of the exact payload bytes. `docs/IDS.md` defines the `trooth:<type>:<value>` grammar for domains, readings, statements, keys, mappings and (reserved) entities; `bin/lib/ids.mjs` implements it.
+- Statement v3 (`trooth.witness-statement.v3`) is checked: the envelope names `RFC8785`, the payload bytes must equal their RFC 8785 canonical form (integers only, so every implementation agrees), `signer.key_id` inside the payload must equal the envelope's `key_id`, and `subject_id` must name the payload's domain. `bin/lib/jcs.mjs` implements the profile. Trooth's witness worker still signs v2; v1 and v2 check exactly as in 0.7.0. `docs/VERIFY.md` is version 1.1.
+- `schemas/` holds JSON Schema 2020-12 for the envelope, payloads v1, v2 and v3, the key list, the evidence manifest, the bundle and the `--json` result, with a description on every field. `scripts/gen-types.mjs` generates `types/trooth.d.ts`, `sdk/python/trooth_verify/models.py` and `sdk/go/trooth/types.go`; `tests/schemas.test.mjs` validates every vector, every bundle, a real trooth.co bundle and the CLI's own output, and fails when a generated file is stale.
+- The package can be used as a library: `trooth/verify`, `trooth/jcs`, `trooth/ids` and `trooth/schemas/*`, with TypeScript declarations. The one dependency is unchanged.
+- `sdk/python` (`trooth-verify`, depends on `cryptography`) and `sdk/go` (standard library only) implement the same checks and run every vector and bundle. CI runs both.
+- Vectors: 9 new (valid v3, v3 not canonical, a fraction, the wrong canonicalization label, a signer that differs from the envelope, a tampered v3 payload, a subject id that disagrees, a v3 domain mismatch, v3 with no manifest), 27 in all; `tests/vectors/bundles.json` adds 7 bundle cases.
+
 ## 0.7.0 (2026-10-06)
 
 ### `trooth verify`: check the signed reading yourself

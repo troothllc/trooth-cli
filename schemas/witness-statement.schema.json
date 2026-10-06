@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/witness-statement.schema.json",
+  "title": "WitnessStatement",
+  "description": "The signed envelope Trooth publishes as `witnessStatement` on a record. The signature covers the exact UTF-8 bytes of `payload`, nothing else. How to check it: docs/VERIFY.md in github.com/troothllc/trooth-cli.",
+  "type": "object",
+  "required": [
+    "payload",
+    "signature",
+    "key_id",
+    "alg",
+    "canonicalization"
+  ],
+  "properties": {
+    "payload": {
+      "type": "string",
+      "description": "The signing input: the exact JSON text that was signed. Parse it to read it; never re-serialize it to check it. Its `statement` field names the version (witness-payload.v1, v2 or v3).",
+      "minLength": 2
+    },
+    "signature": {
+      "type": "string",
+      "description": "The Ed25519 signature over the payload bytes: `ed25519:` followed by standard base64 of the 64 signature bytes.",
+      "pattern": "^ed25519:[A-Za-z0-9+/]+={0,2}$"
+    },
+    "key_id": {
+      "type": "string",
+      "description": "The `kid` of the signing key on https://api.trooth.co/public/keys. A v3 payload names the same key inside the signed bytes, at signer.key_id.",
+      "minLength": 1
+    },
+    "alg": {
+      "type": "string",
+      "description": "The signature algorithm. Always Ed25519 (RFC 8032, pure EdDSA).",
+      "const": "Ed25519"
+    },
+    "canonicalization": {
+      "type": "string",
+      "description": "How the payload bytes were produced. `json-fixed-key-order-no-whitespace-utf8` for v1 and v2; `RFC8785` (JSON Canonicalization Scheme, integers only) for v3, where the payload MUST equal the canonical form of the JSON it holds.",
+      "enum": [
+        "json-fixed-key-order-no-whitespace-utf8",
+        "RFC8785"
+      ]
+    }
+  }
+}

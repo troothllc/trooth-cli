@@ -31,14 +31,14 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 | Command | What it does |
 |---|---|
 | `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
-| `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 18 cases any other implementation must agree on. New in 0.7.0. |
+| `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all; `--save-bundle` keeps every input in one file and `--bundle` checks it later with no network. Statements v1, v2 and v3 (RFC 8785 bytes) are checked. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 27 cases plus 7 bundles any other implementation must agree on. New in 0.7.0; bundles and v3 new in 0.8.0. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, and `verify` takes `--file`, `--keys`, `--mapping`, `--manifest` and `--offline`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, and `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle` and `--bundle`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 Any other flag is a usage error. The message names the flag, and for a `--` flag given to `check` or `lint` it also lists the ones that exist.
 
@@ -289,9 +289,40 @@ trooth.co  witness statement v2, read 2026-10-06
 Checked. A valid v2 signature shows that Trooth's key signed these outcome bytes together with the digest of the exact check mapping, the evaluator version, the subject scope and the digest of the evidence manifest. It does not establish the company's identity, an independently established time, or anything the reading did not read.
 ```
 
-It reads three things: the record (`trooth.co/api/network/profile`), the key list (`api.trooth.co/public/keys`) and the check mapping the statement names (only from `trooth.co/standard/check-mapping/`). Then it decides for itself. To check with no network at all, save those three and run `trooth verify <domain> --file profile.json --keys keys.json --mapping 1.0.1.json --offline`.
+It reads three things: the record (`trooth.co/api/network/profile`), the key list (`api.trooth.co/public/keys`) and the check mapping the statement names (only from `trooth.co/standard/check-mapping/`). Then it decides for itself. Every result names the statement by `trooth:statement:<sha256 of the payload bytes>` ([docs/IDS.md](docs/IDS.md)).
+
+To keep what you checked, and check it again later with no network at all:
+
+```
+trooth verify trooth.co --save-bundle trooth.co.bundle.json
+```
+
+```
+trooth verify --bundle trooth.co.bundle.json
+```
+
+A bundle carries the statement, the evidence manifest, the key list with the time it was read, and the exact mapping bytes. It is only as fresh as its key list. You can also save the inputs separately and run `trooth verify <domain> --file profile.json --keys keys.json --mapping 1.0.1.json --offline`.
+
+### In your own code
+
+The same checks, passing the same test vectors, in three languages:
+
+| Language | Install | Call |
+|---|---|---|
+| JavaScript, TypeScript | `npm install trooth` | `import { verifyStatement, verifyBundle } from 'trooth/verify'` (types included) |
+| Python 3.9+ | `pip install "git+https://github.com/troothllc/trooth-cli#subdirectory=sdk/python"` | `from trooth_verify import verify_bundle` ([sdk/python](sdk/python)) |
+| Go 1.21+ | `go get github.com/troothllc/trooth-cli/sdk/go@latest` | `trooth.VerifyBundle(doc, nil)` ([sdk/go](sdk/go)) |
+
+[schemas/](schemas) holds JSON Schema for every document involved (statement, payload v1 to v3, key list, evidence manifest, bundle, result), each served at `https://trooth.co/schemas/<file>`, with TypeScript, Pydantic and Go types generated from them.
 
 A checked statement means Trooth's key signed that reading for that domain. It does not mean the company is safe, compliant or authorized for anything; what to do with it is your decision.
+
+## Changed in 0.8.0
+
+- `trooth verify --save-bundle <file>` writes every input to one portable file; `trooth verify --bundle <file>` checks it with no network. Every result now carries `statement_id`.
+- Statement v3 is checked: RFC 8785 canonical bytes, the subject named by `trooth:domain:<domain>` and the signing key named inside the signed bytes. Trooth still signs v2; v1 and v2 check exactly as before. [docs/VERIFY.md](docs/VERIFY.md) is now version 1.1, and [docs/IDS.md](docs/IDS.md) defines stable ids.
+- JSON Schemas in [schemas/](schemas), generated types, and the package exports `trooth/verify`, `trooth/jcs`, `trooth/ids` and `trooth/schemas/*` for use as a library. Python and Go verifiers in [sdk/](sdk) run the same vectors.
+- 9 new vectors (27 in all) and 7 bundles, one of them a real bundle saved from trooth.co.
 
 ## Changed in 0.7.0
 

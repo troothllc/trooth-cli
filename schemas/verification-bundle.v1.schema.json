@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/verification-bundle.v1.schema.json",
+  "title": "VerificationBundle",
+  "description": "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list.",
+  "type": "object",
+  "required": [
+    "bundle",
+    "created_at",
+    "domain",
+    "statement",
+    "manifest",
+    "keys",
+    "mapping"
+  ],
+  "properties": {
+    "bundle": {
+      "type": "string",
+      "description": "The bundle format.",
+      "const": "trooth.verification-bundle.v1"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "When the bundle was written. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "domain": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The domain the bundle was saved for. A reader may ask about another; a statement for a different domain is a mismatch."
+    },
+    "statement": {
+      "$ref": "witness-statement.schema.json",
+      "description": "The signed envelope, exactly as published."
+    },
+    "manifest": {
+      "oneOf": [
+        {
+          "$ref": "evidence-manifest.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The evidence manifest, or null when none was saved."
+    },
+    "keys": {
+      "$ref": "#/$defs/BundleKeys",
+      "description": "The key list as read when the bundle was written."
+    },
+    "mapping": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BundleMapping"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The exact mapping bytes, or null when none were saved."
+    }
+  },
+  "$defs": {
+    "BundleKeys": {
+      "title": "BundleKeys",
+      "type": "object",
+      "description": "The key list as read.",
+      "required": [
+        "keys",
+        "list_read_at",
+        "source"
+      ],
+      "properties": {
+        "keys": {
+          "type": "array",
+          "description": "The keys array of the key list.",
+          "items": {
+            "$ref": "key-list.schema.json#/$defs/PublicKey"
+          }
+        },
+        "list_read_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where it was read from: a URL or a file path."
+        }
+      }
+    },
+    "BundleMapping": {
+      "title": "BundleMapping",
+      "type": "object",
+      "description": "The mapping document, byte for byte.",
+      "required": [
+        "url",
+        "digest",
+        "bytes_base64"
+      ],
+      "properties": {
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the bytes were read from."
+        },
+        "digest": {
+          "type": "string",
+          "description": "The digest of the carried bytes, for display. A checker hashes the bytes itself and compares with the signed digest.",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bytes_base64": {
+          "type": "string",
+          "description": "The exact mapping bytes, standard base64."
+        }
+      }
+    }
+  }
+}

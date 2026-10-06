@@ -14,9 +14,15 @@
 // any implementation must agree on.
 
 import { createHash, createPublicKey, verify as edVerify } from 'node:crypto';
+import { isCanonical } from './jcs.mjs';
+import { formatId, statementId } from './ids.mjs';
 
 export const WITNESS_STATEMENT_V1 = 'trooth.witness-statement.v1';
 export const WITNESS_STATEMENT_V2 = 'trooth.witness-statement.v2';
+export const WITNESS_STATEMENT_V3 = 'trooth.witness-statement.v3';
+export const VERIFICATION_BUNDLE_V1 = 'trooth.verification-bundle.v1';
+/** The canonicalization label a v3 envelope carries. */
+export const JCS_LABEL = 'RFC8785';
 
 /** Reason codes a v2 check may carry, and the one outcome each may go with. */
 export const REASONS = {
@@ -32,6 +38,7 @@ export const REASONS = {
 export const ASSURANCE = {
   v1: 'A valid v1 signature shows that Trooth\'s key signed these outcome bytes for this reading. It does not bind the check mapping, the evaluator version, the subject scope or the evidence sources.',
   v2: 'A valid v2 signature shows that Trooth\'s key signed these outcome bytes together with the digest of the exact check mapping, the evaluator version, the subject scope and the digest of the evidence manifest. It does not establish the company\'s identity, an independently established time, or anything the reading did not read.',
+  v3: 'A valid v3 signature shows that Trooth\'s key signed these RFC 8785 canonical outcome bytes, naming the subject by its stable id and the signing key inside the signed bytes, together with the digest of the exact check mapping, the evaluator version, the subject scope and the digest of the evidence manifest. It does not establish the company\'s identity, an independently established time, or anything the reading did not read.',
 };
 
 /** sha256:<hex> over exact bytes; a string is taken as its UTF-8 bytes. */
@@ -114,7 +121,7 @@ export function countProblems(p) {
   }
   if (p?.counts?.read !== read) problems.push(`counts.read is ${p?.counts?.read}; the checks give ${read}`);
   if (p?.counts?.as_expected !== asExpected) problems.push(`counts.as_expected is ${p?.counts?.as_expected}; the checks give ${asExpected}`);
-  if (p?.statement === WITNESS_STATEMENT_V2) {
+  if (p?.statement === WITNESS_STATEMENT_V2 || p?.statement === WITNESS_STATEMENT_V3) {
     const c = p.counts || {};
     if (c.read + c.not_read !== c.in_reading) problems.push('read + not_read does not equal in_reading');
     if (c.as_expected + c.not_as_expected !== c.read) problems.push('as_expected + not_as_expected does not equal read');
@@ -128,6 +135,12 @@ export function countProblems(p) {
       if (r.withheld && r.source_ref) problems.push(`${ch.id}: marked withheld but publishes a source`);
       if (r.withheld && !r.withheld_reason) problems.push(`${ch.id}: withheld with no reason given`);
     }
+  }
+  if (p?.statement === WITNESS_STATEMENT_V3) {
+    let want = null;
+    try { want = formatId('domain', p.domain); } catch { want = null; }
+    if (!want || p.subject_id !== want) problems.push(`subject_id is ${p.subject_id}; the payload's domain gives ${want ?? 'no valid id'}`);
+    if (p.subject_scope?.domain !== p.domain) problems.push('subject_scope.domain does not equal domain');
   }
   return problems;
 }
@@ -143,6 +156,7 @@ export function countProblems(p) {
  * Returns a result whose `verdict` is one of:
  *   checked               signature valid, key trusted, counts hold, subject matches,
  *                         and (v2) mapping and manifest both match what was signed
+ *                         (v2 and v3 statements both reach `checked`)
  *   checked_v1            the same for a v1 statement, which binds no mapping or manifest
  *   partially_checked     all of the above that could be checked held, but the mapping
  *                         or the manifest was not supplied
@@ -153,13 +167,18 @@ export function countProblems(p) {
 export function verifyStatement({ statement, keys, mappingBytes, manifest, domain }) {
   let payload = null;
   try { payload = JSON.parse(String(statement?.payload ?? '')); } catch { payload = null; }
-  const version = payload?.statement === WITNESS_STATEMENT_V1 ? 'v1' : payload?.statement === WITNESS_STATEMENT_V2 ? 'v2' : 'unknown';
+  const version = payload?.statement === WITNESS_STATEMENT_V1 ? 'v1' : payload?.statement === WITNESS_STATEMENT_V2 ? 'v2' : payload?.statement === WITNESS_STATEMENT_V3 ? 'v3' : 'unknown';
+  // v3 adds three conditions to a well-formed envelope: the canonicalization it
+  // names is RFC 8785, the payload bytes ARE the canonical form (so there is one
+  // byte string per meaning), and the key named inside the signed bytes is the
+  // key the envelope names.
+  const v3Formed = version !== 'v3' || (statement?.canonicalization === JCS_LABEL && isCanonical(statement.payload) && payload?.signer?.key_id === statement?.key_id);
   const key = keyTrust(String(statement?.key_id ?? ''), keys, typeof payload?.read_at === 'string' ? payload.read_at : null);
 
   let signature = 'malformed';
   const m = /^ed25519:([A-Za-z0-9+/]+={0,2})$/.exec(String(statement?.signature ?? ''));
   const published = (keys || []).find((k) => k && k.kid === statement?.key_id);
-  if (m && statement?.alg === 'Ed25519' && typeof statement.payload === 'string' && version !== 'unknown') {
+  if (m && statement?.alg === 'Ed25519' && typeof statement.payload === 'string' && version !== 'unknown' && v3Formed) {
     signature = published && ed25519Valid(keyBytes(published), Buffer.from(m[1], 'base64'), Buffer.from(statement.payload, 'utf8')) ? 'valid' : 'invalid';
   }
 
@@ -174,6 +193,7 @@ export function verifyStatement({ statement, keys, mappingBytes, manifest, domai
     counts: { identities_hold: false, problems: [] },
     read_at: typeof payload?.read_at === 'string' ? payload.read_at : null,
     reading_id: payload?.reading_id ?? null,
+    statement_id: typeof statement?.payload === 'string' ? statementId(statement.payload) : null,
     assurance: ASSURANCE[version] || 'Not a Trooth witness statement this checker knows.',
     verdict: 'signature_not_trusted',
   };
@@ -201,4 +221,48 @@ export function verifyStatement({ statement, keys, mappingBytes, manifest, domai
   else if (result.binding.status === 'bound') result.verdict = 'checked';
   else result.verdict = 'partially_checked';
   return result;
+}
+
+export class BundleError extends Error {}
+
+/** Read a trooth.verification-bundle.v1 document into verifyStatement's inputs. Throws BundleError. */
+export function bundleInputs(bundle) {
+  if (!bundle || typeof bundle !== 'object' || bundle.bundle !== VERIFICATION_BUNDLE_V1) throw new BundleError(`not a ${VERIFICATION_BUNDLE_V1} document`);
+  if (!bundle.statement || typeof bundle.statement.payload !== 'string') throw new BundleError('the bundle carries no statement with a payload');
+  if (!bundle.keys || !Array.isArray(bundle.keys.keys)) throw new BundleError('the bundle carries no key list');
+  if (bundle.manifest !== null && bundle.manifest !== undefined && !Array.isArray(bundle.manifest)) throw new BundleError('the bundle manifest is not a list');
+  let mappingBytes;
+  if (bundle.mapping !== null && bundle.mapping !== undefined) {
+    const b64 = bundle.mapping.bytes_base64;
+    if (typeof b64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 !== 0) throw new BundleError('the bundle mapping is not standard base64');
+    mappingBytes = Buffer.from(b64, 'base64');
+  }
+  return {
+    statement: bundle.statement,
+    keys: bundle.keys.keys,
+    keysReadAt: typeof bundle.keys.list_read_at === 'string' ? bundle.keys.list_read_at : null,
+    mappingBytes,
+    manifest: Array.isArray(bundle.manifest) ? bundle.manifest : undefined,
+    domain: typeof bundle.domain === 'string' ? bundle.domain : undefined,
+  };
+}
+
+/** Check a bundle entirely offline. `domain` overrides the domain the bundle names. */
+export function verifyBundle(bundle, { domain } = {}) {
+  const i = bundleInputs(bundle);
+  const result = verifyStatement({ statement: i.statement, keys: i.keys, mappingBytes: i.mappingBytes, manifest: i.manifest, domain: domain ?? i.domain });
+  return { ...result, keys_read_at: i.keysReadAt };
+}
+
+/** Assemble a bundle from inputs already read. The mapping bytes are carried exactly. */
+export function makeBundle({ domain, statement, manifest, keys, keysReadAt, keysSource, mappingUrl, mappingBytes, createdAt }) {
+  return {
+    bundle: VERIFICATION_BUNDLE_V1,
+    created_at: createdAt ?? new Date().toISOString(),
+    domain: domain ?? null,
+    statement,
+    manifest: Array.isArray(manifest) ? manifest : null,
+    keys: { keys, list_read_at: keysReadAt ?? null, source: keysSource ?? null },
+    mapping: mappingBytes === undefined ? null : { url: mappingUrl ?? null, digest: sha256Digest(mappingBytes), bytes_base64: Buffer.from(mappingBytes).toString('base64') },
+  };
 }

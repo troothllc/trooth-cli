@@ -32,6 +32,9 @@
 //                           the exact check mapping and of the evidence manifest. It
 //                           trusts no summary from Trooth. --file reads a saved
 //                           statement; --offline with --keys sends nothing at all.
+//                           --save-bundle writes every input to one portable file;
+//                           --bundle checks such a file with no network at all.
+//                           Statements v1, v2 and v3 (RFC 8785 bytes) are checked.
 //                           The rules are in docs/VERIFY.md; tests/vectors/ holds the
 //                           cases any other implementation must agree on.
 //   trooth --help           Show help.   trooth --version  Show version.
@@ -73,10 +76,10 @@
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
 
-import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
-import { verifyStatement } from './lib/verify.mjs';
+import { verifyStatement, bundleInputs, makeBundle, BundleError } from './lib/verify.mjs';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -92,7 +95,7 @@ const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, 
 const PROJECTION_CONTRACT = 2;
 const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.7.0';
+let VERSION = '0.8.0';
 try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9 };
@@ -190,7 +193,7 @@ function scrub(value) {
 const FLAGS = {
   check: { bool: ['--json', '--no-fallback'], value: [] },
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
-  verify: { bool: ['--json', '--offline'], value: ['--file', '--keys', '--mapping', '--manifest'] },
+  verify: { bool: ['--json', '--offline'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -249,6 +252,8 @@ ${B}Examples${X}
   trooth lint --json > trooth-lint.json  ${D}# the same facts as one JSON document, for a CI artifact${X}
   trooth verify trooth.co                ${D}# check the signature, key, domain and bindings locally${X}
   trooth verify --file saved.json --offline --keys keys.json --mapping 1.0.1.json
+  trooth verify trooth.co --save-bundle trooth.co.bundle.json   ${D}# keep every input in one file${X}
+  trooth verify --bundle trooth.co.bundle.json                  ${D}# check it later, with no network${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
@@ -260,6 +265,9 @@ ${B}Flags${X}
   --mapping <path>          verify: the exact check mapping document the statement names
   --manifest <path>         verify: the evidence manifest (a JSON list)
   --offline                 verify: send nothing; needs --file and --keys
+  --save-bundle <path>      verify: also write the statement, manifest, key list and exact
+                            mapping bytes to one file (refuses to overwrite)
+  --bundle <path>           verify: check a saved bundle; sends nothing
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
@@ -1220,16 +1228,29 @@ const MAX_BODY_SMALL = 1024 * 1024;
 async function verifyCmd() {
   const { flags, positional } = parseArgs('verify');
   if (positional.length > 1) fail(EXIT.USAGE, `verify takes at most one <domain>, got: ${positional.join(' ')}`);
-  const offline = !!flags['--offline'];
-  if (offline && !flags['--file']) fail(EXIT.USAGE, '--offline needs --file: with no network there is no record to read.');
-  if (offline && !flags['--keys']) fail(EXIT.USAGE, '--offline needs --keys: a saved copy of https://api.trooth.co/public/keys.');
+  if (flags['--bundle']) {
+    for (const f of ['--file', '--keys', '--mapping', '--manifest', '--save-bundle']) if (flags[f]) fail(EXIT.USAGE, `--bundle carries every input; it cannot be combined with ${f}.`);
+  }
+  if (flags['--save-bundle'] && existsSync(flags['--save-bundle'])) fail(EXIT.USAGE, `--save-bundle will not overwrite ${flags['--save-bundle']}; choose a new path.`);
+  const offline = !!flags['--offline'] || !!flags['--bundle'];
+  if (offline && !flags['--file'] && !flags['--bundle']) fail(EXIT.USAGE, '--offline needs --file: with no network there is no record to read.');
+  if (offline && !flags['--bundle'] && !flags['--keys']) fail(EXIT.USAGE, '--offline needs --keys: a saved copy of https://api.trooth.co/public/keys.');
   let domain;
   if (positional[0]) {
     const norm = normalizeDomain(positional[0]);
     if (norm.error) fail(EXIT.USAGE, norm.error.replace('trooth check', 'trooth verify'));
     domain = norm.domain;
   }
-  if (!domain && !flags['--file']) fail(EXIT.USAGE, 'missing <domain>. Try: trooth verify trooth.co');
+  if (!domain && !flags['--file'] && !flags['--bundle']) fail(EXIT.USAGE, 'missing <domain>. Try: trooth verify trooth.co');
+
+  if (flags['--bundle']) {
+    let i;
+    try { i = bundleInputs(readJsonFile(flags['--bundle'], 'the bundle')); }
+    catch (e) { if (e instanceof BundleError) fail(EXIT.USAGE, `${flags['--bundle']}: ${e.message}.`); throw e; }
+    if (!domain && i.domain) domain = normalizeDomain(i.domain).domain;
+    const p = flags['--bundle'];
+    return reportVerify({ statement: i.statement, keys: i.keys, keysReadAt: i.keysReadAt, mappingBytes: i.mappingBytes, manifest: i.manifest, domain, sources: { statement: p, keys: p, mapping: i.mappingBytes === undefined ? null : p, manifest: i.manifest ? p : null } });
+  }
 
   const sources = { statement: null, keys: null, mapping: null, manifest: null };
   let found;
@@ -1284,25 +1305,38 @@ async function verifyCmd() {
       sources.mapping = mappingUrl;
     }
 
-    const r = verifyStatement({ statement: found.statement, keys, mappingBytes, manifest, domain });
-    const doc = { domain: domain ?? r.subject.signed, verdict: r.verdict, version: r.version, read_at: r.read_at, reading_id: r.reading_id, signature: r.signature, key: r.key, subject: r.subject, binding: r.binding, counts: r.counts, assurance: r.assurance, keys_read_at: keysReadAt, sources };
-    if (asJson) emitJson(doc);
-    else printVerify(doc, payload);
-    return { checked: EXIT.OK, checked_v1: EXIT.OK, partially_checked: EXIT.INCOMPLETE, signature_not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH }[r.verdict] ?? EXIT.UPSTREAM;
+    if (flags['--save-bundle']) {
+      const b = makeBundle({ domain, statement: found.statement, manifest, keys, keysReadAt, keysSource: sources.keys, mappingUrl: sources.mapping, mappingBytes });
+      try { writeFileSync(flags['--save-bundle'], JSON.stringify(b, null, 2) + '\n', { flag: 'wx' }); }
+      catch (e) { fail(EXIT.USAGE, `could not write the bundle to ${flags['--save-bundle']}: ${e && e.code ? e.code : e}`); }
+      sources.bundle_written = flags['--save-bundle'];
+    }
+    return reportVerify({ statement: found.statement, keys, keysReadAt, mappingBytes, manifest, domain, sources });
   } catch (e) {
     if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
     throw e;
   }
 }
 
+function reportVerify({ statement, keys, keysReadAt, mappingBytes, manifest, domain, sources }) {
+  let payload = null;
+  try { payload = JSON.parse(String(statement.payload)); } catch {}
+  const r = verifyStatement({ statement, keys, mappingBytes, manifest, domain });
+  const doc = { domain: domain ?? r.subject.signed, verdict: r.verdict, version: r.version, read_at: r.read_at, reading_id: r.reading_id, statement_id: r.statement_id, signature: r.signature, key: r.key, subject: r.subject, binding: r.binding, counts: r.counts, assurance: r.assurance, keys_read_at: keysReadAt, sources };
+  if (asJson) emitJson(doc);
+  else printVerify(doc, payload);
+  return { checked: EXIT.OK, checked_v1: EXIT.OK, partially_checked: EXIT.INCOMPLETE, signature_not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH }[r.verdict] ?? EXIT.UPSTREAM;
+}
+
 function printVerify(d, payload) {
   const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
   const when = d.read_at ? `, read ${fmtDate(d.read_at)}` : '';
   out(`${B}${d.domain || '(no domain)'}${X}  ${D}witness statement ${d.version}${when}${X}`);
-  out(`  signature  ${d.signature === 'valid' ? ok('valid') : bad(d.signature)} ${D}(Ed25519, key ${d.key.kid}, ${d.key.state})${X}`);
+  out(`  signature  ${d.signature === 'valid' ? ok('valid') : bad(d.signature)} ${D}(Ed25519${d.version === 'v3' ? ' over RFC 8785 bytes' : ''}, key ${d.key.kid}, ${d.key.state})${X}`);
   if (!d.key.trusted) out(`             ${bad(d.key.reason)}`);
   if (d.verdict === 'signature_not_trusted') {
     out(`\n${bad('Not trusted.')} Nothing in this statement is relied on.`);
+    if (d.sources.bundle_written) out(`${D}Bundle written: ${d.sources.bundle_written}${X}`);
     return;
   }
   const subj = d.subject.status === 'match' ? ok(`${d.subject.signed}, the domain asked about`) : d.subject.status === 'mismatch' ? bad(`signed for ${d.subject.signed}, not ${d.subject.asked}`) : warn(`${d.subject.signed} (no domain given to compare)`);
@@ -1315,6 +1349,9 @@ function printVerify(d, payload) {
   for (const p of d.counts.problems.slice(0, 5)) out(`             ${bad(p)}`);
   const head = { checked: ok('Checked.'), checked_v1: ok('Checked (v1).'), partially_checked: warn('Partially checked.'), mismatch: bad('Mismatch.') }[d.verdict];
   out(`\n${head} ${D}${d.assurance}${X}`);
+  if (d.statement_id) out(`${D}Statement id: ${d.statement_id}${X}`);
+  if (d.keys_read_at && d.sources.keys && !/^https?:/.test(String(d.sources.keys))) out(`${D}The key list was saved at ${d.keys_read_at}; a compromise announced after that is not in it. Refresh it before relying on this for a decision.${X}`);
+  if (d.sources.bundle_written) out(`${D}Bundle written: ${d.sources.bundle_written} (check it later with: trooth verify --bundle ${d.sources.bundle_written})${X}`);
 }
 
 async function main() {

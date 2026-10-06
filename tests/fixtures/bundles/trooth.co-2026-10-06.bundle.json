@@ -1,0 +1,473 @@
+{
+  "bundle": "trooth.verification-bundle.v1",
+  "created_at": "2026-10-06T20:21:01.631Z",
+  "domain": "trooth.co",
+  "statement": {
+    "payload": "{\"statement\":\"trooth.witness-statement.v2\",\"reading_id\":\"rw_mux3srh0_ae207512e4b943d4\",\"domain\":\"trooth.co\",\"read_at\":\"2026-10-06T20:00:44.820Z\",\"subject_scope\":{\"domain\":\"trooth.co\",\"surface\":\"public\",\"checks_in_scope\":100},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"1.0.1\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/1.0.1.json\",\"mapping_digest\":\"sha256:6fea8a0f44a6a47dd0604823a8a65d93055f0e341d016d495cb5d2f73e3d424c\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"2026-10-04.1\"},\"evidence_manifest\":{\"digest\":\"sha256:d412e50d48ac8d3134389efddde69cdb04f35aa5d927090f5ea6501d33a03d79\",\"entries\":100,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"L1\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L2\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L3\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L4\",\"category\":\"legal\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"L5\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L6\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L7\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L8\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L9\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L10\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"S4\",\"category\":\"security\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"S5\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S6\",\"category\":\"security\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"S7\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S8\",\"category\":\"security\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"S9\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S10\",\"category\":\"security\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A1\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A2\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A3\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A4\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A5\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A6\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A7\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A8\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A9\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A10\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"B1\",\"category\":\"business\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"B2\",\"category\":\"business\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"B3\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B4\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B5\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B6\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B7\",\"category\":\"business\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"B8\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B9\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B10\",\"category\":\"business\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I1\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I2\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I3\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I4\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I5\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I6\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I7\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I8\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I9\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I10\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"L11\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L12\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L13\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L14\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L15\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L16\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L17\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L18\",\"category\":\"legal\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"L19\",\"category\":\"legal\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"L20\",\"category\":\"legal\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"S11\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S12\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S13\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S14\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S15\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S16\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S17\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S18\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S19\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S20\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A11\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A12\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A13\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A14\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A15\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A16\",\"category\":\"ai\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"A17\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A18\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A19\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"A20\",\"category\":\"ai\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"B11\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B12\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B13\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B14\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B15\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B16\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B17\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B18\",\"category\":\"business\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"B19\",\"category\":\"business\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"B20\",\"category\":\"business\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I11\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I12\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I13\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I14\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I15\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I16\",\"category\":\"ip\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"I17\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I18\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I19\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}},{\"id\":\"I20\",\"category\":\"ip\",\"kind\":\"attest\",\"outcome\":\"not read\",\"reason\":{\"code\":\"carried_from_earlier_reading\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"The source is the company's own form declaration, which is not published; its reference is committed in the evidence manifest.\"}}],\"counts\":{\"read\":65,\"as_expected\":65,\"not_as_expected\":0,\"not_read\":35,\"in_reading\":100}}",
+    "signature": "ed25519:Dc8dynEiXZ4SKh+6222cqeaVvTq8MBqx0xdQDi2wKjuSt/1Ch+gBLs3FLz4jROo2Bshy1cS+6LuCn7Uk+7upCg==",
+    "key_id": "trooth-master-2026-09",
+    "alg": "Ed25519",
+    "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+  },
+  "manifest": [
+    {
+      "check_id": "L1",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L2",
+      "source": "https://trooth.co/terms"
+    },
+    {
+      "check_id": "L3",
+      "source": "https://trooth.co/aup"
+    },
+    {
+      "check_id": "L4",
+      "commitment": "sha256:9966a70dface74ea3f3ed64ed40607cdc6ae5494389ac5b30f73527ccecead5f"
+    },
+    {
+      "check_id": "L5",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L6",
+      "source": "https://trooth.co/terms"
+    },
+    {
+      "check_id": "L7",
+      "source": "https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "L8",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L9",
+      "source": "https://trooth.co/cookies"
+    },
+    {
+      "check_id": "L10",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "S1",
+      "source": "https://trooth.co/.well-known/security.txt"
+    },
+    {
+      "check_id": "S2",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S3",
+      "commitment": "sha256:c902c365b1b12dc708bdb8f44d78d9fc020d1656428abc1fdd5c444b0089d277"
+    },
+    {
+      "check_id": "S4",
+      "commitment": "sha256:dc5e52cf8f1d4c66d473d4d437effa16cb2cde0b437508749cc51efaa2d170f2"
+    },
+    {
+      "check_id": "S5",
+      "source": "https://trooth.co/security"
+    },
+    {
+      "check_id": "S6",
+      "commitment": "sha256:f0adf55cebd131e16bbe70beb1ba5bdda9185a000b4d56f93fc0b980da972333"
+    },
+    {
+      "check_id": "S7",
+      "source": "https://trooth.co/vdp"
+    },
+    {
+      "check_id": "S8",
+      "commitment": "sha256:5e8de7b640d74b7b2c369fd2f26aca99e2c41d99a60fa283077ce67d1143fded"
+    },
+    {
+      "check_id": "S9",
+      "source": "https://trooth.co/.well-known/security.txt"
+    },
+    {
+      "check_id": "S10",
+      "commitment": "sha256:5834be4d8c5d0410e2f9cf1332deaa2d2ad9cd88ac9c5825c78f1206e087d93e"
+    },
+    {
+      "check_id": "A1",
+      "source": "https://trooth.co/model-card"
+    },
+    {
+      "check_id": "A2",
+      "source": "https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "A3",
+      "commitment": "sha256:3ecf72e530ddb8a062f68e05bac9db70fa556dcdff9ff923b19e31b0354d05bc"
+    },
+    {
+      "check_id": "A4",
+      "source": "https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "A5",
+      "source": "https://trooth.co/ https://trooth.co/disclaimer"
+    },
+    {
+      "check_id": "A6",
+      "commitment": "sha256:6eadb0a9ea1373b93f17fae4266bea8d73a835b790d292df7455e4dde42c54bd"
+    },
+    {
+      "check_id": "A7",
+      "commitment": "sha256:8f790de295b3decafc210d7327520cd221cbbb41f508ebb4025e004b405c68dc"
+    },
+    {
+      "check_id": "A8",
+      "commitment": "sha256:5cce2dd1ef6abcde0fcc299b41ec56a051cca2829d0b75620b9f979c53ff77c0"
+    },
+    {
+      "check_id": "A9",
+      "source": "https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "A10",
+      "commitment": "sha256:f42bfe86e39192b099b67c117df4a90eea0efdc9e49499f619d5886ff4439ca5"
+    },
+    {
+      "check_id": "B1",
+      "commitment": "sha256:a3e682cd88f72e6dbb032c70a3d6081145c3ad68083947daae054e282cacdcc3"
+    },
+    {
+      "check_id": "B2",
+      "commitment": "sha256:38cf9cea382253c2b0057894281ea8e6ee897785368d79517a103a2cffbdcbf3"
+    },
+    {
+      "check_id": "B3",
+      "source": "https://trooth.co/contact"
+    },
+    {
+      "check_id": "B4",
+      "source": "https://trooth.co/status"
+    },
+    {
+      "check_id": "B5",
+      "source": "https://trooth.co/contact"
+    },
+    {
+      "check_id": "B6",
+      "source": "https://trooth.co/status"
+    },
+    {
+      "check_id": "B7",
+      "commitment": "sha256:5852908615e1231a2f48ce34fb56e91cb27f9dd54648fb34584f870fe5538b77"
+    },
+    {
+      "check_id": "B8",
+      "source": "https://trooth.co/pricing"
+    },
+    {
+      "check_id": "B9",
+      "source": "https://trooth.co/refund"
+    },
+    {
+      "check_id": "B10",
+      "commitment": "sha256:f63fb236fc4dc41aa747033a812125c50bc77829da907ff7becb40609b34d198"
+    },
+    {
+      "check_id": "I1",
+      "commitment": "sha256:b416b2a11cd79ef9f59044faafd2e32269575ff7fa461b8efed1072e7680d9f2"
+    },
+    {
+      "check_id": "I2",
+      "commitment": "sha256:316e264a6b0d07ab4e123ea362c9f403aeaa3ed7830c037c37fc40e3f6cfe461"
+    },
+    {
+      "check_id": "I3",
+      "source": "https://trooth.co/sbom https://trooth.co/sbom.json"
+    },
+    {
+      "check_id": "I4",
+      "commitment": "sha256:b35fc1e5407996cb74629f45fc1bfe911e4045244a405b30bd6377f16b8e5a4b"
+    },
+    {
+      "check_id": "I5",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "I6",
+      "commitment": "sha256:80965754f115287b7421604e5752523e4ca06ce28bdca9f0dba525c51fc274fd"
+    },
+    {
+      "check_id": "I7",
+      "commitment": "sha256:6526c6de4e30cfcb46bbacdde37929ef11689f2b99a81939ed1787572e7db170"
+    },
+    {
+      "check_id": "I8",
+      "commitment": "sha256:c0e4101030eb9cd8ddaa62a9c24e21ac116eff53dd9d2b4e9c881dc2f8686849"
+    },
+    {
+      "check_id": "I9",
+      "commitment": "sha256:ae43cbf5761d24ced860f534651f2dff10e6738d05b17412d614481f773ec48c"
+    },
+    {
+      "check_id": "I10",
+      "commitment": "sha256:880b480ffda83a6b51cabb35f252629cc3e4ded839b053ff9e69cf89b466f7e4"
+    },
+    {
+      "check_id": "L11",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L12",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L13",
+      "source": "https://trooth.co/subprocessors"
+    },
+    {
+      "check_id": "L14",
+      "source": "https://trooth.co/dpa"
+    },
+    {
+      "check_id": "L15",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L16",
+      "source": "https://trooth.co/terms"
+    },
+    {
+      "check_id": "L17",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L18",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "L19",
+      "commitment": "sha256:69bbb3504642de812f759dc4173f936ed10c22dd2b4fbd6d408f4699444597f8"
+    },
+    {
+      "check_id": "L20",
+      "commitment": "sha256:d41696d2014060504dc4836c7f10693f5a1498454effaa1386e0fa000ec59e4e"
+    },
+    {
+      "check_id": "S11",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S12",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S13",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S14",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S15",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S16",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S17",
+      "source": "https://trooth.co/.env"
+    },
+    {
+      "check_id": "S18",
+      "source": "https://trooth.co/.git/config"
+    },
+    {
+      "check_id": "S19",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "S20",
+      "source": "https://cloudflare-dns.com/dns-query?name=trooth.co&type=CAA"
+    },
+    {
+      "check_id": "A11",
+      "source": "https://trooth.co/model-card https://trooth.co/model-card.html https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "A12",
+      "source": "https://trooth.co/aup https://trooth.co/acceptable-use https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "A13",
+      "source": "https://trooth.co/ai-policy"
+    },
+    {
+      "check_id": "A14",
+      "source": "https://trooth.co/llms.txt"
+    },
+    {
+      "check_id": "A15",
+      "source": "https://trooth.co/robots.txt"
+    },
+    {
+      "check_id": "A16",
+      "source": "https://trooth.co/privacy"
+    },
+    {
+      "check_id": "A17",
+      "commitment": "sha256:618af2e6707d3ea195ea6ef6af537ddbe014d2454c3b403996e4c353ac3f1bc4"
+    },
+    {
+      "check_id": "A18",
+      "commitment": "sha256:cd262a58e550d6ef6f218b31e983861594f6bd5431acc3315d690b5e0a0d6f5c"
+    },
+    {
+      "check_id": "A19",
+      "commitment": "sha256:59b7a84e41ce7ba7d296deb79c2d80d603050bf674b604023f5c8314c770bcc6"
+    },
+    {
+      "check_id": "A20",
+      "commitment": "sha256:6d85f060cd7937c9da985b90ea0dc6c379ac559749124ac8a0b1a9b7bd8757c3"
+    },
+    {
+      "check_id": "B11",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "B12",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "B13",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "B14",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "B15",
+      "source": "https://trooth.co/terms"
+    },
+    {
+      "check_id": "B16",
+      "source": "https://cloudflare-dns.com/dns-query?name=trooth.co&type=MX"
+    },
+    {
+      "check_id": "B17",
+      "source": "https://cloudflare-dns.com/dns-query?name=trooth.co&type=TXT"
+    },
+    {
+      "check_id": "B18",
+      "source": "https://cloudflare-dns.com/dns-query?name=_dmarc.trooth.co&type=TXT"
+    },
+    {
+      "check_id": "B19",
+      "commitment": "sha256:623c040aba70b094687fcfae9f4dd4a19f7557ea5e63802868310faf3a0fcad3"
+    },
+    {
+      "check_id": "B20",
+      "commitment": "sha256:3c022a6837ea40e010a9dca8a591dec9b4a38b08efcd0516ef705b99a9aef3c7"
+    },
+    {
+      "check_id": "I11",
+      "source": "https://trooth.co/"
+    },
+    {
+      "check_id": "I12",
+      "source": "https://trooth.co/terms"
+    },
+    {
+      "check_id": "I13",
+      "source": "https://trooth.co/licenses https://trooth.co/legal/licenses https://trooth.co/terms"
+    },
+    {
+      "check_id": "I14",
+      "source": "https://trooth.co/.well-known/security.txt"
+    },
+    {
+      "check_id": "I15",
+      "source": "https://trooth.co/.well-known/security.txt"
+    },
+    {
+      "check_id": "I16",
+      "source": "https://trooth.co/ https://trooth.co/terms"
+    },
+    {
+      "check_id": "I17",
+      "commitment": "sha256:f6440d804be11e9c5860831cf7050e3cadfba090b70ce83e1502c315fdd8cce0"
+    },
+    {
+      "check_id": "I18",
+      "commitment": "sha256:217c56ae91dfb49011752bf82477e7d059661138f8436587862452792f71a2c1"
+    },
+    {
+      "check_id": "I19",
+      "commitment": "sha256:463c1bd399d0beb87250535d5a935eaa01dbe71edfd68a64e147ab6add4c432f"
+    },
+    {
+      "check_id": "I20",
+      "commitment": "sha256:167c10626fb50f586feb342ab7806d44b92079085bf57bd04e7cd6ce4b6d554d"
+    }
+  ],
+  "keys": {
+    "keys": [
+      {
+        "kid": "trooth-runtime-2026",
+        "public_key": "cf44fea6b098eb03ad55f1f3091c6449da3edac202718038adb2789b535343d3",
+        "alg": "Ed25519",
+        "encoding": "hex",
+        "signs": "trust ledger audit blocks",
+        "status": "active",
+        "fingerprint": "8355c5be76b70c4c89de5e53139a4959",
+        "created_at": null,
+        "revoked_at": null,
+        "purpose": "trust-ledger",
+        "activated_at": null,
+        "retired_at": null,
+        "compromised_at": null,
+        "events": [
+          {
+            "event": "first_listed",
+            "at": "2026-09-28T21:41:06.216Z",
+            "note": "first published in /public/keys by a build that records lifecycle events"
+          }
+        ],
+        "first_listed_at": "2026-09-28T21:41:06.216Z",
+        "state": "active"
+      },
+      {
+        "kid": "trooth-master-2026-09",
+        "public_key": "DrQxhdSUohskOIUDtjJmK1rMShxbSt5z4yhqW4q8ZUE=",
+        "alg": "Ed25519",
+        "encoding": "base64",
+        "signs": "receipts for outside-in reads of a public domain, published directory receipts and other receipts that name this key in authority_key_id",
+        "status": "active",
+        "fingerprint": "34ea58cbb25832ba00a3fe98e82062d3",
+        "created_at": null,
+        "revoked_at": null,
+        "purpose": "readings-and-receipts",
+        "activated_at": null,
+        "retired_at": null,
+        "compromised_at": null,
+        "events": [
+          {
+            "event": "first_listed",
+            "at": "2026-09-28T21:41:06.269Z",
+            "note": "first published in /public/keys by a build that records lifecycle events"
+          }
+        ],
+        "first_listed_at": "2026-09-28T21:41:06.269Z",
+        "state": "active"
+      }
+    ],
+    "list_read_at": "2026-10-06T20:21:01.554Z",
+    "source": "https://api.trooth.co/public/keys"
+  },
+  "mapping": {
+    "url": "https://trooth.co/standard/check-mapping/1.0.1.json",
+    "digest": "sha256:6fea8a0f44a6a47dd0604823a8a65d93055f0e341d016d495cb5d2f73e3d424c",
+    "bytes_base64": "ewogICJzdGFuZGFyZCI6ICJUcm9vdGggU3RhbmRhcmQiLAogICJ2ZXJzaW9uIjogIjEuMCIsCiAgIm1hcHBpbmdWZXJzaW9uIjogIjEuMC4xIiwKICAicHVibGlzaGVkIjogIjIwMjYtMDktMjYiLAogICJyZXZpc2VkIjogIjIwMjYtMDktMjciLAogICJtYWludGFpbmVkQnkiOiAiVHJvb3RoLCBMTEMiLAogICJleHRlcm5hbFJldmlldyI6ICJOb25lLiBUaGUgU3RhbmRhcmQgYW5kIHRoaXMgbWFwcGluZyBhcmUgbWFpbnRhaW5lZCBieSBUcm9vdGggYW5kIGhhdmUgbm90IGJlZW4gcmV2aWV3ZWQgYnkgYW4gb3V0c2lkZSBib2R5LiIsCiAgInJldmlzaW9ucyI6IFsKICAgIHsKICAgICAgIm1hcHBpbmdWZXJzaW9uIjogIjEuMC4wIiwKICAgICAgImRhdGUiOiAiMjAyNi0wOS0yNiIsCiAgICAgICJjaGFuZ2UiOiAiRmlyc3QgcHVibGlzaGVkOiB0aGUgMTAwIGNoZWNrcyBpbiBhIHJlYWRpbmcsIGVhY2ggbWFwcGVkIHRvIGEgcmVxdWlyZW1lbnQgb3IgbWFya2VkIHVubWFwcGVkLiIKICAgIH0sCiAgICB7CiAgICAgICJtYXBwaW5nVmVyc2lvbiI6ICIxLjAuMSIsCiAgICAgICJkYXRlIjogIjIwMjYtMDktMjciLAogICAgICAiY2hhbmdlIjogIlJlcXVpcmVtZW50IFRTLTEuMC0wOCByZXRpdGxlZCBmcm9tIOKAnE5vIGV4cG9zZWQgc2VjcmV0c+KAnSB0byDigJxObyBzZWNyZXRzIGRldGVjdGVkIGluIHRoZSBjaGVja2VkIHNvdXJjZXPigJ0sIHNvIHRoZSB0aXRsZSBzYXlzIHdoYXQgdGhlIGNoZWNrcyBjb3Zlci4gTm8gY2hlY2sgd2FzIGFkZGVkLCByZW1vdmVkIG9yIHJlbWFwcGVkLiIKICAgIH0KICBdLAogICJub3RlIjogIk1hcHMgZWFjaCBvZiB0aGUgMTAwIGNoZWNrIGlkZW50aWZpZXJzIGluIGEgVHJvb3RoIHJlYWRpbmcgdG8gdGhlIFN0YW5kYXJkJ3MgMTQgcmVxdWlyZW1lbnRzLiBBIHJlcXVpcmVtZW50IGlzIG5ldmVyIG1hcmtlZCBtZXQgb3IgZmFpbGVkIGFzIGEgd2hvbGU6IHRoZSByZWNvcmQgc2hvd3MgZWFjaCBjaGVjaydzIG9ic2VydmVkIG91dGNvbWUgYmVzaWRlIHRoZSByZXF1aXJlbWVudCBpdCBiZWxvbmdzIHRvLiBBIGNoZWNrIG1hcmtlZCB1bm1hcHBlZCBpcyByZWFkIGFuZCByZXBvcnRlZCwgYW5kIGJlbG9uZ3MgdG8gbm8gcmVxdWlyZW1lbnQuIEFuIGF0dGVzdCBjaGVjayBpcyB0aGUgY29tcGFueSdzIGRlY2xhcmF0aW9uLCByZWNvcmRlZCBhbmQgbm90IHdpdG5lc3NlZC4gTm90aGluZyBoZXJlIGlzIGFuIGV4dGVybmFsIGNlcnRpZmljYXRpb24uIEEgY2hhbmdlIHRvIGEgcmVxdWlyZW1lbnQgb3IgdG8gdGhpcyBtYXBwaW5nIGNyZWF0ZXMgYSBuZXcgbWFwcGluZ1ZlcnNpb247IGFuIGV4aXN0aW5nIHJlYWRpbmcgaXMgbmV2ZXIgcmVpbnRlcnByZXRlZCB1bmRlciBhIG5ld2VyIG1hcHBpbmcuIiwKICAicmVxdWlyZW1lbnRzIjogWwogICAgewogICAgICAiaWQiOiAiVFMtMS4wLTAxIiwKICAgICAgInRpdGxlIjogIkRvbWFpbiBjb250cm9sIHdpdG5lc3NlZCIsCiAgICAgICJjaGVja3MiOiBbXSwKICAgICAgIm5vdGUiOiAiRXN0YWJsaXNoZWQgYnkgdGhlIGNsYWltIGZsb3cgYmVmb3JlIHB1YmxpY2F0aW9uIChhIEROUyBUWFQgcmVjb3JkIG9yIGEgY29kZSBzZW50IHRvIGFuIGFkZHJlc3MgYXQgdGhlIGRvbWFpbiksIG5vdCBieSBhIGNoZWNrIGluIHRoZSByZWFkaW5nLiIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJUUy0xLjAtMDIiLAogICAgICAidGl0bGUiOiAiUmVwcmVzZW50YXRpdmUgYXR0ZXN0YXRpb24gcmVjb3JkZWQiLAogICAgICAiY2hlY2tzIjogWwogICAgICAgICJCMiIKICAgICAgXSwKICAgICAgIm5vdGUiOiBudWxsCiAgICB9LAogICAgewogICAgICAiaWQiOiAiVFMtMS4wLTAzIiwKICAgICAgInRpdGxlIjogIlJlcG9zaXRvcnkgcHJvdmVuYW5jZSB3aXRuZXNzZWQiLAogICAgICAiY2hlY2tzIjogW10sCiAgICAgICJub3RlIjogIkVzdGFibGlzaGVkIGZyb20gR2l0SHViIG9yZ2FuaXphdGlvbnMgdGhlIGNvbXBhbnkgY29ubmVjdHMgaW4gaXRzIHdvcmtzcGFjZSwgbm90IGJ5IGEgY2hlY2sgaW4gdGhlIHB1YmxpYyByZWFkaW5nLiBDb25kaXRpb25hbDogc29mdHdhcmUgYW5kIEFJIGNvbXBhbmllcy4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAiVFMtMS4wLTA0IiwKICAgICAgInRpdGxlIjogIlRMUyBldmVyeXdoZXJlLCBjb3JyZWN0bHkgY29uZmlndXJlZCIsCiAgICAgICJjaGVja3MiOiBbCiAgICAgICAgIlMyIgogICAgICBdLAogICAgICAibm90ZSI6IG51bGwKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJUUy0xLjAtMDUiLAogICAgICAidGl0bGUiOiAiU2VjdXJpdHkgaGVhZGVycyBiYXNlbGluZSIsCiAgICAgICJjaGVja3MiOiBbCiAgICAgICAgIlMyIiwKICAgICAgICAiUzExIiwKICAgICAgICAiUzE1IgogICAgICBdLAogICAgICAibm90ZSI6IG51bGwKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJUUy0xLjAtMDYiLAogICAgICAidGl0bGUiOiAiRW1haWwgYXV0aGVudGljYXRpb24gYXQgZW5mb3JjZW1lbnQiLAogICAgICAiY2hlY2tzIjogWwogICAgICAgICJCMTciLAogICAgICAgICJCMTgiCiAgICAgIF0sCiAgICAgICJub3RlIjogIlRoZSByZWFkaW5nIGNoZWNrcyBTUEYgYW5kIERNQVJDIHJlY29yZHMuIERLSU0gaXMgbm90IHJlYWQsIGJlY2F1c2UgYSBES0lNIHNlbGVjdG9yIGNhbm5vdCBiZSBkaXNjb3ZlcmVkIGZyb20gb3V0c2lkZTsgdGhlIHJlcXVpcmVtZW50J3MgREtJTSBwYXJ0IGlzIG5vdCBldmFsdWF0ZWQuIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlRTLTEuMC0wNyIsCiAgICAgICJ0aXRsZSI6ICJzZWN1cml0eS50eHQgcHVibGlzaGVkIiwKICAgICAgImNoZWNrcyI6IFsKICAgICAgICAiUzEiLAogICAgICAgICJJMTQiLAogICAgICAgICJJMTUiCiAgICAgIF0sCiAgICAgICJub3RlIjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImlkIjogIlRTLTEuMC0wOCIsCiAgICAgICJ0aXRsZSI6ICJObyBzZWNyZXRzIGRldGVjdGVkIGluIHRoZSBjaGVja2VkIHNvdXJjZXMiLAogICAgICAiY2hlY2tzIjogWwogICAgICAgICJTMTciLAogICAgICAgICJTMTgiLAogICAgICAgICJTNCIKICAgICAgXSwKICAgICAgIm5vdGUiOiAiUzQgaXMgdGhlIGNvbXBhbnkncyBhdHRlc3RhdGlvbiB0aGF0IGl0cyBwdWJsaWMgcmVwb3NpdG9yeSBob2xkcyBubyBzZWNyZXRzOyBUcm9vdGggZG9lcyBub3QgcmVhZCByZXBvc2l0b3JpZXMgZm9yIHNlY3JldHMgaW4gdGhlIHB1YmxpYyByZWFkaW5nLiIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJUUy0xLjAtMDkiLAogICAgICAidGl0bGUiOiAiUHJpdmFjeSBwb2xpY3kgYW5kIHRlcm1zIHB1Ymxpc2hlZCIsCiAgICAgICJjaGVja3MiOiBbCiAgICAgICAgIkwxIiwKICAgICAgICAiTDIiCiAgICAgIF0sCiAgICAgICJub3RlIjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImlkIjogIlRTLTEuMC0xMCIsCiAgICAgICJ0aXRsZSI6ICJTdWItcHJvY2Vzc29yIHJlZ2lzdGVyIHB1Ymxpc2hlZCIsCiAgICAgICJjaGVja3MiOiBbCiAgICAgICAgIkwxMyIKICAgICAgXSwKICAgICAgIm5vdGUiOiBudWxsCiAgICB9LAogICAgewogICAgICAiaWQiOiAiVFMtMS4wLTExIiwKICAgICAgInRpdGxlIjogIkFJIGRpc2Nsb3N1cmUgcHVibGlzaGVkIiwKICAgICAgImNoZWNrcyI6IFsKICAgICAgICAiQTEiLAogICAgICAgICJBMTYiLAogICAgICAgICJBMjAiCiAgICAgIF0sCiAgICAgICJub3RlIjogIkNvbmRpdGlvbmFsOiBjb21wYW5pZXMgc2hpcHBpbmcgQUkuIEEyMCBpcyB0aGUgY29tcGFueSdzIGF0dGVzdGF0aW9uLiIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJUUy0xLjAtMTIiLAogICAgICAidGl0bGUiOiAiVnVsbmVyYWJpbGl0eSBkaXNjbG9zdXJlIHBvbGljeSBwdWJsaXNoZWQiLAogICAgICAiY2hlY2tzIjogWwogICAgICAgICJTNyIsCiAgICAgICAgIlM5IgogICAgICBdLAogICAgICAibm90ZSI6IG51bGwKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJUUy0xLjAtMTMiLAogICAgICAidGl0bGUiOiAiV2l0bmVzc2luZyBzdGlsbCBhY3RpdmUiLAogICAgICAiY2hlY2tzIjogW10sCiAgICAgICJub3RlIjogIkEgcHJvcGVydHkgb2YgdGhlIHJlY29yZCwgbm90IG9mIG9uZSByZWFkaW5nOiBlYWNoIHdpdG5lc3NlZCBmYWN0J3MgZnJlc2huZXNzIHdpbmRvdywgc2hvd24gb24gdGhlIHByb2ZpbGUuIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlRTLTEuMC0xNCIsCiAgICAgICJ0aXRsZSI6ICJUaGUgY2xhaW1zIGxlZGdlciBpcyBjbGVhbiIsCiAgICAgICJjaGVja3MiOiBbXSwKICAgICAgIm5vdGUiOiAiQSBwcm9wZXJ0eSBvZiB0aGUgcmVjb3JkOiBldmVyeSBjbGFpbSBjYXJyaWVzIGl0cyBvcmlnaW4gbGFiZWwuIE5vdCBhIGNoZWNrIGluIHRoZSByZWFkaW5nLiIKICAgIH0KICBdLAogICJjaGVja3MiOiBbCiAgICB7CiAgICAgICJpZCI6ICJBMSIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIk1vZGVsIGNhcmQgcHVibGlzaGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTExIgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJBMiIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlRyYWluaW5nIGRhdGEgaHlnaWVuZSBzdGF0ZW1lbnQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTMiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiRXZhbCBiYXNlbGluZSBkZWNsYXJlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJBNCIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkh1bWFuIG92ZXJzaWdodCBwb3NpdGlvbiBkb2N1bWVudGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkE1IiwKICAgICAgImNhdGVnb3J5IjogImFpIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiSGFsbHVjaW5hdGlvbiBkaXNjbG9zdXJlIHZpc2libGUgdG8gdXNlcnMiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTYiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiUHJvbXB0LWluamVjdGlvbiBkZWZlbnNlIGRvY3VtZW50ZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTciLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiQUkgYWdlbnQgY2FwYWJpbGl0eSBkaXNjbG9zdXJlIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkE4IiwKICAgICAgImNhdGVnb3J5IjogImFpIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkFJLXNwZWNpZmljIGluY2lkZW50IHJlc3BvbnNlIHJ1bmJvb2siLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTkiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJTeW50aGV0aWMgbWVkaWEgbGFiZWxpbmcgcG9saWN5IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkExMCIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJSZWQtdGVhbSB0ZXN0aW5nIGxvZyBtYWludGFpbmVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkExMSIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlRyYWluaW5nLWRhdGEgcHJvdmVuYW5jZSBhZGRyZXNzZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTEyIiwKICAgICAgImNhdGVnb3J5IjogImFpIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQUkgbWlzdXNlIHJlcG9ydGluZyBjaGFubmVsIHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJBMTMiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJBSS1nZW5lcmF0ZWQgY29udGVudCBkaXNjbG9zdXJlIHN0YXRlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJBMTQiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJsbG1zLnR4dCBwdWJsaXNoZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTE1IiwKICAgICAgImNhdGVnb3J5IjogImFpIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQUkgY3Jhd2xlciBwb2xpY3kgZGVjbGFyZWQgaW4gcm9ib3RzLnR4dCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJBMTYiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJDdXN0b21lci1kYXRhIHRyYWluaW5nIHN0YW5jZSBkaXNjbG9zZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogWwogICAgICAgICJUUy0xLjAtMTEiCiAgICAgIF0sCiAgICAgICJzdGF0dXMiOiAibWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkExNyIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJIdW1hbiBvdmVyc2lnaHQgZm9yIGhpZ2gtaW1wYWN0IGRlY2lzaW9ucyIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJBMTgiLAogICAgICAiY2F0ZWdvcnkiOiAiYWkiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiTW9kZWwgZXZhbCAvIHJlZC10ZWFtIHdpdGhpbiA5MCBkYXlzIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkExOSIsCiAgICAgICJjYXRlZ29yeSI6ICJhaSIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJBSSBzeXN0ZW0gaW52ZW50b3J5IG1haW50YWluZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQTIwIiwKICAgICAgImNhdGVnb3J5IjogImFpIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkZvdW5kYXRpb24tbW9kZWwgcHJvdmlkZXJzIGRpc2Nsb3NlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0xMSIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQjEiLAogICAgICAiY2F0ZWdvcnkiOiAiYnVzaW5lc3MiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiRW50aXR5IGFjdGl2ZSBpbiBpdHMgc3RhdGUgb3IgY291bnRyeSByZWdpc3RyeSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMiIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJGb3VuZGVyIGlkZW50aXR5IGF0dGVzdGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTAyIgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMyIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkNvbnRhY3QgcmVhY2hhYmlsaXR5IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkI0IiwKICAgICAgImNhdGVnb3J5IjogImJ1c2luZXNzIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiVXB0aW1lIC8gU0xBIHN0YXRlbWVudCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCNSIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkNvbXBsYWludCBjaGFubmVsIHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCNiIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlN0YXR1cyBwYWdlIG9yIGluY2lkZW50IGxvZyIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCNyIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJDdXN0b21lciBzdXBwb3J0IFNMQSBkb2N1bWVudGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkI4IiwKICAgICAgImNhdGVnb3J5IjogImJ1c2luZXNzIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiUHJpY2luZyB0cmFuc3BhcmVuY3kgKHB1YmxpYyBwcmljaW5nKSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCOSIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlJlZnVuZCAvIGNhbmNlbGxhdGlvbiBwb2xpY3kiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQjEwIiwKICAgICAgImNhdGVnb3J5IjogImJ1c2luZXNzIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkN5YmVyIGxpYWJpbGl0eSBpbnN1cmFuY2UgZGlzY2xvc3VyZSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMTEiLAogICAgICAiY2F0ZWdvcnkiOiAiYnVzaW5lc3MiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJTdXBwb3J0IGNvbnRhY3QgZGlzY292ZXJhYmxlIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkIxMiIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlN0YXR1cyBwYWdlIGxpbmtlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMTMiLAogICAgICAiY2F0ZWdvcnkiOiAiYnVzaW5lc3MiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJQcmljaW5nIHRyYW5zcGFyZW5jeSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMTQiLAogICAgICAiY2F0ZWdvcnkiOiAiYnVzaW5lc3MiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJMZWdhbCBlbnRpdHkgbmFtZWQgb24gc2l0ZSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMTUiLAogICAgICAiY2F0ZWdvcnkiOiAiYnVzaW5lc3MiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJTTEEgb3IgdXB0aW1lIGNvbW1pdG1lbnQgc3RhdGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkIxNiIsCiAgICAgICJjYXRlZ29yeSI6ICJidXNpbmVzcyIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIk1YIHJlY29yZHMgcHJlc2VudCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJCMTciLAogICAgICAiY2F0ZWdvcnkiOiAiYnVzaW5lc3MiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJTUEYgcmVjb3JkIHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0wNiIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQjE4IiwKICAgICAgImNhdGVnb3J5IjogImJ1c2luZXNzIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiRE1BUkMgcmVjb3JkIHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0wNiIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQjE5IiwKICAgICAgImNhdGVnb3J5IjogImJ1c2luZXNzIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkN5YmVyIGxpYWJpbGl0eSBpbnN1cmFuY2UgaW4gZm9yY2UiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiQjIwIiwKICAgICAgImNhdGVnb3J5IjogImJ1c2luZXNzIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkNyaXRpY2FsIHN1Yi1wcm9jZXNzb3JzIHJldmlld2VkIGFubnVhbGx5IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkxIiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkZvdW5kZXIgSVAgYXNzaWdubWVudCBvbiBmaWxlIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkyIiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIlRoaXJkLXBhcnR5IGxpY2Vuc2UgaW52ZW50b3J5IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkzIiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiU0JPTSBwdWJsaXNoZWQgKEN5Y2xvbmVEWCBvciBTUERYKSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJJNCIsCiAgICAgICJjYXRlZ29yeSI6ICJpcCIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJUcmFkZW1hcmsgY2xlYXJhbmNlIGNoZWNrIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkk1IiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQ29weXJpZ2h0IG5vdGljZSBwcmVzZW50IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkk2IiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkFJLWdlbmVyYXRlZC1jb2RlIGRpc2Nsb3N1cmUiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiSTciLAogICAgICAiY2F0ZWdvcnkiOiAiaXAiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiUGF0ZW50IGRpc2Nsb3N1cmUgKGZpbGVkIHBhdGVudHMgbGlzdGVkKSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJJOCIsCiAgICAgICJjYXRlZ29yeSI6ICJpcCIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJUcmFkZSBzZWNyZXQgcHJvdGVjdGlvbiBzdGF0ZW1lbnQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiSTkiLAogICAgICAiY2F0ZWdvcnkiOiAiaXAiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiT3Blbi1zb3VyY2UgY29udHJpYnV0aW9uIHBvbGljeSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJJMTAiLAogICAgICAiY2F0ZWdvcnkiOiAiaXAiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiQUkgdHJhaW5pbmcgZGF0YSBhdHRyaWJ1dGlvbiBkaXNjbG9zdXJlIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkxMSIsCiAgICAgICJjYXRlZ29yeSI6ICJpcCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkNvcHlyaWdodCBub3RpY2UgaXMgY3VycmVudCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJJMTIiLAogICAgICAiY2F0ZWdvcnkiOiAiaXAiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJETUNBIC8gSVAgaW5mcmluZ2VtZW50IGNvbnRhY3QgcHVibGlzaGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkxMyIsCiAgICAgICJjYXRlZ29yeSI6ICJpcCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIk9wZW4tc291cmNlIG5vdGljZXMgYWRkcmVzc2VkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkxNCIsCiAgICAgICJjYXRlZ29yeSI6ICJpcCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogInNlY3VyaXR5LnR4dCBoYXMgQ29udGFjdCBmaWVsZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0wNyIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiSTE1IiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAic2VjdXJpdHkudHh0IGhhcyB2YWxpZCBFeHBpcmVzIGZpZWxkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA3IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJJMTYiLAogICAgICAiY2F0ZWdvcnkiOiAiaXAiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJCcmFuZC90cmFkZW1hcmsgbm90aWNlIHByZXNlbnQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiSTE3IiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIlRlYW0gSVAgYXNzaWdubWVudCBhZ3JlZW1lbnRzIG9uIGZpbGUiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiSTE4IiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIk9TUyBsaWNlbnNlIGNvbXBsaWFuY2UgcmV2aWV3ZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiSTE5IiwKICAgICAgImNhdGVnb3J5IjogImlwIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIlRyYWRlLXNlY3JldCBoYW5kbGluZyBwb2xpY3kgZXhpc3RzIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkkyMCIsCiAgICAgICJjYXRlZ29yeSI6ICJpcCIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJObyB1bmRpc2Nsb3NlZCBJUCBsaXRpZ2F0aW9uIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkwxIiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiUHJpdmFjeSBQb2xpY3kgcHVibGlzaGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA5IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJMMiIsCiAgICAgICJjYXRlZ29yeSI6ICJsZWdhbCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlRlcm1zIG9mIFNlcnZpY2UgcHVibGlzaGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA5IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJMMyIsCiAgICAgICJjYXRlZ29yeSI6ICJsZWdhbCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkFjY2VwdGFibGUgVXNlIFBvbGljeSBwdWJsaXNoZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDQiLAogICAgICAiY2F0ZWdvcnkiOiAibGVnYWwiLAogICAgICAia2luZCI6ICJhdHRlc3QiLAogICAgICAidGl0bGUiOiAiRVUgQUkgQWN0IHJpc2sgY2xhc3Mgc2VsZi1jbGFzc2lmaWVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkw1IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiR0RQUi9DQ1BBIGRhdGEtc3ViamVjdCBjb250YWN0IHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJMNiIsCiAgICAgICJjYXRlZ29yeSI6ICJsZWdhbCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkV4cG9ydC1jb250cm9sIHN0YXRlbWVudCBwcmVzZW50IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkw3IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQUkgVXNlIFBvbGljeSAoZW1wbG95ZWUtZmFjaW5nKSBwdWJsaXNoZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDgiLAogICAgICAiY2F0ZWdvcnkiOiAibGVnYWwiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJDaGlsZHJlbidzIHByaXZhY3kgZGlzY2xvc3VyZSAoQ09QUEEpIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkw5IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQ29va2llIGNvbnNlbnQgLyBiYW5uZXIgcHJlc2VudCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJMMTAiLAogICAgICAiY2F0ZWdvcnkiOiAibGVnYWwiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJDcm9zcy1ib3JkZXIgZGF0YSB0cmFuc2ZlciBtZWNoYW5pc20gZG9jdW1lbnRlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJMMTEiLAogICAgICAiY2F0ZWdvcnkiOiAibGVnYWwiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJDb29raWUgZGlzY2xvc3VyZSBwcmVzZW50IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkwxMiIsCiAgICAgICJjYXRlZ29yeSI6ICJsZWdhbCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkRhdGEtcmV0ZW50aW9uIHN0YXRlbWVudCBwdWJsaXNoZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDEzIiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiU3ViLXByb2Nlc3NvciBkaXNjbG9zdXJlIHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0xMCIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDE0IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiRFBBIGF2YWlsYWJpbGl0eSBzdGF0ZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDE1IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQ2hpbGRyZW4ncyBkYXRhIHN0YXRlbWVudCBwcmVzZW50IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIkwxNiIsCiAgICAgICJjYXRlZ29yeSI6ICJsZWdhbCIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkdvdmVybmluZy1sYXcgY2xhdXNlIHByZXNlbnQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDE3IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQnJlYWNoLW5vdGlmaWNhdGlvbiBjb21taXRtZW50IHN0YXRlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJMMTgiLAogICAgICAiY2F0ZWdvcnkiOiAibGVnYWwiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJJbnRlcm5hdGlvbmFsIHRyYW5zZmVyIG1lY2hhbmlzbSBzdGF0ZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDE5IiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIlJlY29yZCBvZiBwcm9jZXNzaW5nIG1haW50YWluZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiTDIwIiwKICAgICAgImNhdGVnb3J5IjogImxlZ2FsIiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkRhdGEtc3ViamVjdCByZXF1ZXN0cyBhbnN3ZXJlZCBpbiAzMCBkYXlzIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlMxIiwKICAgICAgImNhdGVnb3J5IjogInNlY3VyaXR5IiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAic2VjdXJpdHkudHh0IHB1Ymxpc2hlZCAoUkZDIDkxMTYpIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA3IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMiIsCiAgICAgICJjYXRlZ29yeSI6ICJzZWN1cml0eSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIlRMUyB2YWxpZCArIEhTVFMgcmVjb21tZW5kZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogWwogICAgICAgICJUUy0xLjAtMDQiLAogICAgICAgICJUUy0xLjAtMDUiCiAgICAgIF0sCiAgICAgICJzdGF0dXMiOiAibWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlMzIiwKICAgICAgImNhdGVnb3J5IjogInNlY3VyaXR5IiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkRlcGVuZGVuY3kgYXVkaXQgcnVuIGluIGxhc3QgMzAgZGF5cyIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTNCIsCiAgICAgICJjYXRlZ29yeSI6ICJzZWN1cml0eSIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJObyBzZWNyZXRzIGluIHB1YmxpYyByZXBvIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA4IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTNSIsCiAgICAgICJjYXRlZ29yeSI6ICJzZWN1cml0eSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkluY2lkZW50LXJlc3BvbnNlIGNvbnRhY3QgcHVibGlzaGVkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlM2IiwKICAgICAgImNhdGVnb3J5IjogInNlY3VyaXR5IiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIkJhY2t1cCBwb3N0dXJlIGRvY3VtZW50ZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogW10sCiAgICAgICJzdGF0dXMiOiAidW5tYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiUzciLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJWdWxuZXJhYmlsaXR5IGRpc2Nsb3N1cmUgcHJvZ3JhbSAoVkRQKSBwdWJsaXNoZWQiLAogICAgICAicmVxdWlyZW1lbnRzIjogWwogICAgICAgICJUUy0xLjAtMTIiCiAgICAgIF0sCiAgICAgICJzdGF0dXMiOiAibWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlM4IiwKICAgICAgImNhdGVnb3J5IjogInNlY3VyaXR5IiwKICAgICAgImtpbmQiOiAiYXR0ZXN0IiwKICAgICAgInRpdGxlIjogIlBlbiB0ZXN0IHJlcG9ydCBvciBhdHRlc3RhdGlvbiIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTOSIsCiAgICAgICJjYXRlZ29yeSI6ICJzZWN1cml0eSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkJ1ZyBib3VudHkgb3IgZXF1aXZhbGVudCBkaXNjbG9zdXJlIHBhdGgiLAogICAgICAicmVxdWlyZW1lbnRzIjogWwogICAgICAgICJUUy0xLjAtMTIiCiAgICAgIF0sCiAgICAgICJzdGF0dXMiOiAibWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlMxMCIsCiAgICAgICJjYXRlZ29yeSI6ICJzZWN1cml0eSIsCiAgICAgICJraW5kIjogImF0dGVzdCIsCiAgICAgICJ0aXRsZSI6ICJFbmNyeXB0aW9uLWF0LXJlc3QgZGlzY2xvc3VyZSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMTEiLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJDb250ZW50LVNlY3VyaXR5LVBvbGljeSBoZWFkZXIgc2V0IiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA1IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMTIiLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJSZWZlcnJlci1Qb2xpY3kgaGVhZGVyIHNldCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMTMiLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJQZXJtaXNzaW9ucy1Qb2xpY3kgaGVhZGVyIHNldCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMTQiLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJYLUNvbnRlbnQtVHlwZS1PcHRpb25zOiBub3NuaWZmIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFtdLAogICAgICAic3RhdHVzIjogInVubWFwcGVkIgogICAgfSwKICAgIHsKICAgICAgImlkIjogIlMxNSIsCiAgICAgICJjYXRlZ29yeSI6ICJzZWN1cml0eSIsCiAgICAgICJraW5kIjogInByb2JlIiwKICAgICAgInRpdGxlIjogIkNsaWNramFja2luZyBwcm90ZWN0aW9uIHNldCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0wNSIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiUzE2IiwKICAgICAgImNhdGVnb3J5IjogInNlY3VyaXR5IiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiQ29va2llcyBzZXQgd2l0aCBTZWN1cmUgKyBIdHRwT25seSIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMTciLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICIuZW52IG5vdCBwdWJsaWNseSBleHBvc2VkIiwKICAgICAgInJlcXVpcmVtZW50cyI6IFsKICAgICAgICAiVFMtMS4wLTA4IgogICAgICBdLAogICAgICAic3RhdHVzIjogIm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMTgiLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICIuZ2l0IGRpcmVjdG9yeSBub3QgcHVibGljbHkgZXhwb3NlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbCiAgICAgICAgIlRTLTEuMC0wOCIKICAgICAgXSwKICAgICAgInN0YXR1cyI6ICJtYXBwZWQiCiAgICB9LAogICAgewogICAgICAiaWQiOiAiUzE5IiwKICAgICAgImNhdGVnb3J5IjogInNlY3VyaXR5IiwKICAgICAgImtpbmQiOiAicHJvYmUiLAogICAgICAidGl0bGUiOiAiU2VydmVyIHZlcnNpb24gbm90IGRpc2Nsb3NlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJTMjAiLAogICAgICAiY2F0ZWdvcnkiOiAic2VjdXJpdHkiLAogICAgICAia2luZCI6ICJwcm9iZSIsCiAgICAgICJ0aXRsZSI6ICJDQUEgcmVjb3JkIHB1Ymxpc2hlZCIsCiAgICAgICJyZXF1aXJlbWVudHMiOiBbXSwKICAgICAgInN0YXR1cyI6ICJ1bm1hcHBlZCIKICAgIH0KICBdCn0K"
+  }
+}
