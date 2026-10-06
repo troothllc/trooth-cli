@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/key-list.schema.json",
+  "title": "KeyList",
+  "description": "The body of https://api.trooth.co/public/keys, or a saved copy of it. Save it with the time you read it: a saved list cannot show a compromise announced later.",
+  "type": "object",
+  "required": [
+    "keys"
+  ],
+  "properties": {
+    "keys": {
+      "type": "array",
+      "description": "Every key, current and past.",
+      "items": {
+        "$ref": "#/$defs/PublicKey"
+      }
+    },
+    "list_read_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "When the list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "active_kid": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The kid of the key currently used for new statements."
+    },
+    "note": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "A note from the key service."
+    }
+  },
+  "$defs": {
+    "PublicKey": {
+      "title": "PublicKey",
+      "type": "object",
+      "description": "One published key and its lifecycle. Only `kid`, `alg`, `encoding`, `public_key`, `status` and the three lifecycle times decide trust (docs/VERIFY.md section 3).",
+      "required": [
+        "kid",
+        "alg",
+        "public_key",
+        "status"
+      ],
+      "properties": {
+        "kid": {
+          "type": "string",
+          "description": "The key id a statement names in key_id.",
+          "minLength": 1
+        },
+        "alg": {
+          "type": "string",
+          "description": "Always Ed25519.",
+          "const": "Ed25519"
+        },
+        "encoding": {
+          "type": "string",
+          "description": "How public_key is written: hex or base64.",
+          "enum": [
+            "hex",
+            "base64"
+          ]
+        },
+        "public_key": {
+          "type": "string",
+          "description": "The 32-byte Ed25519 public key, in `encoding`.",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "description": "active, retired, revoked or compromised.",
+          "enum": [
+            "active",
+            "retired",
+            "revoked",
+            "compromised"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "description": "The same lifecycle state as written by the key service."
+        },
+        "retired_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key was retired. Statements carrying a read_at strictly before this stay trusted. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "compromised_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key was found compromised. Nothing signed by it is relied on. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "revoked_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key was revoked. A revocation with no compromise recorded is treated as a compromise. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "created_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key was created, when recorded. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "activated_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key was first used, when recorded. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "first_listed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the key first appeared on the list. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "fingerprint": {
+          "type": "string",
+          "description": "A short fingerprint of the key, for display."
+        },
+        "purpose": {
+          "type": "string",
+          "description": "What the key is for, as a short label."
+        },
+        "signs": {
+          "type": "string",
+          "description": "What the key signs, in words."
+        },
+        "events": {
+          "type": "array",
+          "description": "Lifecycle events, oldest first.",
+          "items": {
+            "$ref": "#/$defs/KeyEvent"
+          }
+        }
+      }
+    },
+    "KeyEvent": {
+      "title": "KeyEvent",
+      "type": "object",
+      "description": "One lifecycle event of a key.",
+      "required": [
+        "event",
+        "at"
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "description": "What happened (for example first_listed, retired, compromised)."
+        },
+        "at": {
+          "type": "string",
+          "description": "When. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A note, or null."
+        }
+      }
+    }
+  }
+}

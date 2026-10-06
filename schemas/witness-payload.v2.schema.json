@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/witness-payload.v2.schema.json",
+  "title": "WitnessPayloadV2",
+  "description": "The JSON a trooth.witness-statement.v2 payload holds. Its members are signed in exactly this order with no whitespace. It binds the check mapping, the evaluator, the subject scope and the evidence manifest.",
+  "type": "object",
+  "required": [
+    "statement",
+    "reading_id",
+    "domain",
+    "read_at",
+    "subject_scope",
+    "methodology",
+    "evaluator",
+    "evidence_manifest",
+    "checks",
+    "counts"
+  ],
+  "properties": {
+    "statement": {
+      "type": "string",
+      "description": "The statement version.",
+      "const": "trooth.witness-statement.v2"
+    },
+    "reading_id": {
+      "type": "string",
+      "description": "The id of the reading. Also usable as trooth:reading:<reading_id> (docs/IDS.md).",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "description": "The domain the reading was taken of: lowercase, no trailing dot."
+    },
+    "read_at": {
+      "type": "string",
+      "description": "When Trooth took the reading, as Trooth asserts it when signing. There is no independent timestamp. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "subject_scope": {
+      "$ref": "#/$defs/SubjectScope",
+      "description": "What the reading covered."
+    },
+    "methodology": {
+      "$ref": "#/$defs/Methodology",
+      "description": "The check mapping, bound by digest."
+    },
+    "evaluator": {
+      "$ref": "#/$defs/Evaluator",
+      "description": "The software that took the reading."
+    },
+    "evidence_manifest": {
+      "$ref": "#/$defs/EvidenceManifestRef",
+      "description": "The evidence manifest, bound by digest."
+    },
+    "checks": {
+      "type": "array",
+      "description": "Every check in the reading.",
+      "items": {
+        "$ref": "#/$defs/Check"
+      }
+    },
+    "counts": {
+      "$ref": "#/$defs/Counts",
+      "description": "Counts that must agree with the checks."
+    }
+  },
+  "$defs": {
+    "Check": {
+      "title": "Check",
+      "type": "object",
+      "description": "One check in the reading and its outcome.",
+      "required": [
+        "id",
+        "category",
+        "kind",
+        "outcome",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The check id in the check mapping the payload names (for example S1, L2).",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "description": "The check category in the mapping (for example security, legal, ai, ip, business).",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "description": "How the check is taken: `probe` reads the public surface; `attest` reads something the company published about itself.",
+          "minLength": 1
+        },
+        "outcome": {
+          "type": "string",
+          "description": "One of three outcomes. There is no fourth value and no score.",
+          "enum": [
+            "as expected",
+            "not as expected",
+            "not read"
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CheckReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null when the outcome is `as expected`; otherwise why."
+        }
+      }
+    },
+    "CheckReason": {
+      "title": "CheckReason",
+      "type": "object",
+      "description": "Why a check is not `as expected`. Present on every check whose outcome is `not read` or `not as expected`.",
+      "required": [
+        "code",
+        "version",
+        "source_ref",
+        "withheld",
+        "withheld_reason"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "The reason code. source_unavailable, timeout, evaluator_limitation, carried_from_earlier_reading and check_misconfigured go with `not read`; contrary_observation and expected_item_absent go with `not as expected`.",
+          "enum": [
+            "source_unavailable",
+            "timeout",
+            "evaluator_limitation",
+            "carried_from_earlier_reading",
+            "check_misconfigured",
+            "contrary_observation",
+            "expected_item_absent"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "description": "The version of the reason vocabulary.",
+          "const": "trooth.check-explanations.v1"
+        },
+        "source_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The public source the reason refers to, or null. Always null when `withheld` is true."
+        },
+        "withheld": {
+          "type": "boolean",
+          "description": "True when the source behind this reason is not published (for example a private document); only a commitment to it is in the evidence manifest."
+        },
+        "withheld_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why the source is withheld. Required, non-empty, when `withheld` is true; otherwise null."
+        }
+      }
+    },
+    "Counts": {
+      "title": "Counts",
+      "type": "object",
+      "description": "Counts that MUST agree with the checks: read + not_read = in_reading; as_expected + not_as_expected = read; in_reading = the number of checks. They are reported apart and never added into one number.",
+      "required": [
+        "read",
+        "as_expected",
+        "not_as_expected",
+        "not_read",
+        "in_reading"
+      ],
+      "properties": {
+        "read": {
+          "type": "integer",
+          "description": "Checks whose outcome is not `not read`.",
+          "minimum": 0
+        },
+        "as_expected": {
+          "type": "integer",
+          "description": "Checks whose outcome is `as expected`.",
+          "minimum": 0
+        },
+        "not_as_expected": {
+          "type": "integer",
+          "description": "Checks whose outcome is `not as expected`.",
+          "minimum": 0
+        },
+        "not_read": {
+          "type": "integer",
+          "description": "Checks whose outcome is `not read`.",
+          "minimum": 0
+        },
+        "in_reading": {
+          "type": "integer",
+          "description": "All checks in the reading.",
+          "minimum": 0
+        }
+      }
+    },
+    "SubjectScope": {
+      "title": "SubjectScope",
+      "type": "object",
+      "description": "What the reading covered.",
+      "required": [
+        "domain",
+        "surface",
+        "checks_in_scope"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain read. Equals the payload domain."
+        },
+        "surface": {
+          "type": "string",
+          "description": "Which surface was read. `public`: only what anyone can fetch."
+        },
+        "checks_in_scope": {
+          "type": "integer",
+          "description": "The number of checks in scope. Equals the number of checks listed.",
+          "minimum": 0
+        }
+      }
+    },
+    "Methodology": {
+      "title": "Methodology",
+      "type": "object",
+      "description": "The exact check mapping the reading used, bound by digest.",
+      "required": [
+        "standard",
+        "mapping_version",
+        "mapping_url",
+        "mapping_digest"
+      ],
+      "properties": {
+        "standard": {
+          "type": "string",
+          "description": "The name of the standard the mapping belongs to."
+        },
+        "mapping_version": {
+          "type": "string",
+          "description": "The mapping version."
+        },
+        "mapping_url": {
+          "type": "string",
+          "description": "Where the exact mapping bytes are served. Immutable versions live under https://trooth.co/standard/check-mapping/."
+        },
+        "mapping_digest": {
+          "type": "string",
+          "description": "`sha256:` plus the lowercase hex SHA-256 of the exact mapping bytes.",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "Evaluator": {
+      "title": "Evaluator",
+      "type": "object",
+      "description": "The software that took the reading.",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The evaluator name."
+        },
+        "version": {
+          "type": "string",
+          "description": "The evaluator version."
+        }
+      }
+    },
+    "EvidenceManifestRef": {
+      "title": "EvidenceManifestRef",
+      "type": "object",
+      "description": "The evidence manifest the reading binds, by digest.",
+      "required": [
+        "digest",
+        "entries",
+        "canonicalization"
+      ],
+      "properties": {
+        "digest": {
+          "type": "string",
+          "description": "`sha256:` plus the hex SHA-256 of the canonical manifest bytes (evidence-manifest.schema.json).",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "entries": {
+          "type": "integer",
+          "description": "The number of manifest entries.",
+          "minimum": 0
+        },
+        "canonicalization": {
+          "type": "string",
+          "description": "How the manifest bytes are formed: entries sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8."
+        }
+      }
+    }
+  }
+}

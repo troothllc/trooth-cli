@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trooth-verify"
+version = "0.1.0"
+description = "Check a Trooth witness statement yourself: Ed25519 signature, key lifecycle, subject, counts, mapping and manifest digests, offline bundles. The rules of docs/VERIFY.md."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Trooth, LLC" }]
+requires-python = ">=3.9"
+dependencies = ["cryptography>=42"]
+
+[project.optional-dependencies]
+models = ["pydantic>=2.5"]
+
+[project.urls]
+Homepage = "https://trooth.co"
+Source = "https://github.com/troothllc/trooth-cli/tree/main/sdk/python"
+
+[tool.setuptools]
+packages = ["trooth_verify"]

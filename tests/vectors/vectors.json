@@ -794,6 +794,416 @@
       }
     },
     {
+      "name": "valid-v3",
+      "note": "A v3 statement: RFC 8785 bytes, subject id and signer inside the signed bytes.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "checked",
+        "signature": "valid"
+      }
+    },
+    {
+      "name": "v3-no-manifest-supplied",
+      "note": "Not supplied is never reported as a match, in v3 either.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": null,
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "partially_checked",
+        "signature": "valid"
+      }
+    },
+    {
+      "name": "v3-not-canonical",
+      "note": "Signed correctly, but the payload bytes are not the RFC 8785 form: refused before the signature is checked.",
+      "statement": {
+        "payload": "{\"statement\":\"trooth.witness-statement.v3\",\"reading_id\":\"scan_vectors_3\",\"domain\":\"acme-vectors.com\",\"read_at\":\"2026-10-01T12:00:00.000Z\",\"subject_scope\":{\"domain\":\"acme-vectors.com\",\"surface\":\"public\",\"checks_in_scope\":3},\"methodology\":{\"standard\":\"Trooth Standard 1.0\",\"mapping_version\":\"test-1.0.0\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\"},\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3,\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\"},\"checks\":[{\"id\":\"S1\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"id\":\"S2\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"withheld\":false,\"withheld_reason\":null}},{\"id\":\"S3\",\"category\":\"security\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"version\":\"trooth.check-explanations.v1\",\"source_ref\":null,\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"read\":2,\"as_expected\":1,\"not_as_expected\":1,\"not_read\":1,\"in_reading\":3},\"subject_id\":\"trooth:domain:acme-vectors.com\",\"signer\":{\"key_id\":\"test-key-a\",\"issuer\":\"trooth.co\"}}",
+        "signature": "ed25519:YzIaesTEgvqAoVBk7cj6VYYkzQSuwGD/VQisOBatW4x4Wnf0YZFgJyj22sqCpP8LHUzOvwfyKBa+qL/x+1y1AA==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "signature_not_trusted",
+        "signature": "malformed"
+      }
+    },
+    {
+      "name": "v3-fraction",
+      "note": "A number written 2.0 is not canonical: the canonical text of the same value is 2.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2.0},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:cLMfJkrLSodVqWfy3nl3wX3QfhuYi1bbOW9T4aVLQqTKQwe3UOFrYYZXgsT00Lp6QQwWnlZAJ1LmQyXArEGSBw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "signature_not_trusted",
+        "signature": "malformed"
+      }
+    },
+    {
+      "name": "v3-wrong-label",
+      "note": "A v3 payload in an envelope that names the v2 canonicalization.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "json-fixed-key-order-no-whitespace-utf8"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "signature_not_trusted",
+        "signature": "malformed"
+      }
+    },
+    {
+      "name": "v3-signer-differs",
+      "note": "The envelope names key A; the signed bytes name key B.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-b\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:h6RfV/K9peg+2V/MO8suRMLiKe7azmIOEjnfWt0KqD3WwcUik2BZEGo/GLOldjilq+9pCWHv/D14SfMiBxGODw==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "signature_not_trusted",
+        "signature": "malformed"
+      }
+    },
+    {
+      "name": "v3-tampered",
+      "note": "One outcome changed after signing.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "signature_not_trusted",
+        "signature": "invalid"
+      }
+    },
+    {
+      "name": "v3-subject-id-disagrees",
+      "note": "Signed, but the stable id names another domain than the payload does.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-lookalike.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:F/lAOCdHI0CNv9Cv6pfJipCugbP3xY3vnalUIyslNnJgFofijxrkrnm4r1bwHipg3aDFzDHO8ZKCH9kjZ/kXAA==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-vectors.com",
+      "expect": {
+        "verdict": "mismatch",
+        "signature": "valid"
+      }
+    },
+    {
+      "name": "v3-domain-mismatch",
+      "note": "A genuine v3 statement for another domain.",
+      "statement": {
+        "payload": "{\"checks\":[{\"category\":\"security\",\"id\":\"S1\",\"kind\":\"probe\",\"outcome\":\"as expected\",\"reason\":null},{\"category\":\"security\",\"id\":\"S2\",\"kind\":\"probe\",\"outcome\":\"not as expected\",\"reason\":{\"code\":\"expected_item_absent\",\"source_ref\":\"https://acme-vectors.com/.well-known/security.txt\",\"version\":\"trooth.check-explanations.v1\",\"withheld\":false,\"withheld_reason\":null}},{\"category\":\"security\",\"id\":\"S3\",\"kind\":\"probe\",\"outcome\":\"not read\",\"reason\":{\"code\":\"timeout\",\"source_ref\":null,\"version\":\"trooth.check-explanations.v1\",\"withheld\":true,\"withheld_reason\":\"source privée held by its owner\"}}],\"counts\":{\"as_expected\":1,\"in_reading\":3,\"not_as_expected\":1,\"not_read\":1,\"read\":2},\"domain\":\"acme-vectors.com\",\"evaluator\":{\"name\":\"trooth-scan-worker\",\"version\":\"vectors\"},\"evidence_manifest\":{\"canonicalization\":\"trooth.evidence-manifest.v1: JSON array sorted by check_id, keys check_id then source or commitment, no whitespace, UTF-8\",\"digest\":\"sha256:53501845754e2ceec3a8c84fa5b5c7bf953943a0fc6813bab82a633f49372838\",\"entries\":3},\"methodology\":{\"mapping_digest\":\"sha256:63104bbca70e7ac2219f0791e142b2e752e3918cfee9f43eeb463645ef6da143\",\"mapping_url\":\"https://trooth.co/standard/check-mapping/test-1.0.0.json\",\"mapping_version\":\"test-1.0.0\",\"standard\":\"Trooth Standard 1.0\"},\"read_at\":\"2026-10-01T12:00:00.000Z\",\"reading_id\":\"scan_vectors_3\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"test-key-a\"},\"statement\":\"trooth.witness-statement.v3\",\"subject_id\":\"trooth:domain:acme-vectors.com\",\"subject_scope\":{\"checks_in_scope\":3,\"domain\":\"acme-vectors.com\",\"surface\":\"public\"}}",
+        "signature": "ed25519:3Dwm5cl2o0MSmzvy1ckO0lO/+Fx/EclOAARs3eQUEBg6OM380KutJcq5uMidGiP+QiGdMMBK+MEa0VznBys+Bg==",
+        "key_id": "test-key-a",
+        "alg": "Ed25519",
+        "canonicalization": "RFC8785"
+      },
+      "keys": [
+        {
+          "kid": "test-key-a",
+          "alg": "Ed25519",
+          "encoding": "base64",
+          "public_key": "+SZFI1P37cY2tgCV+7O7httYDUCrpiFYwGBPn+vap68=",
+          "status": "active"
+        },
+        {
+          "kid": "test-key-b",
+          "alg": "Ed25519",
+          "encoding": "hex",
+          "public_key": "3587e6f1127aadc43bec2ce28da7b4aa247a0ae47a382962046a57443fa41183",
+          "status": "active"
+        }
+      ],
+      "mapping": true,
+      "manifest": [
+        {
+          "check_id": "S1",
+          "source": "https://acme-vectors.com/"
+        },
+        {
+          "check_id": "S2",
+          "source": "https://acme-vectors.com/.well-known/security.txt"
+        },
+        {
+          "check_id": "S3",
+          "commitment": "sha256:b01634fdd513dce35c58d67ed9b87dd7bbf5f349243e7a1e33d4a49a08c3a97a"
+        }
+      ],
+      "domain": "acme-lookalike.com",
+      "expect": {
+        "verdict": "mismatch",
+        "signature": "valid"
+      }
+    },
+    {
       "name": "wrong-alg",
       "note": "A statement naming another algorithm is not checked as Ed25519.",
       "statement": {

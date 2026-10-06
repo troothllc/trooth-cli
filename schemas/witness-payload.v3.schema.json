@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/witness-payload.v3.schema.json",
+  "title": "WitnessPayloadV3",
+  "description": "The JSON a trooth.witness-statement.v3 payload holds: the v2 content plus subject_id and signer, serialized as RFC 8785 (JCS). Every number is an integer between -(2^53 - 1) and 2^53 - 1, so every implementation produces the same bytes.",
+  "type": "object",
+  "required": [
+    "checks",
+    "counts",
+    "domain",
+    "evaluator",
+    "evidence_manifest",
+    "methodology",
+    "read_at",
+    "reading_id",
+    "signer",
+    "statement",
+    "subject_id",
+    "subject_scope"
+  ],
+  "properties": {
+    "checks": {
+      "type": "array",
+      "description": "Every check in the reading.",
+      "items": {
+        "$ref": "witness-payload.v2.schema.json#/$defs/Check"
+      }
+    },
+    "counts": {
+      "$ref": "witness-payload.v2.schema.json#/$defs/Counts",
+      "description": "Counts that must agree with the checks."
+    },
+    "domain": {
+      "type": "string",
+      "description": "The domain the reading was taken of: lowercase, no trailing dot."
+    },
+    "evaluator": {
+      "$ref": "witness-payload.v2.schema.json#/$defs/Evaluator",
+      "description": "The software that took the reading."
+    },
+    "evidence_manifest": {
+      "$ref": "witness-payload.v2.schema.json#/$defs/EvidenceManifestRef",
+      "description": "The evidence manifest, bound by digest."
+    },
+    "methodology": {
+      "$ref": "witness-payload.v2.schema.json#/$defs/Methodology",
+      "description": "The check mapping, bound by digest."
+    },
+    "read_at": {
+      "type": "string",
+      "description": "When Trooth took the reading, as Trooth asserts it when signing. There is no independent timestamp. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "reading_id": {
+      "type": "string",
+      "description": "The id of the reading. Also usable as trooth:reading:<reading_id> (docs/IDS.md).",
+      "minLength": 1
+    },
+    "signer": {
+      "$ref": "#/$defs/Signer",
+      "description": "The signing key, inside the signed bytes."
+    },
+    "statement": {
+      "type": "string",
+      "description": "The statement version.",
+      "const": "trooth.witness-statement.v3"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "The subject by its stable id, trooth:domain:<domain> (docs/IDS.md). MUST name the payload domain.",
+      "pattern": "^trooth:domain:[a-z0-9.-]+$"
+    },
+    "subject_scope": {
+      "$ref": "witness-payload.v2.schema.json#/$defs/SubjectScope",
+      "description": "What the reading covered."
+    }
+  },
+  "$defs": {
+    "Signer": {
+      "title": "Signer",
+      "type": "object",
+      "description": "The signing key, named inside the signed bytes so the envelope cannot point at another key.",
+      "required": [
+        "key_id",
+        "issuer"
+      ],
+      "properties": {
+        "key_id": {
+          "type": "string",
+          "description": "The kid of the signing key. MUST equal the envelope key_id."
+        },
+        "issuer": {
+          "type": "string",
+          "description": "Who signs: trooth.co.",
+          "const": "trooth.co"
+        }
+      }
+    }
+  }
+}

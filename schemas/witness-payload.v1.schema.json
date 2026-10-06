@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/witness-payload.v1.schema.json",
+  "title": "WitnessPayloadV1",
+  "description": "The JSON a trooth.witness-statement.v1 payload holds. v1 binds the outcomes and counts only: no mapping, manifest, evaluator or subject scope.",
+  "type": "object",
+  "required": [
+    "statement",
+    "reading_id",
+    "domain",
+    "read_at",
+    "checks",
+    "counts"
+  ],
+  "properties": {
+    "statement": {
+      "type": "string",
+      "description": "The statement version.",
+      "const": "trooth.witness-statement.v1"
+    },
+    "reading_id": {
+      "type": "string",
+      "description": "The id of the reading. Also usable as trooth:reading:<reading_id> (docs/IDS.md).",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "description": "The domain the reading was taken of: lowercase, no trailing dot."
+    },
+    "read_at": {
+      "type": "string",
+      "description": "When Trooth took the reading, as Trooth asserts it when signing. There is no independent timestamp. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "checks": {
+      "type": "array",
+      "description": "Every check in the reading.",
+      "items": {
+        "$ref": "#/$defs/CheckV1"
+      }
+    },
+    "counts": {
+      "$ref": "#/$defs/CountsV1",
+      "description": "The two counts, which must agree with the checks."
+    }
+  },
+  "$defs": {
+    "CheckV1": {
+      "title": "CheckV1",
+      "type": "object",
+      "description": "One check in a v1 reading. v1 carries no reason.",
+      "required": [
+        "id",
+        "category",
+        "kind",
+        "outcome"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The check id."
+        },
+        "category": {
+          "type": "string",
+          "description": "The check category."
+        },
+        "kind": {
+          "type": "string",
+          "description": "probe or attest."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "One of three outcomes.",
+          "enum": [
+            "as expected",
+            "not as expected",
+            "not read"
+          ]
+        }
+      }
+    },
+    "CountsV1": {
+      "title": "CountsV1",
+      "type": "object",
+      "description": "The two counts a v1 payload carries.",
+      "required": [
+        "read",
+        "as_expected"
+      ],
+      "properties": {
+        "read": {
+          "type": "integer",
+          "description": "Checks whose outcome is not `not read`.",
+          "minimum": 0
+        },
+        "as_expected": {
+          "type": "integer",
+          "description": "Checks whose outcome is `as expected`.",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

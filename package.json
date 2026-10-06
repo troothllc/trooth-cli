@@ -1,14 +1,32 @@
 {
   "name": "trooth",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "The Trooth Network in your terminal. Read a company's public record with no key and no account: each fact with its provenance, the evidence state and the record version, as the API serves it. Also reads what your repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
     "trooth": "bin/trooth.mjs"
   },
+  "exports": {
+    "./verify": {
+      "types": "./types/verify.d.ts",
+      "default": "./bin/lib/verify.mjs"
+    },
+    "./jcs": {
+      "types": "./types/jcs.d.ts",
+      "default": "./bin/lib/jcs.mjs"
+    },
+    "./ids": {
+      "types": "./types/ids.d.ts",
+      "default": "./bin/lib/ids.mjs"
+    },
+    "./schemas/*": "./schemas/*",
+    "./package.json": "./package.json"
+  },
   "files": [
     "bin/",
     "docs/",
+    "schemas/",
+    "types/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
@@ -20,7 +38,8 @@
   "scripts": {
     "check": "node ./bin/trooth.mjs check",
     "lint": "node ./bin/trooth.mjs lint",
-    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs && node tests/check-projection.test.mjs && node tests/audit-1004.test.mjs && node tests/output-delivery.test.mjs && node tests/verify.test.mjs && node tests/vectors/generate.mjs --check"
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs && node tests/check-projection.test.mjs && node tests/audit-1004.test.mjs && node tests/output-delivery.test.mjs && node tests/verify.test.mjs && node tests/vectors/generate.mjs --check && node tests/schemas.test.mjs",
+    "types": "node scripts/gen-types.mjs"
   },
   "license": "Apache-2.0",
   "author": "Trooth, LLC",
@@ -44,6 +63,7 @@
     "agent-tools",
     "signed-records",
     "provenance",
+    "json-schema",
     "infrastructure-as-code",
     "terraform",
     "kubernetes",

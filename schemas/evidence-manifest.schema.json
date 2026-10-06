@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/evidence-manifest.schema.json",
+  "title": "EvidenceManifest",
+  "description": "The evidence manifest a v2 or v3 statement binds by digest, published beside the statement as `witnessEvidenceManifest`. Canonical bytes: entries sorted by check_id, each as {\"check_id\":..,\"source\":..} or {\"check_id\":..,\"commitment\":..}, no whitespace, UTF-8.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/ManifestEntry"
+  },
+  "$defs": {
+    "ManifestEntry": {
+      "title": "ManifestEntry",
+      "type": "object",
+      "description": "One check and the evidence behind it: a public `source`, or a `commitment` to a private one. Exactly one of the two.",
+      "required": [
+        "check_id"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "source"
+          ]
+        },
+        {
+          "required": [
+            "commitment"
+          ]
+        }
+      ],
+      "properties": {
+        "check_id": {
+          "type": "string",
+          "description": "The check id. Unique in the manifest.",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "description": "The public URL the check read."
+        },
+        "commitment": {
+          "type": "string",
+          "description": "`sha256:` plus the hex SHA-256 of salt, a newline byte and the private reference. Only its holder can open it.",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

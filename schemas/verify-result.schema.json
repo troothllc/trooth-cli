@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/verify-result.schema.json",
+  "title": "VerifyResult",
+  "description": "The JSON document `trooth verify --json` writes, and the shape the SDKs return. The verdict is the only conclusion; everything else says how it was reached.",
+  "type": "object",
+  "required": [
+    "domain",
+    "verdict",
+    "version",
+    "signature",
+    "key",
+    "subject",
+    "binding",
+    "counts",
+    "assurance"
+  ],
+  "properties": {
+    "domain": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The domain asked about, or the signed domain when none was asked."
+    },
+    "verdict": {
+      "type": "string",
+      "description": "checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping or the manifest disagrees.",
+      "enum": [
+        "checked",
+        "checked_v1",
+        "partially_checked",
+        "signature_not_trusted",
+        "mismatch"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "description": "The statement version, or unknown.",
+      "enum": [
+        "v1",
+        "v2",
+        "v3",
+        "unknown"
+      ]
+    },
+    "read_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The read_at the payload carries. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "reading_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The reading id the payload carries."
+    },
+    "statement_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "trooth:statement: plus the hex SHA-256 of the exact payload bytes (docs/IDS.md).",
+      "pattern": "^trooth:statement:[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "description": "valid, invalid or malformed.",
+      "enum": [
+        "valid",
+        "invalid",
+        "malformed"
+      ]
+    },
+    "key": {
+      "$ref": "#/$defs/KeyTrust",
+      "description": "The signing key and whether it is trusted at read_at."
+    },
+    "subject": {
+      "$ref": "#/$defs/Subject",
+      "description": "The signed domain against the domain asked about."
+    },
+    "binding": {
+      "$ref": "#/$defs/Binding",
+      "description": "The mapping and manifest against their signed digests."
+    },
+    "counts": {
+      "$ref": "#/$defs/CountCheck",
+      "description": "Whether the signed counts agree with the signed checks."
+    },
+    "assurance": {
+      "type": "string",
+      "description": "What a valid signature of this version shows and does not show, in words."
+    },
+    "keys_read_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "When the key list used was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "sources": {
+      "type": "object",
+      "description": "Where each input came from: a URL, a file path, or null when not supplied.",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "KeyTrust": {
+      "title": "KeyTrust",
+      "type": "object",
+      "description": "The key decision.",
+      "required": [
+        "kid",
+        "state",
+        "trusted",
+        "reason"
+      ],
+      "properties": {
+        "kid": {
+          "type": "string",
+          "description": "The key id the envelope names."
+        },
+        "state": {
+          "type": "string",
+          "description": "The lifecycle state found on the key list.",
+          "enum": [
+            "active",
+            "retired",
+            "compromised",
+            "revoked_unrecorded",
+            "unknown"
+          ]
+        },
+        "trusted": {
+          "type": "boolean",
+          "description": "Whether a valid signature from this key at this time is relied on."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why, in words."
+        }
+      }
+    },
+    "Subject": {
+      "title": "Subject",
+      "type": "object",
+      "description": "The subject decision.",
+      "required": [
+        "signed",
+        "asked",
+        "status"
+      ],
+      "properties": {
+        "signed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The domain in the signed payload."
+        },
+        "asked": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The domain asked about."
+        },
+        "status": {
+          "type": "string",
+          "description": "match, mismatch, or not_checked (no domain given, or the signature was not trusted).",
+          "enum": [
+            "match",
+            "mismatch",
+            "not_checked"
+          ]
+        }
+      }
+    },
+    "Binding": {
+      "title": "Binding",
+      "type": "object",
+      "description": "The binding decision.",
+      "required": [
+        "status",
+        "mapping",
+        "manifest"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "bound, partially_checked, mismatch, absent (v1 binds neither) or unchecked (signature not trusted).",
+          "enum": [
+            "bound",
+            "partially_checked",
+            "mismatch",
+            "absent",
+            "unchecked"
+          ]
+        },
+        "mapping": {
+          "type": "string",
+          "description": "The mapping result.",
+          "enum": [
+            "match",
+            "mismatch",
+            "not_supplied",
+            "absent"
+          ]
+        },
+        "manifest": {
+          "type": "string",
+          "description": "The manifest result.",
+          "enum": [
+            "match",
+            "mismatch",
+            "not_supplied",
+            "absent"
+          ]
+        }
+      }
+    },
+    "CountCheck": {
+      "title": "CountCheck",
+      "type": "object",
+      "description": "The count decision.",
+      "required": [
+        "identities_hold",
+        "problems"
+      ],
+      "properties": {
+        "identities_hold": {
+          "type": "boolean",
+          "description": "True when every identity holds."
+        },
+        "problems": {
+          "type": "array",
+          "description": "Each identity that does not hold, in words.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

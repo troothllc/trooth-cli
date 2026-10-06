@@ -11,7 +11,8 @@
 
 import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { canonicalManifest, sha256Digest } from '../../bin/lib/verify.mjs';
+import { canonicalManifest, sha256Digest, makeBundle } from '../../bin/lib/verify.mjs';
+import { canonicalize } from '../../bin/lib/jcs.mjs';
 
 const here = new URL('.', import.meta.url);
 const seedOf = (label) => createHash('sha256').update(`trooth test vectors v1 / ${label} / NOT A TROOTH KEY`).digest();
@@ -58,6 +59,22 @@ function v2(over = {}) {
   });
 }
 
+// v3: the same reading as v2, with the subject named by its stable id and the
+// signing key named inside the signed bytes, serialized as RFC 8785 (JCS). The
+// non-ASCII and U+2028 text in a withheld reason makes every implementation's
+// string escaping meet the same bytes.
+function v3obj(over = {}) {
+  const base = JSON.parse(v2({ domain: over.domain }));
+  base.statement = 'trooth.witness-statement.v3';
+  base.reading_id = 'scan_vectors_3';
+  base.subject_id = over.subjectId ?? `trooth:domain:${over.domain ?? 'acme-vectors.com'}`;
+  base.signer = { key_id: over.signerKid ?? 'test-key-a', issuer: 'trooth.co' };
+  base.checks[2].reason.withheld_reason = 'source privée\u2028held by its owner';
+  return base;
+}
+const v3 = (over) => canonicalize(v3obj(over));
+const st3 = (payload, kp = A, kid = 'test-key-a', label = 'RFC8785') => ({ payload, signature: sig(kp, payload), key_id: kid, alg: 'Ed25519', canonicalization: label });
+
 function v1() {
   return JSON.stringify({
     statement: 'trooth.witness-statement.v1',
@@ -94,6 +111,15 @@ const vectors = [
   { name: 'domain-mismatch', note: 'A genuine statement for another domain.', statement: st(good), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-lookalike.com', expect: { verdict: 'mismatch', signature: 'valid' } },
   { name: 'counts-disagree', note: 'Signed, but the signed counts contradict the signed checks.', statement: st(v2({ counts: { read: 3, as_expected: 3, not_as_expected: 0, not_read: 0, in_reading: 3 } })), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'mismatch', signature: 'valid' } },
   { name: 'malformed-signature', note: 'No algorithm prefix.', statement: { ...st(good), signature: st(good).signature.replace('ed25519:', '') }, keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'malformed' } },
+  { name: 'valid-v3', note: 'A v3 statement: RFC 8785 bytes, subject id and signer inside the signed bytes.', statement: st3(v3()), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'checked', signature: 'valid' } },
+  { name: 'v3-no-manifest-supplied', note: 'Not supplied is never reported as a match, in v3 either.', statement: st3(v3()), keys: KEYS, mapping: true, manifest: null, domain: 'acme-vectors.com', expect: { verdict: 'partially_checked', signature: 'valid' } },
+  { name: 'v3-not-canonical', note: 'Signed correctly, but the payload bytes are not the RFC 8785 form: refused before the signature is checked.', statement: st3(JSON.stringify(v3obj())), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'malformed' } },
+  { name: 'v3-fraction', note: 'A number written 2.0 is not canonical: the canonical text of the same value is 2.', statement: st3(v3().replace('"read":2}', '"read":2.0}')), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'malformed' } },
+  { name: 'v3-wrong-label', note: 'A v3 payload in an envelope that names the v2 canonicalization.', statement: st3(v3(), A, 'test-key-a', 'json-fixed-key-order-no-whitespace-utf8'), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'malformed' } },
+  { name: 'v3-signer-differs', note: 'The envelope names key A; the signed bytes name key B.', statement: st3(v3({ signerKid: 'test-key-b' })), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'malformed' } },
+  { name: 'v3-tampered', note: 'One outcome changed after signing.', statement: { ...st3(v3()), payload: v3().replace('"outcome":"as expected"', '"outcome":"not read"') }, keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'invalid' } },
+  { name: 'v3-subject-id-disagrees', note: 'Signed, but the stable id names another domain than the payload does.', statement: st3(v3({ subjectId: 'trooth:domain:acme-lookalike.com' })), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'mismatch', signature: 'valid' } },
+  { name: 'v3-domain-mismatch', note: 'A genuine v3 statement for another domain.', statement: st3(v3()), keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-lookalike.com', expect: { verdict: 'mismatch', signature: 'valid' } },
   { name: 'wrong-alg', note: 'A statement naming another algorithm is not checked as Ed25519.', statement: { ...st(good), alg: 'RS256' }, keys: KEYS, mapping: true, manifest: MANIFEST, domain: 'acme-vectors.com', expect: { verdict: 'signature_not_trusted', signature: 'malformed' } },
 ];
 
@@ -103,12 +129,29 @@ const doc = {
   other_mapping_file: 'mapping-test-other.json',
   vectors,
 };
-const text = JSON.stringify(doc, null, 2) + '\n';
-const target = new URL('vectors.json', here);
-if (process.argv.includes('--check')) {
-  if (readFileSync(target, 'utf8') !== text) { console.error('vectors.json differs from what generate.mjs builds'); process.exit(1); }
-  console.log(`vectors.json reproduces: ${vectors.length} cases`);
-} else {
-  writeFileSync(target, text);
-  console.log(`wrote vectors.json: ${vectors.length} cases`);
-}
+// Bundles: the same checks, carried in one portable file (docs/VERIFY.md section 7).
+const OTHER = readFileSync(new URL('mapping-test-other.json', here));
+const bundleOf = (statement, over = {}) => makeBundle({ domain: 'acme-vectors.com', statement, manifest: MANIFEST, keys: KEYS, keysReadAt: '2026-10-06T00:00:00.000Z', keysSource: 'https://api.trooth.co/public/keys', mappingUrl: MAPPING_URL, mappingBytes: MAPPING, createdAt: '2026-10-06T00:00:00.000Z', ...over });
+const bundles = [
+  { name: 'bundle-v3', note: 'Everything needed, in one file, checked with no network.', bundle: bundleOf(st3(v3())), expect: { verdict: 'checked', signature: 'valid' } },
+  { name: 'bundle-v2', note: 'A v2 statement in a bundle.', bundle: bundleOf(st(good)), expect: { verdict: 'checked', signature: 'valid' } },
+  { name: 'bundle-no-mapping', note: 'A bundle saved without the mapping bytes.', bundle: bundleOf(st3(v3()), { mappingBytes: undefined }), expect: { verdict: 'partially_checked', signature: 'valid' } },
+  { name: 'bundle-other-mapping', note: 'The bytes carried are not the mapping that was signed.', bundle: bundleOf(st3(v3()), { mappingBytes: OTHER }), expect: { verdict: 'mismatch', signature: 'valid' } },
+  { name: 'bundle-asked-other-domain', note: 'The reader asks about a different domain than the bundle names.', bundle: bundleOf(st3(v3())), domain: 'acme-lookalike.com', expect: { verdict: 'mismatch', signature: 'valid' } },
+  { name: 'bundle-compromised-key', note: 'The key list carried in the bundle marks the key compromised.', bundle: bundleOf(st3(v3()), { keys: [keyA({ status: 'compromised', compromised_at: '2026-10-02T00:00:00.000Z' }), keyB] }), expect: { verdict: 'signature_not_trusted', signature: 'valid' } },
+  { name: 'not-a-bundle', note: 'A document that is not a bundle is refused, not checked.', bundle: { bundle: 'something.else', statement: st(good) }, expect: { error: 'not_a_bundle' } },
+];
+
+const write = (file, value, count, what) => {
+  const text = JSON.stringify(value, null, 2) + '\n';
+  const target = new URL(file, here);
+  if (process.argv.includes('--check')) {
+    if (readFileSync(target, 'utf8') !== text) { console.error(`${file} differs from what generate.mjs builds`); process.exit(1); }
+    console.log(`${file} reproduces: ${count} ${what}`);
+  } else {
+    writeFileSync(target, text);
+    console.log(`wrote ${file}: ${count} ${what}`);
+  }
+};
+write('vectors.json', doc, vectors.length, 'cases');
+write('bundles.json', { description: 'Verification bundles (trooth.verification-bundle.v1) and the verdict each must reach when checked with no network. `domain`, when present, is the domain the reader asks about in place of the one the bundle names. The keys are the same test keys as vectors.json.', bundles }, bundles.length, 'bundles');
