@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { PINNED_LOG_VKEYS, PINNED_WITNESSES } from './log-trust.mjs';
 import { parseVkey } from './tlog.mjs';
 import { parseCosignerVkey } from './witness.mjs';
-import { parsePolicy as parsePolicyText, PolicyError, toolCovered, targetHosts, normalizeHost, normalizePolicy, hostOfValue } from './guard-policy.mjs';
+import { parsePolicy as parsePolicyText, PolicyError, toolCovered, targetHosts, normalizeHost, normalizePolicy, hostOfValue, asText } from './guard-policy.mjs';
 import { decideFrom, validateDecision, GUARD_DECISION_SCHEMA, REASON_CODES } from './guard-decide.mjs';
 import { gatherFacts, fetchBundle, writeCached, readCached, factsFromBundle, Unreachable } from './guard-evidence.mjs';
 
@@ -88,7 +88,7 @@ export function createGuard(opts = {}) {
     let a = args;
     if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = undefined; } }
     const names = a && typeof a === 'object' && !Array.isArray(a) ? Object.keys(a).slice(0, 64) : [];
-    const out = { tool: String(tool ?? ''), host: host ?? null, argument_names: names, stored: 'local only; never sent to Trooth' };
+    const out = { tool: asText(tool), host: host ?? null, argument_names: names, stored: 'local only; never sent to Trooth' };
     if (fields) out.host_fields = fields;
     return out;
   };
@@ -117,8 +117,8 @@ export function createGuard(opts = {}) {
   async function decide(input = {}) {
     const raw = input.host;
     if (raw === null || raw === undefined || raw === '') return decideInternal(input.tool, null, input.args, 'none');
-    const host = hostOfValue(String(raw)) ?? normalizeHost(String(raw));
-    if (!host) return decideInternal(input.tool, String(raw), input.args, 'non_record');
+    const host = hostOfValue(asText(raw)) ?? normalizeHost(asText(raw));
+    if (!host) return decideInternal(input.tool, asText(raw), input.args, 'non_record');
     return decideInternal(input.tool, host, input.args, 'ok');
   }
 

@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
 import { canonicalize, CanonicalizationError } from './jcs.mjs';
-import { parseYaml, YamlError } from './yaml-lite.mjs';
+import { parseYaml, YamlError, MAX_DEPTH } from './yaml-lite.mjs';
 import { PINNED_WITNESSES } from './log-trust.mjs';
 
 export class PolicyError extends Error {}
@@ -150,7 +150,9 @@ export function normalizePolicy(doc) {
       const p = `applies_to.http[${i}]`;
       if (!isObj(h)) throw new PolicyError(`${p} must be a mapping { method, host }.`);
       onlyKeys(h, ['method', 'host'], p);
-      const method = choice(String(h.method ?? '').toUpperCase(), `${p}.method`, HTTP_METHODS);
+      // A string only: String(["POST"]) is "POST", so a list would pass as a method.
+      if (typeof h.method !== 'string') throw new PolicyError(`${p}.method must be a string: an HTTP method or *.`);
+      const method = choice(h.method.toUpperCase(), `${p}.method`, HTTP_METHODS);
       http.push({ method, host: checkHostPattern(h.host, `${p}.host`) });
     });
   }
@@ -191,15 +193,26 @@ export function normalizePolicy(doc) {
   });
 }
 
-/** Parse a policy from YAML-subset or JSON text. Throws PolicyError. */
+/** Parse a policy from YAML-subset or JSON text. Throws PolicyError, and no other error. */
 export function parsePolicy(text, format) {
+  try { return parsePolicyText(text, format); }
+  catch (e) {
+    if (e instanceof PolicyError) throw e;
+    // A backstop: whatever else a malformed file could raise (an exhausted stack)
+    // is reported as the policy error it is.
+    throw new PolicyError(`the policy could not be read: ${e && e.message ? e.message : e}`);
+  }
+}
+
+function parsePolicyText(text, format) {
   if (typeof text !== 'string') throw new PolicyError('the policy is not text.');
   const fmt = format ?? (/^\s*[{]/.test(text) ? 'json' : 'yaml');
   if (fmt !== 'json' && fmt !== 'yaml') throw new PolicyError(`unknown policy format ${format}; use yaml or json.`);
   let doc;
   if (fmt === 'json') {
     try { doc = JSON.parse(text); } catch (e) { throw new PolicyError(`the policy is not valid JSON: ${e.message}`); }
-    // A duplicate key in JSON silently keeps the last value; refuse it.
+    // A duplicate key in JSON silently keeps the last value; refuse it. The same
+    // scan refuses nesting deeper than any policy needs, before anything recurses.
     const dupe = findJsonDuplicate(text);
     if (dupe) throw new PolicyError(`the policy JSON names the key "${dupe}" twice in one object.`);
     if (!jsonIntegersOnly(doc)) throw new PolicyError('the policy JSON holds a number that is not a whole number.');
@@ -237,6 +250,7 @@ function findJsonDuplicate(text) {
       i = j + 1;
       continue;
     }
+    if ((ch === '{' || ch === '[') && stack.length >= MAX_DEPTH) throw new PolicyError(`the policy JSON is nested deeper than ${MAX_DEPTH} levels.`);
     if (ch === '{') { stack.push({ type: 'obj', keys: new Set() }); expectKey = true; }
     else if (ch === '[') { stack.push({ type: 'arr' }); }
     else if (ch === '}' || ch === ']') { stack.pop(); expectKey = false; }
@@ -253,6 +267,13 @@ function globRe(pattern) {
 }
 const fold = (s) => String(s).normalize('NFKC').toLowerCase();
 
+/** A caller's value as text, without ever throwing (an object with no prototype has no String form). */
+export function asText(v) {
+  if (typeof v === 'string') return v;
+  if (v === null || v === undefined) return '';
+  try { return String(v); } catch { return ''; }
+}
+
 /**
  * Whether a tool call is covered. A name matches a pattern exactly, with "*"
  * standing for any run of characters. To fail toward checking, a name is
@@ -262,7 +283,7 @@ const fold = (s) => String(s).normalize('NFKC').toLowerCase();
  * because a look-alike letter cannot be told apart from the real one by rule.
  */
 export function toolCovered(policy, toolName) {
-  const name = String(toolName ?? '');
+  const name = asText(toolName);
   const tools = policy.applies_to.tools;
   if (!tools.length) return false;
   if (tools.some((p) => globRe(p).test(name))) return true;

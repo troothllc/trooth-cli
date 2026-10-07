@@ -1,0 +1,13 @@
+# Trooth-run pilot policy: data-export agent, live Trooth API
+policy: pilot-data-export
+version: 1
+applies_to:
+  tools: ["export_dataset", "mcp__exporter__*"]
+host_from: ["destination_url", "url", "endpoint", "to"]
+log: { required: true, min_witnesses: 0 }
+rules:
+  - id: signed-reading
+    require: { claim: trooth_reading }
+    on_fail: hold
+unknown_counterparty: hold
+source_unreachable: hold

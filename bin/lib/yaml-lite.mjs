@@ -25,6 +25,9 @@ export class YamlError extends Error {
 }
 
 const INT = /^[-+]?(0|[1-9][0-9]*)$/;
+/** The deepest nesting a policy may use. A policy needs four levels; the limit keeps a
+ *  deeply nested file from exhausting the stack (tests/guard-fuzz.test.mjs). */
+export const MAX_DEPTH = 64;
 const FLOATISH = /^[-+]?(\.[0-9]+|[0-9]+\.[0-9]*|[0-9]+(\.[0-9]*)?[eE][-+]?[0-9]+|\.inf|\.Inf|\.INF|\.nan|\.NaN|\.NAN)$/;
 
 /** Strip a comment: a # at the start or after whitespace, outside quotes. */
@@ -87,7 +90,7 @@ function scalar(raw, lineNo, inFlow = false) {
 }
 
 /** Parse one flow collection that sits wholly on one line. */
-function flow(text, lineNo) {
+function flow(text, lineNo, outer = 0) {
   let i = 0;
   const ws = () => { while (i < text.length && /\s/.test(text[i])) i++; };
   const fail = (m) => { throw new YamlError(m, lineNo); };
@@ -111,10 +114,12 @@ function flow(text, lineNo) {
     }
     return scalar(text.slice(start, i), lineNo, true);
   }
+  let depth = outer;
+  const deeper = () => { if (++depth > MAX_DEPTH) fail(`a flow collection nested deeper than ${MAX_DEPTH} levels`); };
   function value(stops) {
     ws();
-    if (text[i] === '[') return list();
-    if (text[i] === '{') return map();
+    if (text[i] === '[') { deeper(); const v = list(); depth--; return v; }
+    if (text[i] === '{') { deeper(); const v = map(); depth--; return v; }
     if (text[i] === '"' || text[i] === "'") return quoted();
     return plain(stops);
   }
@@ -165,9 +170,9 @@ function flow(text, lineNo) {
   return v;
 }
 
-function valueOf(rest, lineNo) {
+function valueOf(rest, lineNo, depth = 0) {
   const s = rest.trim();
-  if (s[0] === '[' || s[0] === '{') return flow(s, lineNo);
+  if (s[0] === '[' || s[0] === '{') return flow(s, lineNo, depth);
   return scalar(s, lineNo);
 }
 
@@ -198,20 +203,21 @@ export function parseYaml(text) {
   if (!lines.length) throw new YamlError('the policy is empty');
   let pos = 0;
 
-  function block(indent) {
+  function block(indent, depth = 0) {
+    if (depth > MAX_DEPTH) throw new YamlError(`the policy is nested deeper than ${MAX_DEPTH} levels`, lines[pos].lineNo);
     const first = lines[pos];
     if (first.indent !== indent) throw new YamlError('unexpected indentation', first.lineNo);
-    if (first.text === '-' || first.text.startsWith('- ')) return seq(indent);
+    if (first.text === '-' || first.text.startsWith('- ')) return seq(indent, depth);
     if (first.text[0] === '[' || first.text[0] === '{') {
       pos++;
-      const v = flow(first.text, first.lineNo);
+      const v = flow(first.text, first.lineNo, depth);
       if (pos < lines.length && lines[pos].indent >= indent && indent > 0) throw new YamlError('a flow collection that spans lines is not accepted', lines[pos].lineNo);
       return v;
     }
-    return map(indent);
+    return map(indent, depth);
   }
 
-  function seq(indent) {
+  function seq(indent, depth) {
     const out = [];
     while (pos < lines.length && lines[pos].indent === indent && (lines[pos].text === '-' || lines[pos].text.startsWith('- '))) {
       const l = lines[pos];
@@ -219,7 +225,7 @@ export function parseYaml(text) {
       const restTrim = rest.replace(/^ +/, '');
       if (restTrim === '') {
         pos++;
-        if (pos < lines.length && lines[pos].indent > indent) out.push(block(lines[pos].indent));
+        if (pos < lines.length && lines[pos].indent > indent) out.push(block(lines[pos].indent, depth + 1));
         else out.push(null);
         continue;
       }
@@ -227,10 +233,10 @@ export function parseYaml(text) {
       if (KEY.test(restTrim) || restTrim.startsWith('- ') || restTrim === '-') {
         // "- key: value": the item is a mapping (or a list) whose first line starts after the dash.
         lines[pos] = { indent: inner, text: restTrim, lineNo: l.lineNo };
-        out.push(block(inner));
+        out.push(block(inner, depth + 1));
       } else {
         pos++;
-        out.push(valueOf(restTrim, l.lineNo));
+        out.push(valueOf(restTrim, l.lineNo, depth + 1));
         if (pos < lines.length && lines[pos].indent > indent) throw new YamlError('unexpected indentation after a list item', lines[pos].lineNo);
       }
     }
@@ -238,7 +244,7 @@ export function parseYaml(text) {
     return out;
   }
 
-  function map(indent) {
+  function map(indent, depth) {
     const out = {};
     while (pos < lines.length && lines[pos].indent === indent) {
       const l = lines[pos];
@@ -254,11 +260,11 @@ export function parseYaml(text) {
       pos++;
       const rest = m[4];
       if (rest === undefined || rest.trim() === '') {
-        if (pos < lines.length && lines[pos].indent > indent) out[key] = block(lines[pos].indent);
-        else if (pos < lines.length && lines[pos].indent === indent && (lines[pos].text === '-' || lines[pos].text.startsWith('- '))) out[key] = seq(indent);
+        if (pos < lines.length && lines[pos].indent > indent) out[key] = block(lines[pos].indent, depth + 1);
+        else if (pos < lines.length && lines[pos].indent === indent && (lines[pos].text === '-' || lines[pos].text.startsWith('- '))) out[key] = seq(indent, depth + 1);
         else out[key] = null;
       } else {
-        out[key] = valueOf(rest, l.lineNo);
+        out[key] = valueOf(rest, l.lineNo, depth + 1);
         if (pos < lines.length && lines[pos].indent > indent) throw new YamlError(`unexpected indentation after "${key}: ${rest.trim()}"`, lines[pos].lineNo);
       }
     }

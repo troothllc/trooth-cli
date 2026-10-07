@@ -137,7 +137,22 @@ Reason `detail` strings are written by the guard. A value taken from a served do
 
 ## 7. CI mode
 
-`trooth guard ci --policy <file> [--base <ref>] [paths...]` reads the lines a change adds (`git diff --unified=0 <base>...HEAD`, default base `origin/main`) or the given files, and finds the external hosts they name: http and https URLs anywhere, and bare host names written as a quoted string or a config value (`key: host`, `KEY=host`). It skips prose files (Markdown, text, licenses, changelogs), IP addresses, `localhost` and the reserved example names (`example.com`, `.test`, `.example`, `.invalid`, `.localhost`). Each host not in `destinations.allowed` is printed with `file:line`, and the command exits 22. When the policy lists `destinations.watch`, only hosts a watch pattern covers are reported; with no watch list, every new external host that is not allowed is reported. It reads no network.
+`trooth guard ci --policy <file> [--base <ref>] [paths...]` reads the lines a change adds (`git diff --unified=0 <base>...HEAD`, default base `origin/main`) or the given files, and finds the destinations they name. Each destination not in `destinations.allowed` is printed with `file:line`, and the command exits 22. When the policy lists `destinations.watch`, only hosts a watch pattern covers are reported; with no watch list, every new destination that is not allowed is reported. It reads no network.
+
+What counts as a destination, since trooth 0.15.0:
+
+1. The host of an `http`, `https`, `ws` or `wss` URL, anywhere in a code or config file, always, whatever its top-level domain. A URL built from a template (`${host}`, `{{ host }}`, `%s`) is skipped, because its host is not in the text.
+2. A bare host name only when all of these hold:
+   - it is the whole value of a host-like key or argument: one whose name, or the last word of whose name, is `host`, `hostname`, `domain`, `endpoint`, `url`, `base_url` (or `baseURL`), `origin`, `webhook`, `to`, `from`, `redirect`, `server` or `api` (so `API_HOST`, `webhook_host`, `baseURL` and `apiServer` count), written as `key: value` in YAML, `"key": "value"` in JSON, `key = "value"` in TOML, `KEY=value` in a .env file, `key: "value"` in a JavaScript object literal or `--key value` on a command line;
+   - in source code (JavaScript, TypeScript, Python and the other languages listed in bin/lib/guard-ci.mjs), the value is quoted, since an unquoted value there is an expression such as `to: msg.to`;
+   - it is written in lowercase letters, digits, dots and hyphens only, with at least two labels: a value with an uppercase letter (camelCase) or an underscore is an identifier, not a host;
+   - its last label is in the curated list of public suffixes kept in bin/lib/guard-ci.mjs (`PUBLIC_SUFFIXES`: the generic and country-code top-level domains most used by services, such as com, net, org, io, co, ai, dev, app, cloud, us, uk, de and jp). The list leaves out real top-level domains that are also common words at the end of keys and property paths, such as name, link, open, next, email and host.
+
+A quoted dotted string on its own is not a destination. Before 0.15.0 any quoted dotted string whose last label looked like a top-level domain counted, and on the trooth.co repository that reported 323 i18n keys and dotted identifiers (`"page.docs.cli.guardTitle"`, `"lib.changelog.e2026.name"`, `"x.open"`) as hosts.
+
+Never reported: anything in a prose file (Markdown, reStructuredText, AsciiDoc, text, SVG, lock files, licenses, changelogs), where a link is documentation, not a destination; IP literals; `localhost`; and the reserved names `example.com`, `example.net`, `example.org`, `.test`, `.example`, `.invalid`, `.localhost`, `.local`, `.internal` and `home.arpa`.
+
+What it misses: a host assembled at run time, a host under a key with another name (`const VENDOR = "api.vendor.io"`), and a bare host whose top-level domain is not in the list. A URL is always found, so writing destinations as URLs keeps them in view.
 
 ## 8. The Claude Code hook
 
@@ -160,7 +175,9 @@ tests/guard-adversarial.test.mjs runs attacks on the guard in the style of Agent
 
 tests/guard-model.test.mjs enumerates every combination of the abstract decision inputs and checks the decision against an independent statement of the table and the invariants. spec/GuardDecision.tla states the same table and invariants for TLC, with spec/GuardDecision.cfg.
 
-docs/GUARD-RESULTS.md holds the counts from an actual run, written by `node scripts/guard-results.mjs --tlc <tla2tools.jar>`. All of these run in `npm test` except TLC.
+tests/guard-fuzz.test.mjs (since 0.15.0) is property-based testing with a seeded generator and no dependency: mutated and truncated policies, random bytes, deep nesting, huge strings and numbers, Unicode look-alikes and prototype keys through parsePolicy (each must give a policy inside schemas/guard-policy.v1.schema.json or a PolicyError, within a per-case time bound); random facts through decideFrom and random cached bundles through factsFromBundle (allow never occurs unless every required check held, the invariants of the model check); an offline guard with no cache (never allow); and the hook (exit 0 or 2 only). It runs about 80,000 cases in under 20 seconds with a fixed seed; `TROOTH_FUZZ_SEED=<n>` runs another sequence. It found four defects, fixed in 0.15.0.
+
+docs/GUARD-RESULTS.md holds the counts from an actual run, written by `node scripts/guard-results.mjs --tlc <tla2tools.jar>`. All of these run in `npm test` except TLC. docs/GUARD-THREAT-MODEL.md maps each threat to the code that answers it and the tests that cover it. .github/workflows/codeql.yml runs GitHub CodeQL over the JavaScript and the Python on every push and pull request and weekly. .github/workflows/guard-pilots.yml runs the pilots in pilots/ every night against the latest releases of the agent frameworks.
 
 ## 10. Adapters
 
@@ -198,10 +215,16 @@ Duck-typed adapters that import no framework package (documented with their code
 
 20, 21 and 22 are outside the CLI's existing table (0 to 11).
 
-## 13. Phase 4 exit conditions, and where they stand
+## 13. Phase 4 exit, as amended on 2026-10-07
+
+The brief set three exit conditions for Phase 4: open source under a permissive license, an outside security review, and use in production by at least three teams outside Trooth. On 2026-10-07 the founder decided to keep the guard confidential to Trooth until launch, and so amended the two conditions that need people outside Trooth. The amended conditions, and where they stand:
 
 | Condition | Status |
 |---|---|
 | Open source under a permissive license | Done: this repository is under the Apache License, Version 2.0. |
-| Passed an outside security review | OPEN. No outside review has been done. |
-| Used in production by at least three teams outside Trooth | OPEN. No outside team uses it in production today. |
+| In place of an outside security review before launch: an internal review gate | In place: separate internal review passes, property-based fuzzing (tests/guard-fuzz.test.mjs, in `npm test`), GitHub CodeQL on every push and pull request and weekly (.github/workflows/codeql.yml), and a threat model with its residual risks (docs/GUARD-THREAT-MODEL.md). |
+| In place of three outside teams in production before launch: Trooth as the first production user | In place: the code-change check (`trooth guard ci`) on every trooth.co change, the Claude Code hook (`trooth guard hook`) in Trooth's own development (.claude/settings.json and .trooth/guard-policy.yaml in this repository), and the pilots run every night against the latest framework releases (.github/workflows/guard-pilots.yml, pilots/). |
+| An outside security review | Moved to the launch phase. No outside party has reviewed the guard. |
+| Use in production by teams outside Trooth | Moved to the launch phase. No team outside Trooth uses the guard in production. |
+
+The internal gate and Trooth's own use are not an outside review and not outside adoption, and nothing here says they are. They are what stands before launch, by the founder's decision for confidentiality; the outside review and outside production use are launch-phase work.

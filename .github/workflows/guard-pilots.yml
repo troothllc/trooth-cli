@@ -1,0 +1,76 @@
+name: Guard pilots
+
+# Continuous pilots (docs/GUARD.md section on the exit condition,
+# docs/GUARD-PILOTS.md): every night, install the LATEST published releases of
+# the agent frameworks the guard adapters target, and run the Trooth-run pilots
+# in pilots/ against them, with the guard taken from this commit. The point is
+# to catch a framework release that changes behavior the adapters rely on.
+#
+#   fixture pilots  a local server with keys generated for the run: every step
+#                   must pass (allow, hold with approval, deny for a spoofed
+#                   subject, a revoked key and a forged log proof)
+#   live pilots     https://trooth.co and https://api.trooth.co: an unknown
+#                   domain must hold; trooth.co under a policy with
+#                   min_witnesses 0 must allow
+#
+# Any failed step fails the workflow. The logs are uploaded either way.
+# Actions are pinned by full commit SHA, with the release tag in a comment.
+
+on:
+  schedule:
+    - cron: "41 5 * * *"   # nightly, 05:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilots:
+    name: Pilots against the latest framework releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # The guard's own one dependency, from the lock, as CI installs it.
+      - name: trooth from this commit
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # Latest releases on purpose: no lock file, no version ranges.
+      - name: Latest JavaScript framework releases
+        working-directory: pilots/js
+        run: |
+          npm install --no-save --no-audit --no-fund --no-package-lock --ignore-scripts \
+            @openai/agents@latest @langchain/langgraph@latest langchain@latest @langchain/core@latest zod@latest
+          for p in @openai/agents @langchain/langgraph langchain @langchain/core zod; do
+            echo "$p $(node -p "require('./node_modules/$p/package.json').version")"
+          done
+
+      - name: Latest Python framework releases
+        run: |
+          python -m venv pilots/py/.venv
+          pilots/py/.venv/bin/python -m pip install --upgrade pip
+          pilots/py/.venv/bin/python -m pip install --upgrade openai-agents crewai langgraph langchain-core
+          pilots/py/.venv/bin/python -m pip list | grep -iE '^(openai-agents|openai|crewai|langgraph|langchain-core) '
+
+      - name: Run the pilots
+        env:
+          PYTHON: ${{ github.workspace }}/pilots/py/.venv/bin/python
+        run: pilots/run.sh
+
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: guard-pilot-logs-${{ github.run_id }}
+          path: pilots/logs/
+          if-no-files-found: error
+          retention-days: 30

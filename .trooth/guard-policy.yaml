@@ -1,0 +1,30 @@
+# The Trooth guard policy for this repository's own Claude Code sessions
+# (.claude/settings.json runs `trooth guard hook` with it before a covered tool).
+# It covers consequential tools only: sending a message or an email, writing to
+# Stripe, buying through Vercel. Reading tools, WebFetch included, are not
+# covered, so they run as Claude Code's own permissions allow.
+policy: trooth-cli-claude-code
+version: 1
+description: "Consequential agent actions in the trooth-cli repository"
+applies_to:
+  tools:
+    - "mcp__*send*"
+    - "mcp__*Gmail__send_message"
+    - "mcp__*Resend__send*"
+    - "mcp__*Stripe__*write*"
+    - "mcp__*Vercel__buy*"
+# min_witnesses is 0 because the witness network has not yet added Trooth's
+# log, so no pinned witness cosigns its checkpoints today. The log inclusion
+# proof is still required and still checked; raise this to 1 when a pinned
+# witness cosigns.
+log: { required: true, min_witnesses: 0 }
+rules:
+  - id: signed-reading
+    require: { claim: trooth_reading, max_age_days: 30 }
+    on_fail: hold
+  - id: no-compromised-keys
+    require: { signature: valid, key_status: [active, retired_before_use] }
+    on_fail: deny
+    absolute: true
+unknown_counterparty: hold
+source_unreachable: hold

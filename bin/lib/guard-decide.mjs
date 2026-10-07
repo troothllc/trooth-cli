@@ -57,6 +57,14 @@ export function claimState(rule, claim, now) {
   return { state: 'present', limit };
 }
 
+/** A claim the decision can cite: the fields its evidence entry carries, with their types. */
+function wellFormedClaim(c) {
+  return !!c && typeof c === 'object' && !Array.isArray(c)
+    && typeof c.fact_id === 'string' && typeof c.statement_sha256 === 'string' && typeof c.observed_at === 'string'
+    && (c.log_index === undefined || c.log_index === null || Number.isSafeInteger(c.log_index))
+    && (c.stale_after === undefined || c.stale_after === null || typeof c.stale_after === 'string');
+}
+
 function evidenceOf(claim, limit) {
   return { fact_id: claim.fact_id, statement_sha256: claim.statement_sha256, log_index: claim.log_index ?? null, observed_at: claim.observed_at, stale_after: limit === null ? (claim.stale_after ?? null) : iso(limit) };
 }
@@ -64,49 +72,53 @@ function evidenceOf(claim, limit) {
 /** The decision for these facts under this policy. Pure. */
 export function decideFrom(facts, policy) {
   const f = facts;
-  const d = f.detail || {};
+  const d = f.detail && typeof f.detail === 'object' ? f.detail : {};
   const reasons = [];
   const evidence = [];
   const finish = (decision) => {
     const out = {
       decision,
       reasons,
-      subject: f.subject || '',
+      subject: typeof f.subject === 'string' ? f.subject : '',
       policy: { id: policy.id, version: policy.version, sha256: policy.sha256 },
       evidence,
       decided_at: iso(f.now),
     };
-    if (f.action) out.action = f.action;
+    if (f.action && typeof f.action === 'object' && !Array.isArray(f.action)) out.action = f.action;
     const errs = validateDecision(out);
     if (errs.length) throw new Error(`the guard produced a decision outside its schema: ${errs.join('; ')}`);
     return out;
   };
   const why = (code, detail, extra = {}) => { const r = { code, ...extra }; if (detail) r.detail = String(detail); reasons.push(r); };
 
-  // 0. Which host. No typed argument names one: nothing to look up.
-  if (f.target === 'none' || f.target === 'ambiguous' || (!f.host && f.target !== 'non_record')) {
+  // 0. Which host. No typed argument names one: nothing to look up. A target
+  // that is not one of the four known values counts as no host.
+  if ((f.target !== 'ok' && f.target !== 'non_record') || (f.target === 'ok' && (typeof f.host !== 'string' || !f.host))) {
     why('EVIDENCE_MISSING', f.target === 'ambiguous' ? 'the typed arguments name more than one host, or a host field holds a value the guard cannot read as one host' : 'no typed argument names the host this action is about', { needed: 'target_host' });
     return finish('hold');
   }
   // 1. No source reachable and nothing cached: never fail open.
-  if (f.target !== 'non_record' && f.source === 'unreachable') {
+  if (f.target !== 'non_record' && f.source !== 'network' && f.source !== 'cache') {
     why('SOURCE_UNREACHABLE', d.source || 'no Trooth source answered and no cached bundle is held');
     return finish(policy.source_unreachable === 'deny' ? 'deny' : 'hold');
   }
+  // Facts are read strictly: a field that is not exactly the value that shows the
+  // evidence (true, a number of witnesses, an own claim) counts as the evidence
+  // missing, so a malformed facts object can never pass as a complete one.
   // 2. No record for the host or any parent.
-  if (f.target === 'non_record' || !f.record) {
+  if (f.target === 'non_record' || f.record !== true) {
     why('NO_RECORD', f.target === 'non_record' ? 'an IP address, localhost or single-label name has no Trooth record' : (d.record || 'no Trooth record for the host or a parent domain of it'));
     return finish(policy.unknown_counterparty === 'deny' ? 'deny' : 'hold');
   }
   // 3. A version this guard does not read.
-  if (!f.schema_supported) {
+  if (f.schema_supported !== true) {
     why('SCHEMA_UNSUPPORTED', d.schema || 'a signed artifact is in a version this guard does not read');
     return finish('hold');
   }
   // 4. Failed proof: the signature, the key at signing time, the subject.
   if (f.signature === 'invalid') why('SIGNATURE_INVALID', d.signature);
   if (f.signature !== 'absent' && !TRUSTED.includes(f.key_status)) why('KEY_NOT_TRUSTED', d.key || `the signing key is ${f.key_status}`);
-  if (!f.subject_match) why('SUBJECT_MISMATCH', d.subject || 'a signed subject is not the host or a parent domain of it');
+  if (f.subject_match !== true) why('SUBJECT_MISMATCH', d.subject || 'a signed subject is not the host or a parent domain of it');
   if (reasons.length) return finish('deny');
   // 5. The log.
   let held = false;
@@ -114,7 +126,7 @@ export function decideFrom(facts, policy) {
     if (f.log === 'proof_invalid') { why('NOT_IN_LOG', d.log || 'the log proof does not check'); return finish('deny'); }
     if (policy.log.required) {
       if (f.log !== 'included') { why('NOT_IN_LOG', d.log || (f.log === 'unavailable' ? 'the log could not be read' : 'the statement is not in the log')); held = true; }
-      else if (f.witnesses < policy.log.min_witnesses) { why('NOT_IN_LOG', `${f.witnesses} pinned witness${f.witnesses === 1 ? '' : 'es'} cosigned a checkpoint covering the statement; the policy asks for ${policy.log.min_witnesses}`); held = true; }
+      else if (!(typeof f.witnesses === 'number' && f.witnesses >= policy.log.min_witnesses)) { why('NOT_IN_LOG', typeof f.witnesses === 'number' ? `${f.witnesses} pinned witness${f.witnesses === 1 ? '' : 'es'} cosigned a checkpoint covering the statement; the policy asks for ${policy.log.min_witnesses}` : `the number of pinned witnesses that cosigned is not known; the policy asks for ${policy.log.min_witnesses}`); held = true; }
     }
   }
   // 6. Each rule.
@@ -124,7 +136,7 @@ export function decideFrom(facts, policy) {
     if (rule.require.claim) {
       const name = rule.require.claim;
       // A claim stands only on a valid signature: with none, every claim is missing.
-      const claim = f.signature === 'valid' && f.claims ? f.claims[name] : undefined;
+      const claim = f.signature === 'valid' && f.claims && typeof f.claims === 'object' && Object.prototype.hasOwnProperty.call(f.claims, name) && wellFormedClaim(f.claims[name]) ? f.claims[name] : undefined;
       const st = claimState(rule, claim, f.now);
       if (claim) { factId = claim.fact_id; evidence.push(evidenceOf(claim, st.limit)); }
       if (st.state === 'missing') { failCode = 'EVIDENCE_MISSING'; needed = name; failDetail = (d.claims && d.claims[name]) || `no signed, logged claim ${name}`; }
@@ -163,7 +175,12 @@ export function validateDecision(d) {
   if (typeof d.subject !== 'string') errs.push('subject is not a string');
   if (!isObj(d.policy) || !['id', 'version', 'sha256'].every((k) => k in d.policy)) errs.push('policy lacks id, version or sha256');
   if (!Array.isArray(d.evidence)) errs.push('evidence is not a list');
-  else d.evidence.forEach((e, i) => { if (!isObj(e) || !['fact_id', 'statement_sha256', 'log_index', 'observed_at', 'stale_after'].every((k) => k in e)) errs.push(`evidence[${i}] lacks a required field`); });
+  else d.evidence.forEach((e, i) => {
+    if (!isObj(e) || !['fact_id', 'statement_sha256', 'log_index', 'observed_at', 'stale_after'].every((k) => k in e)) { errs.push(`evidence[${i}] lacks a required field`); return; }
+    if (typeof e.fact_id !== 'string' || typeof e.statement_sha256 !== 'string' || typeof e.observed_at !== 'string') errs.push(`evidence[${i}] has a field that is not a string`);
+    if (e.log_index !== null && !Number.isInteger(e.log_index)) errs.push(`evidence[${i}].log_index is not an integer or null`);
+    if (e.stale_after !== null && typeof e.stale_after !== 'string') errs.push(`evidence[${i}].stale_after is not a string or null`);
+  });
   if ('action' in d && !isObj(d.action)) errs.push('action is not an object');
   if (typeof d.decided_at !== 'string' || !Number.isFinite(Date.parse(d.decided_at))) errs.push('decided_at is not a date-time');
   if (Array.isArray(d.reasons) && d.decision === 'allow' && (!d.reasons.length || d.reasons.some((r) => r.code !== 'RULE_PASSED'))) errs.push('an allow carries a reason other than RULE_PASSED');

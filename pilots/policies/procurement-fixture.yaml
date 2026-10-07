@@ -1,0 +1,20 @@
+# Trooth-run pilot policy: procurement agent, local fixture server (keys generated for the run)
+policy: pilot-procurement-fixture
+version: 1
+applies_to:
+  tools: ["create_purchase_order"]
+host_from: ["vendor_url", "url", "domain"]
+log: { required: true, min_witnesses: 1 }
+rules:
+  - id: legal-entity
+    require: { claim: legal_entity_registry_record, max_age_days: 365 }
+    on_fail: hold
+  - id: no-sanctions-match
+    require: { claim: no_sanctions_name_match, max_age_days: 7 }
+    on_fail: hold
+  - id: no-compromised-keys
+    require: { signature: valid, key_status: [active, retired_before_use] }
+    on_fail: deny
+    absolute: true
+unknown_counterparty: hold
+source_unreachable: hold

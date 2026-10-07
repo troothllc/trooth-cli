@@ -175,5 +175,5 @@ def create_payout(url: str, amount: int) -> str: ...
 
 ## What is open
 
-- The adapters were tested against fakes in the shapes the documentation above describes (`tests/guard-adapters.test.mjs`, `sdk/python/tests/test_guard.py`), not against the framework packages themselves. Running each against its framework in a real agent is open.
-- No team uses these adapters in production yet.
+- In `npm test` the adapters are tested against fakes in the shapes the documentation above describes (`tests/guard-adapters.test.mjs`, `sdk/python/tests/test_guard.py`). Against the framework packages themselves they are tested by the Trooth-run pilots in pilots/ (docs/GUARD-PILOTS.md), which .github/workflows/guard-pilots.yml runs every night against the latest framework releases.
+- No team outside Trooth uses these adapters in production yet; that is a launch-phase item (GUARD.md section 13).
