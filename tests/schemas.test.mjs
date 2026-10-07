@@ -20,9 +20,11 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 14);
+  assert.equal(Object.keys(schemas).length, 16);
+  // The guard decision keeps the $id the brief published for it (docs/GUARD.md).
+  const publishedIds = { 'guard-decision.v1.schema.json': 'https://trooth.co/schemas/guard-decision.v1.json' };
   for (const [f, s] of Object.entries(schemas)) {
-    assert.equal(s.$id, `https://trooth.co/schemas/${f}`);
+    assert.equal(s.$id, publishedIds[f] ?? `https://trooth.co/schemas/${f}`);
     assert.equal(s.$schema, 'https://json-schema.org/draft/2020-12/schema');
     assert.ok(s.title && s.description, `${f} has a title and a description`);
   }
@@ -176,4 +178,36 @@ test('the subjects a reading names are Trooth ids (docs/IDS.md 1.3)', () => {
   assert.deepEqual(parseId(m.subject_id), { type: 'mcp', value: 'api.trooth.co/public/mcp' });
   assert.equal(formatId('registry', 'US-NY:4986044'), 'trooth:registry:US-NY:4986044');
   assert.equal(parseId('trooth:repo:github.com/Troothllc'), null);
+});
+
+test('the Phase 3 public record fields validate, and values outside their enums do not (docs/EVIDENCE.md section 10)', () => {
+  const r = JSON.parse(readFileSync(new URL('./fixtures/public-record/nvidia.com.json', import.meta.url), 'utf8'));
+  const days = { regulator_filing: 90, registry_record: 365, sanctions_list: 7, procurement_exclusion: 7, domain_registration: 30, dns_configuration: 2, certificate_transparency: 7, site_publication: 30, patent_record: 90, merger_review: 30 };
+  const p3 = {
+    ...r,
+    bindings: r.bindings.map((b, i) => ({ ...b, proof_method: i ? 'registry_name_match' : 'regulator_filing' })),
+    evidence_classes: Object.entries(days).map(([c, d]) => ({ class: c, sections: ['sec'], stale_after_days: d, does_not_establish: 'One sentence.', read: c !== 'patent_record', observed_at: c !== 'patent_record' ? r.read_at : null, stale_after: c !== 'patent_record' ? r.read_at : null })),
+    continuity: { previous: { read_at: r.read_at, record_sha256: 'a'.repeat(64) }, events: [{ kind: 'entity_changed', detail: 'now ties to another entity; kept apart.' }] },
+    subjects: [...r.subjects, { id: 'trooth:contact:mailto:psirt@nvidia.com', kind: 'representative', basis: 'a contact the site publishes in security.txt; not a person authorized to act for the entity' }, { id: 'trooth:key:trooth-master-2026-09', kind: 'signing_authority', basis: "the key that signed this reading's statement" }],
+  };
+  ok('public-record.v1.schema.json', p3, 'a reading with the Phase 3 fields');
+  ok('public-record.v1.schema.json', { ...p3, continuity: { previous: null, events: [] } }, 'a first reading');
+  const bad = (v, label) => assert.notDeepEqual(validate('public-record.v1.schema.json', v), [], label);
+  bad({ ...p3, bindings: [{ ...p3.bindings[0], proof_method: 'trusted' }] }, 'an unknown proof method');
+  bad({ ...p3, evidence_classes: [{ ...p3.evidence_classes[0], class: 'rating' }] }, 'an unknown evidence class');
+  bad({ ...p3, continuity: { previous: null, events: [{ kind: 'merged', detail: 'x' }] } }, 'an unknown continuity kind');
+  bad({ ...p3, subjects: [{ id: 'trooth:contact:x.example', kind: 'officer', basis: 'x' }] }, 'an unknown subject kind');
+});
+
+test('contact ids: security.txt contacts in canonical form (docs/IDS.md 1.4)', () => {
+  assert.equal(formatId('contact', 'mailto:Security@Example.COM?subject=x'), 'trooth:contact:mailto:Security@example.com');
+  assert.equal(formatId('contact', 'https://Example.com/Report/?a=1#b'), 'trooth:contact:example.com/Report');
+  assert.equal(formatId('contact', 'security.apple.com'), 'trooth:contact:security.apple.com');
+  assert.deepEqual(parseId('trooth:contact:mailto:product-security@apple.com'), { type: 'contact', value: 'mailto:product-security@apple.com' });
+  assert.deepEqual(parseId('trooth:contact:security.apple.com/report'), { type: 'contact', value: 'security.apple.com/report' });
+  for (const bad of ['trooth:contact:mailto:a@Example.com', 'trooth:contact:mailto:a@localhost', 'trooth:contact:Security.apple.com', 'trooth:contact:example.com/a?b=1', 'trooth:contact:example.com/a#b', 'trooth:contact:https://example.com', 'trooth:contact:tel:+15550100', 'trooth:contact:mailto:a b@example.com']) assert.equal(parseId(bad), null, bad);
+  for (const bad of ['http://example.com/report', 'tel:+15550100', 'mailto:a@b', 'https://user:pw@example.com/x']) assert.throws(() => formatId('contact', bad), bad);
+  assert.equal(parseId(`trooth:contact:${'a'.repeat(490)}.example.com`), null, 'longer than 500 characters');
+  const r = { subjects: [{ id: 'trooth:contact:mailto:psirt@widget.example', kind: 'representative', basis: 'a contact the site publishes in security.txt; not a person authorized to act for the entity' }, { id: 'trooth:key:trooth-master-2026-09', kind: 'signing_authority', basis: "the key that signed this reading's statement" }] };
+  for (const s of r.subjects) assert.ok(parseId(s.id), s.id);
 });

@@ -2,6 +2,18 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.13.0 (2026-10-07)
+
+### The guard: an open pre-execution check for consequential agent actions
+
+- New `trooth/guard` library and `trooth guard` command (docs/GUARD.md). It runs inside the customer's agent. Before a consequential tool call (a payment, a contract signature, sending data out, installing an MCP server), it looks up the counterparty's domain, checks Trooth's signed records locally (RFC 8785 bytes, Ed25519 signature, the key's status at signing time, log inclusion against the pinned log key, cosignatures by pinned witnesses, freshness, the subject is the host being called) and applies the customer's written policy. It answers allow, hold for a person, or deny, with reason codes, as a `guard-decision.v1` document. Missing, stale or disputed evidence holds; only a failed proof or a rule the customer marked absolute denies; an unreachable source with no cached bundle holds. It never fails open, never follows a link found in vendor content, and never sends the action to Trooth.
+- Policies are data (`guard-policy.v1`, YAML or JSON). Claims come only from signed, logged records: `trooth_reading` and `check:<id>` from the witness statement; `legal_entity_registry_record`, `no_sanctions_name_match`, `no_sam_exclusion_name_match`, `domain_registration_record` and `security_txt_published` from the public record, each with the freshness of its evidence class. `domain_control_confirmed` is not a signed claim today, so a rule requiring it holds.
+- `trooth guard decide` (exit 0 allow, 20 hold, 21 deny; a tool the policy does not cover decides nothing and exits 0), `trooth guard hook` (a Claude Code PreToolUse hook: hold asks a person, deny exits 2), `trooth guard ci` (exit 22 when a change adds a destination host the policy does not list) and `trooth guard cache` (signed bundles for offline use).
+- Adapters: `trooth/guard/openai-agents`, `trooth/guard/langchain`, `trooth/guard/langgraph`, `trooth/guard/http`, and the Python package `trooth_guard` (CrewAI, LangGraph, LangChain, OpenAI Agents) over the CLI (docs/GUARD-ADAPTERS.md). Duck-typed: no framework package is a dependency.
+- The decision table is checked exhaustively in `tests/guard-model.test.mjs` (4,534,272 input combinations) and by TLC on `spec/GuardDecision.tla`; an adversarial suite (injection in vendor text, spoofed records, a malicious tool description, replayed, revoked and compromised keys, confused-deputy hosts, policy bypass, forged log proofs, corrections, unreachable sources) runs in `npm test`. Results in docs/GUARD-RESULTS.md.
+- Public record (scan worker): `bindings[].proof_method`, `evidence_classes` (each with its stale-after days and what it does not establish), `continuity` against the previous reading (a changed entity is never merged), and the subjects `representative` and `signing_authority`. Schema `public-record.v1` gains them (optional); `docs/EVIDENCE.md` 1.3; id type `contact` (`docs/IDS.md` 1.4).
+- Open: the guard has not had an outside security review, and it is not yet used in production by teams outside Trooth. Both are Phase 4 exit conditions; neither is claimed.
+
 ## 0.12.0 (2026-10-07)
 
 ### MCP tool description hashes, the rest of the public record, and the hardware key

@@ -55,6 +55,14 @@
 //                           checked: its signature, its key, and its log entry.
 //                           docs/EVIDENCE.md. --cik, --lei, --ticker name the
 //                           identifier when the site does not.
+//   trooth guard decide|hook|ci|cache
+//                           The pre-execution guardrail (docs/GUARD.md): allow, hold or
+//                           deny one action an agent is about to take, under the
+//                           customer's written policy, from Trooth's signed and logged
+//                           artifacts checked on this machine. Only the domain is sent
+//                           to Trooth; the action never is. `hook` is a Claude Code
+//                           PreToolUse hook; `ci` fails a build that adds a destination
+//                           the policy does not list; `cache` saves bundles for offline use.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
@@ -94,6 +102,12 @@
 //                               Trooth signed and logged withdraws or replaces the statement)
 //   verify also uses 4 (a mapping or manifest was not supplied, so the binding is only
 //   partially checked) and 5 (the record carries no signed statement).
+//  20  guard hold              (new with trooth guard, guard decide: route the action to a person)
+//  21  guard deny              (new with trooth guard, guard decide: a proof or an absolute rule failed)
+//  22  guard ci finding        (new with trooth guard, guard ci: the change adds a destination host the
+//                               policy's destinations.allowed does not list)
+//   guard hook uses Claude Code's codes instead: 0 (allow, or ask with the hook JSON on stdout),
+//   2 (deny, or any failure: the hook never fails open). guard cache uses 0, 1 and 3.
 //
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
@@ -111,6 +125,9 @@ import { keyTrust, keyBytes } from './lib/verify.mjs';
 import { statementId } from './lib/ids.mjs';
 import { hashTool, manifestOf, diffTools, listTools } from './lib/mcp-tools.mjs';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
+import { loadPolicy as loadGuardPolicy, createGuard, PolicyError } from './lib/guard.mjs';
+import { addedLines, scanLines } from './lib/guard-ci.mjs';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
 // The record projection, GET /api/network/profile, is served by the website:
@@ -128,7 +145,7 @@ const require = createRequire(import.meta.url);
 let VERSION = '0.11.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10, GUARD_HOLD: 20, GUARD_DENY: 21, GUARD_CI_FOUND: 22 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -227,6 +244,7 @@ const FLAGS = {
   log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
   'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey'] },
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
+  guard: { bool: ['--json', '--offline'], value: ['--policy', '--tool', '--host', '--args', '--cache', '--max-age', '--base', '--log-vkey', '--timeout-ms'], multi: ['--witness'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -248,12 +266,14 @@ function parseArgs(command) {
     if (a.startsWith('--')) {
       const [name, inlineVal] = a.split('=', 2);
       if (spec.bool.includes(name)) { flags[name] = true; continue; }
-      if (spec.value.includes(name)) {
+      if (spec.value.includes(name) || (spec.multi || []).includes(name)) {
         const v = inlineVal !== undefined ? inlineVal : argv[++i];
         if (v === undefined || v.startsWith('--')) fail(EXIT.USAGE, `${name} needs a value.`);
-        flags[name] = v; continue;
+        if ((spec.multi || []).includes(name)) (flags[name] = flags[name] || []).push(v);
+        else flags[name] = v;
+        continue;
       }
-      const known = [...spec.bool, ...spec.value];
+      const known = [...spec.bool, ...spec.value, ...(spec.multi || [])];
       fail(EXIT.USAGE, `unknown flag ${name} for \`trooth ${command}\`. ` +
         (known.length ? `Known flags: ${known.join(', ')}.` : `\`trooth ${command}\` takes no flags.`) +
         ` Run \`trooth --help\`.`);
@@ -281,6 +301,11 @@ ${B}Usage${X}
   trooth log receipt <index>  Fetch and check the COSE receipt (RFC 9942) for one log entry
   trooth public-record <domain>  What the company published to regulators and registries, signed
   trooth mcp-tools [endpoint]  The MCP servers whose tool lists Trooth logs, or one server's tool hashes
+  trooth guard decide --policy <file> --tool <name> [--host <host>] [--args <json>]
+                            Allow, hold or deny one action under your policy, checked locally
+  trooth guard hook --policy <file>   Claude Code PreToolUse hook (reads the hook JSON on stdin)
+  trooth guard ci --policy <file> [--base <ref>] [paths...]   Fail a build that adds an unlisted destination
+  trooth guard cache --policy <file> --cache <dir> <domain>...   Save signed bundles for offline decisions
   trooth --help | --version
 
 ${B}Examples${X}
@@ -314,6 +339,13 @@ ${B}Flags${X}
   --out <path>              log receipt: write the COSE receipt bytes to a new file
   --cik, --lei, --ticker    public-record: name the SEC filer or LEI to read for the domain
   --live                    mcp-tools: also read the server's tool list from this machine and compare
+  --policy <file>           guard: the policy (YAML subset or JSON; docs/GUARD.md)
+  --tool, --host, --args    guard decide: the tool name, the target host, the typed arguments as JSON
+                            (with --args and no --host, the host is read from the policy's host_from fields)
+  --cache <dir>             guard: the bundle cache; --max-age <seconds> its freshness (default 900)
+  --offline                 guard decide, hook: read only cached bundles; none means hold
+  --base <ref>              guard ci: compare HEAD with this ref (default origin/main)
+  --witness <vkey>          guard: a witness cosigner key to count, in place of the pinned ones (repeatable)
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
@@ -327,6 +359,10 @@ ${B}Exit codes${X}
     mcp-tools: a hash, the statement or its receipt does not match; with --live, the server lists other tools now
   8 also: public-record, mcp-tools: the statement's signature or key does not hold
   10 verify: a correction Trooth signed and logged withdraws or replaces the statement
+  20 guard decide: hold (route the action to a person)   21 guard decide: deny
+  22 guard ci: the change adds a destination host the policy does not list
+     guard hook follows Claude Code instead: 0 allow or ask (the JSON on stdout says which), 2 deny
+     or any failure, with the reason on stderr. guard cache: 0 all saved, 1 a domain has no record, 3 unreachable.
 
 ${D}check reads only public, already-published records. No key, no account. It reads
 the one record projection, trooth.co/api/network/profile, the same body the website,
@@ -1496,7 +1532,7 @@ function printPublicRecord(d, sig) {
   for (const b of d.bindings) {
     const label = b.identifier === 'cik' ? 'SEC filer ' : 'LEI       ';
     const best = b.for.find((x) => ['filing_namespace_names_domain', 'registry_lists_domain', 'through_corroborated_filer'].includes(x.kind)) || b.against[0] || b.for[0];
-    out(`  ${label}   ${b.identifier === 'cik' ? `CIK ${b.value}` : b.value}  ${st(b.status)}${best ? ` ${D}${best.detail}${X}` : ''}`);
+    out(`  ${label}   ${b.identifier === 'cik' ? `CIK ${b.value}` : b.value}  ${st(b.status)}${b.proof_method ? ` ${D}[${b.proof_method.replace(/_/g, ' ')}]${X}` : ''}${best ? ` ${D}${best.detail}${X}` : ''}`);
   }
   if (d.sec) {
     const f = d.sec.facts;
@@ -1534,6 +1570,14 @@ function printPublicRecord(d, sig) {
   if (Array.isArray(d.changes) && d.changes.length) {
     out(`  changes      ${d.changes.length} recorded, newest first:`);
     for (const c of d.changes.slice(0, 5)) out(`               ${c.date || 'undated'}  ${c.detail}`);
+  }
+  if (d.continuity && Array.isArray(d.continuity.events)) {
+    if (!d.continuity.previous) out(`  ${D}continuity   no earlier reading of this domain to compare with${X}`);
+    else for (const e of d.continuity.events) out(`  continuity   ${e.kind === 'unchanged' ? ok('unchanged') : warn(e.kind.replace(/_/g, ' '))} ${D}since the reading of ${String(d.continuity.previous.read_at).slice(0, 10)}: ${e.detail}${X}`);
+  }
+  if (Array.isArray(d.evidence_classes)) {
+    const read = d.evidence_classes.filter((c) => c.read);
+    if (read.length) out(`  ${D}freshness    ${read.map((c) => `${c.class.replace(/_/g, ' ')} until ${String(c.stale_after).slice(0, 10)}`).join('; ')}${X}`);
   }
   if (Array.isArray(d.subjects) && d.subjects.length) out(`  ${D}subjects     ${d.subjects.map((x) => x.id).join(', ')}${X}`);
   if (Array.isArray(d.sources)) out(`  ${D}sources      ${d.sources.length} responses read, each kept by its SHA-256${X}`);
@@ -1898,6 +1942,159 @@ function printVerify(d, payload) {
   if (d.sources.bundle_written) out(`${D}Bundle written: ${d.sources.bundle_written} (check it later with: trooth verify --bundle ${d.sources.bundle_written})${X}`);
 }
 
+/* --------------------------------------------------------------- guard ---- */
+
+/** Build a guard from the command's flags. Throws PolicyError or Error; the caller decides the exit. */
+async function guardFromFlags(flags, { needCache = false } = {}) {
+  if (!flags['--policy']) throw new PolicyError('--policy <file> is required.');
+  const policy = await loadGuardPolicy(flags['--policy']);
+  let maxAge = 900;
+  if (flags['--max-age'] !== undefined) {
+    if (!/^(0|[1-9][0-9]{0,7})$/.test(flags['--max-age'])) throw new PolicyError('--max-age is a whole number of seconds.');
+    maxAge = Number(flags['--max-age']);
+  }
+  if (needCache && !flags['--cache']) throw new PolicyError('--cache <dir> is required.');
+  if (flags['--offline'] && !flags['--cache']) throw new PolicyError('--offline reads only cached bundles; it needs --cache <dir>.');
+  const opts = { policy, api: API, web: WEB, cache: flags['--cache'] ? { dir: flags['--cache'], maxAgeSeconds: maxAge } : null, offline: !!flags['--offline'] };
+  if (flags['--log-vkey']) { parseVkey(flags['--log-vkey']); opts.vkeys = [flags['--log-vkey']]; }
+  if (flags['--witness']) opts.witnesses = flags['--witness'];
+  if (flags['--timeout-ms'] !== undefined) opts.timeoutMs = Number(flags['--timeout-ms']);
+  return createGuard(opts);
+}
+
+/** One line per reason, for people and for the hook's reason. Every detail was written by the guard. */
+function guardReasonText(d) {
+  const parts = d.reasons.filter((r) => d.decision === 'allow' || r.code !== 'RULE_PASSED').map((r) => `${r.code}${r.rule_id ? ` [${r.rule_id}]` : ''}${r.needed ? ` needs ${r.needed}` : ''}${r.detail ? `: ${r.detail}` : ''}`);
+  return parts.join('; ');
+}
+
+function printGuardDecision(d) {
+  const color = d.decision === 'allow' ? J : d.decision === 'hold' ? A : R;
+  out(`${B}${d.action?.tool || '(tool)'}${X} → ${d.action?.host || '(no host)'}  ${color}${d.decision.toUpperCase()}${X}  ${D}policy ${d.policy.id} v${d.policy.version}${X}`);
+  for (const r of d.reasons) out(`  ${r.code.padEnd(21)}${r.rule_id ? ` ${r.rule_id}` : ''}${r.needed ? ` ${D}needs ${r.needed}${X}` : ''}${r.detail ? ` ${D}${r.detail}${X}` : ''}`);
+  if (d.subject) out(`  ${D}subject ${d.subject}; ${d.evidence.length} signed fact${d.evidence.length === 1 ? '' : 's'} read; decided ${d.decided_at}${X}`);
+  out(`${D}The guard answers about this action under your policy. It does not say whether a company is safe.${X}`);
+}
+
+async function readStdin(limit = 1024 * 1024) {
+  const chunks = [];
+  let total = 0;
+  for await (const c of process.stdin) {
+    total += c.length;
+    if (total > limit) throw new Error(`the hook input is over ${limit} bytes`);
+    chunks.push(c);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function guardHook(flags) {
+  // Claude Code reads exit 2 as "block" and any other non-zero code as a
+  // non-blocking error that lets the tool run, so every failure here exits 2.
+  const block = (why) => { diag(`trooth guard: ${why}`); return 2; };
+  let guard;
+  try { guard = await guardFromFlags(flags); }
+  catch (e) { return block(`the policy could not be used, so the action is stopped: ${e.message}`); }
+  let input;
+  try { input = JSON.parse(await readStdin()); }
+  catch (e) { return block(`the hook input is not JSON, so the action is stopped: ${e.message}`); }
+  if (!input || typeof input !== 'object' || typeof input.tool_name !== 'string') return block('the hook input has no tool_name, so the action is stopped.');
+  if (!guard.applies(input.tool_name)) return EXIT.OK;
+  let d;
+  try { d = await guard.decideToolCall({ name: input.tool_name, arguments: input.tool_input ?? {} }); }
+  catch (e) { return block(`the guard could not decide, so the action is stopped: ${e.message}`); }
+  if (!d) return EXIT.OK;
+  const reason = `Trooth guard, policy ${d.policy.id} v${d.policy.version}: ${d.decision} for ${d.action?.host || 'no host'}. ${guardReasonText(d)}`;
+  if (d.decision === 'allow') return EXIT.OK;
+  if (d.decision === 'hold') {
+    out(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: reason } }));
+    return EXIT.OK;
+  }
+  diag(`${reason} Reason codes: ${[...new Set(d.reasons.filter((r) => r.code !== 'RULE_PASSED').map((r) => r.code))].join(', ')}`);
+  return 2;
+}
+
+function gitDiff(base) {
+  try {
+    return execFileSync('git', ['diff', '--unified=0', '--no-color', '--no-ext-diff', `${base}...HEAD`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    fail(EXIT.USAGE, `git diff ${base}...HEAD did not run: ${String(e.stderr || e.message).trim().split('\n')[0]}. Pass --base <ref> or the files to scan.`);
+  }
+}
+
+async function guardCmd() {
+  const { flags, positional } = parseArgs('guard');
+  const sub = positional[0];
+  const rest = positional.slice(1);
+  if (sub === 'hook') {
+    hookMode = true;
+    if (rest.length) return guardHookUsage(`unexpected argument: ${rest.join(' ')}`);
+    return guardHook(flags);
+  }
+  if (!['decide', 'ci', 'cache'].includes(sub)) fail(EXIT.USAGE, 'trooth guard takes decide, hook, ci or cache. Try: trooth guard decide --policy policy.yaml --tool stripe.create_payout --host api.stripe.com');
+  let guard;
+  try { guard = await guardFromFlags(flags, { needCache: sub === 'cache' }); }
+  catch (e) { fail(EXIT.USAGE, e.message); }
+
+  if (sub === 'decide') {
+    if (rest.length) fail(EXIT.USAGE, `unexpected argument: ${rest.join(' ')}`);
+    if (!flags['--tool']) fail(EXIT.USAGE, '--tool <name> is required.');
+    let args;
+    if (flags['--args'] !== undefined) { try { args = JSON.parse(flags['--args']); } catch { fail(EXIT.USAGE, '--args is not valid JSON.'); } }
+    if (!guard.applies(flags['--tool'])) {
+      // The policy does not cover this tool: nothing is decided, and the caller
+      // lets the call run as its policy intends. Not an allow.
+      const doc = { covered: false, tool: flags['--tool'], policy: { id: guard.policy.id, version: guard.policy.version, sha256: guard.policy.sha256 }, note: 'The policy does not cover this tool, so the guard decided nothing about it.' };
+      if (asJson) emitJson(doc); else out(`${flags['--tool']}  ${D}not covered by the policy ${guard.policy.id} v${guard.policy.version}; nothing decided${X}`);
+      return EXIT.OK;
+    }
+    let d;
+    if (flags['--host'] !== undefined) d = await guard.decide({ tool: flags['--tool'], host: flags['--host'], args });
+    else d = await guard.decideToolCall({ name: flags['--tool'], arguments: args ?? {} });
+    if (asJson) emitJson(d); else printGuardDecision(d);
+    return d.decision === 'allow' ? EXIT.OK : d.decision === 'hold' ? EXIT.GUARD_HOLD : EXIT.GUARD_DENY;
+  }
+
+  if (sub === 'ci') {
+    let lines;
+    if (rest.length) {
+      lines = [];
+      for (const f of rest) {
+        if (!existsSync(f) || !statSync(f).isFile()) fail(EXIT.USAGE, `not a file: ${f}`);
+        readFileSync(f, 'utf8').split('\n').forEach((text, i) => lines.push({ file: f, line: i + 1, text }));
+      }
+    } else {
+      lines = addedLines(gitDiff(flags['--base'] || 'origin/main'));
+    }
+    const { findings, allowed } = scanLines(lines, guard.policy);
+    if (asJson) emitJson({ policy: { id: guard.policy.id, version: guard.policy.version, sha256: guard.policy.sha256 }, scanned: rest.length ? 'files' : `git diff ${flags['--base'] || 'origin/main'}...HEAD`, lines: lines.length, findings, allowed });
+    else {
+      for (const f of findings) out(`${f.file}:${f.line}  ${R}${f.host}${X}  ${D}not in destinations.allowed${X}`);
+      if (findings.length) out(`\n${findings.length} added destination${findings.length === 1 ? '' : 's'} the policy ${guard.policy.id} does not list. Add the host to destinations.allowed after review, or remove it.`);
+      else out(`${J}No added destination outside destinations.allowed${X} ${D}(${lines.length} line${lines.length === 1 ? '' : 's'} read; ${allowed.length} allowed host reference${allowed.length === 1 ? '' : 's'})${X}`);
+    }
+    return findings.length ? EXIT.GUARD_CI_FOUND : EXIT.OK;
+  }
+
+  // cache
+  if (!rest.length) fail(EXIT.USAGE, 'trooth guard cache needs at least one <domain>.');
+  const results = [];
+  for (const raw of rest) {
+    const norm = normalizeDomain(raw);
+    if (norm.error) fail(EXIT.USAGE, norm.error.replace('trooth check', 'trooth guard cache'));
+    results.push(await guard.saveBundle(norm.domain));
+  }
+  if (asJson) emitJson({ cache: flags['--cache'], results });
+  else for (const r of results) out(r.saved ? `${J}saved${X}  ${r.domain}  ${D}${r.path}; witness statement ${r.witness_statement ? 'yes' : 'no'}, public record ${r.public_record ? 'yes' : 'no'}, signature ${r.signature}, key ${r.key_status}, log ${r.log}, ${r.witnesses} witness cosignature${r.witnesses === 1 ? '' : 's'}${X}` : `${A}not saved${X}  ${r.domain}  ${r.reason}`);
+  if (results.some((r) => !r.saved && !/^no Trooth record/.test(r.reason))) return EXIT.UPSTREAM;
+  if (results.some((r) => !r.saved)) return EXIT.FINDING;
+  return EXIT.OK;
+}
+
+function guardHookUsage(why) { diag(`trooth guard: ${why}`); return 2; }
+
+/** Set for `trooth guard hook`: Claude Code lets the tool run on any exit but 0 and 2. */
+let hookMode = false;
+
 async function main() {
   if (cmd === '--version' || cmd === '-v' || cmd === 'version') { out(VERSION); return EXIT.OK; }
   if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') { out(helpText()); return EXIT.OK; }
@@ -1907,12 +2104,13 @@ async function main() {
   if (cmd === 'log') return logCmd();
   if (cmd === 'public-record') return publicRecordCmd();
   if (cmd === 'mcp-tools') return mcpToolsCmd();
+  if (cmd === 'guard') return guardCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record, mcp-tools.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record, mcp-tools, guard.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only
@@ -1930,6 +2128,13 @@ async function dispatch() {
   }
   if (!Number.isInteger(code)) code = EXIT.UPSTREAM;
   await drainOutput();
+  // The hook never fails open: an unexpected failure, or an ask (or a deny reason)
+  // that was not delivered, blocks the tool (exit 2) instead of letting it run.
+  if (hookMode && (outputFailure || (code !== EXIT.OK && code !== 2))) {
+    try { if (!process.stderr.destroyed && process.stderr.writable) process.stderr.write('trooth guard: the hook could not deliver its answer, so the action is stopped.\n', () => {}); } catch {}
+    process.exitCode = 2;
+    return;
+  }
   if (outputFailure) {
     // Best effort, on the stream that did not fail; never retried.
     const other = outputFailure.stream === 'stdout' ? process.stderr : process.stdout;

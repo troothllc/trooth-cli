@@ -1,6 +1,6 @@
 # What a company publishes, and what Trooth reads
 
-Version 1.2, October 7, 2026. Version 1.2 adds SAM.gov registrations and exclusions, patent applications, four state business registries, FTC merger review, the domain's registration (RDAP), the changes those sources record, the subjects a reading names (section 7), and MCP tool description hashes (section 9). Version 1.1 added certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
+Version 1.3, October 7, 2026. Version 1.3 adds the proof method of each binding, evidence classes with their stale-after days, continuity between readings, and the representative and signing authority subjects (section 10). Version 1.2 added SAM.gov registrations and exclusions, patent applications, four state business registries, FTC merger review, the domain's registration (RDAP), the changes those sources record, the subjects a reading names (section 7), and MCP tool description hashes (section 9). Version 1.1 added certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
 
 A company publishes about itself in three places: its own website and DNS, the regulators and registries it must file with, and outside parties that describe it. This document lists what is published in each, says for every item whether Trooth reads it today, and sets the rules for reading it. Nothing here grades, rates or ranks a company.
 
@@ -162,3 +162,44 @@ A statement naming the reading ([statement schema](../schemas/mcp-tools-statemen
 Trooth reads each server at most once a day. The servers read are listed at `https://api.trooth.co/scan/mcp-tools`; one server's newest reading is at `https://api.trooth.co/scan/mcp-tools/reading?endpoint=<url>`. `trooth mcp-tools <endpoint>` recomputes every description hash and the manifest, checks the statement and its log receipt, and with `--live` reads the server's tool list from the user's own machine and says whether it is the same, tool by tool (exit 9 when it is not).
 
 What a hash establishes: the server listed exactly these bytes to a client with no credentials when Trooth read it. It does not establish what a tool does, that its description is accurate, or that the server lists the same tools to every client.
+
+## 10. Proof methods, evidence classes, continuity and new subjects
+
+These fields are additive: the format stays `trooth.public-record.v1`, and a reading taken before them simply does not carry them.
+
+**Proof method.** Each binding carries `proof_method`, what ties the identifier to the domain, strongest first:
+
+| `proof_method` | Meaning |
+|---|---|
+| `regulator_filing` | The company's own 10-K XBRL extension namespace names a host in the domain |
+| `registry_record` | The registry record (the SEC record's website, or the LEI record) lists the domain |
+| `site_statement` | The site states the legal name. This is the site's claim, and any site can state any name |
+| `registry_name_match` | A name match between registries, or a registry search by name. Nothing ties the domain |
+| `asked` | The caller supplied the identifier, and nothing above ties it |
+| `none` | No evidence ties it |
+
+An LEI tied through a corroborated SEC filer takes the filer's proof method.
+
+**Evidence classes.** `evidence_classes` lists each class of evidence the reading can hold, kept apart, each with the record sections that hold it, `stale_after_days`, whether this reading read it (`read`), when the evidence was observed (`observed_at`: the reading's `read_at`, or a cached source's own earlier read time), `stale_after` (`observed_at` plus the days; null when not read) and a `does_not_establish` line saying in one sentence what that class of evidence does not show.
+
+| Class | Sections | Stale after (days) |
+|---|---|---|
+| `regulator_filing` | `sec` | 90 |
+| `registry_record` | `lei`, `registries` | 365 |
+| `sanctions_list` | `sanctions` | 7 |
+| `procurement_exclusion` | `sam` | 7 |
+| `domain_registration` | `domain_registration` | 30 |
+| `dns_configuration` | `dns` | 2 |
+| `certificate_transparency` | `certificates` | 7 |
+| `site_publication` | `site`, `security_txt` | 30 |
+| `patent_record` | `patents` | 90 |
+| `merger_review` | `merger_review` | 30 |
+
+A reader that has no rule of its own takes evidence past `stale_after` as stale and reads again. The guard (`trooth guard`) uses these days when a policy rule gives no `max_age_days`.
+
+**Continuity.** `continuity` compares this reading with the previous cached reading of the same domain. `previous` is that reading's `read_at` and `record_sha256`, or null when there is none. Each event in `events` has a `kind` and a `detail` naming both readings' values: `entity_changed`, `entity_appeared`, `entity_disappeared`, `renamed`, `parent_changed`, `registrar_changed`, `domain_transferred`, or a single `unchanged` when none of these differ. A changed entity is never merged: the new reading carries only what it read now, nothing from the earlier entity is carried over, and a parent named in the LEI record stays a separate legal entity.
+
+**New subjects.** `subjects` gains two kinds:
+
+- `representative`: a contact the site publishes in security.txt, named by a `contact` id ([IDS.md](IDS.md) 1.4), such as `trooth:contact:mailto:psirt@example.com` or `trooth:contact:security.example.com/report`. It is a contact the site publishes; it is not a person authorized to act for the entity. Contacts of other kinds (telephone, plain HTTP) are not kept, and a site that opted out of reading is not read for contacts.
+- `signing_authority`: the key that signs this reading's statement, `trooth:key:<kid>`, filled in at signing. A reading with no signature names no signing authority.

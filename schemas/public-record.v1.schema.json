@@ -203,6 +203,17 @@
         "$ref": "#/$defs/Subject"
       }
     },
+    "evidence_classes": {
+      "type": "array",
+      "description": "Each class of evidence in this reading with its stale-after rule, when it was observed and what it does not establish (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.",
+      "items": {
+        "$ref": "#/$defs/EvidenceClass"
+      }
+    },
+    "continuity": {
+      "description": "What changed since the previous cached reading of the same domain (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.",
+      "$ref": "#/$defs/Continuity"
+    },
     "signed": {
       "$ref": "#/$defs/Signed",
       "description": "The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0."
@@ -781,7 +792,7 @@
         },
         "kind": {
           "type": "string",
-          "description": "What it names.",
+          "description": "What it names. representative: a contact the site publishes in security.txt (a trooth:contact id); not a person authorized to act for the entity. signing_authority: the key that signed this reading's statement (a trooth:key id), named at signing.",
           "enum": [
             "domain",
             "entity",
@@ -792,7 +803,9 @@
             "sam_uei",
             "code_repository",
             "api",
-            "mcp_server"
+            "mcp_server",
+            "representative",
+            "signing_authority"
           ]
         },
         "basis": {
@@ -1245,6 +1258,18 @@
             "not_found"
           ]
         },
+        "proof_method": {
+          "type": "string",
+          "description": "What ties the identifier to the domain, strongest first. regulator_filing: the company's 10-K XBRL namespace names the domain. registry_record: the LEI registry record lists the domain. site_statement: the site states the legal name; this is the site's claim. registry_name_match: a name match only; nothing ties the domain. asked: the caller supplied the identifier and nothing above ties it. none: no evidence ties it. Optional; added in trooth 0.13.0 (docs/EVIDENCE.md section 10).",
+          "enum": [
+            "regulator_filing",
+            "registry_record",
+            "site_statement",
+            "registry_name_match",
+            "asked",
+            "none"
+          ]
+        },
         "for": {
           "type": "array",
           "description": "Evidence for the binding.",
@@ -1623,6 +1648,148 @@
         "reason": {
           "type": "string",
           "description": "Why."
+        }
+      }
+    },
+    "EvidenceClass": {
+      "title": "EvidenceClass",
+      "type": "object",
+      "description": "One class of evidence in the reading, kept apart from the others, with its own freshness rule and a line saying what it does not establish.",
+      "required": [
+        "class",
+        "sections",
+        "stale_after_days",
+        "does_not_establish",
+        "read",
+        "observed_at",
+        "stale_after"
+      ],
+      "properties": {
+        "class": {
+          "type": "string",
+          "description": "The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30.",
+          "enum": [
+            "regulator_filing",
+            "registry_record",
+            "sanctions_list",
+            "procurement_exclusion",
+            "domain_registration",
+            "dns_configuration",
+            "certificate_transparency",
+            "site_publication",
+            "patent_record",
+            "merger_review"
+          ]
+        },
+        "sections": {
+          "type": "array",
+          "description": "The sections of this record that hold this class of evidence.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stale_after_days": {
+          "type": "integer",
+          "description": "After this many days from observed_at a reader should take the evidence as stale and read again."
+        },
+        "does_not_establish": {
+          "type": "string",
+          "description": "What this class of evidence does not show, in one sentence."
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether this reading read any of the sections."
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the evidence was observed: the reading's read_at, or the source's own earlier read time when a cached answer was used. Null when not read."
+        },
+        "stale_after": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "observed_at plus stale_after_days, as an ISO 8601 time. Null when not read."
+        }
+      }
+    },
+    "ContinuityEvent": {
+      "title": "ContinuityEvent",
+      "type": "object",
+      "description": "One difference between this reading and the previous reading of the same domain.",
+      "required": [
+        "kind",
+        "detail"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "What differs. entity_changed: the domain now ties to a different legal entity. entity_appeared: it now ties to one and did not before. entity_disappeared: it tied to one and now ties to none. renamed: the same entity under a new name. parent_changed: the LEI record names a different direct or ultimate parent. registrar_changed: RDAP names a different registrar. domain_transferred: RDAP records a transfer after the previous reading. unchanged: none of these.",
+          "enum": [
+            "entity_changed",
+            "entity_appeared",
+            "entity_disappeared",
+            "renamed",
+            "parent_changed",
+            "registrar_changed",
+            "domain_transferred",
+            "unchanged"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "description": "The difference in words, naming both readings' values."
+        }
+      }
+    },
+    "ContinuityPrevious": {
+      "title": "ContinuityPrevious",
+      "type": "object",
+      "description": "The previous cached reading of the same domain this reading was compared with.",
+      "required": [
+        "read_at",
+        "record_sha256"
+      ],
+      "properties": {
+        "read_at": {
+          "type": "string",
+          "description": "When the previous reading was taken."
+        },
+        "record_sha256": {
+          "type": "string",
+          "description": "Lowercase hex SHA-256 of the previous record as it was cached."
+        }
+      }
+    },
+    "Continuity": {
+      "title": "Continuity",
+      "type": "object",
+      "description": "This reading compared with the previous cached reading of the same domain. A changed entity is never merged: the new reading carries only what it read now, and the event names both.",
+      "required": [
+        "previous",
+        "events"
+      ],
+      "properties": {
+        "previous": {
+          "description": "The previous reading compared with; null when there is none.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ContinuityPrevious"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "events": {
+          "type": "array",
+          "description": "What differs; empty when there is no previous reading, and a single unchanged event when nothing listed differs.",
+          "items": {
+            "$ref": "#/$defs/ContinuityEvent"
+          }
         }
       }
     }

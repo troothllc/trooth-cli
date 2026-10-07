@@ -2,11 +2,11 @@
 // uses, validated with no dependency (the package keeps exactly one). It
 // supports $ref (local and to a sibling file by name), type, const, enum,
 // properties, required, additionalProperties, items, minItems, minLength,
-// minimum, pattern, oneOf and anyOf. A keyword outside that set is refused so a
+// minimum, pattern, oneOf and anyOf, and takes format as an annotation only. A keyword outside that set is refused so a
 // schema cannot quietly use something this validator ignores.
 import { readFileSync, readdirSync } from 'node:fs';
 
-const KNOWN = new Set(['$schema', '$id', '$defs', '$ref', 'title', 'description', 'type', 'const', 'enum', 'properties', 'required', 'additionalProperties', 'items', 'minItems', 'minLength', 'minimum', 'pattern', 'oneOf', 'anyOf']);
+const KNOWN = new Set(['$schema', '$id', '$defs', '$ref', 'title', 'description', 'type', 'const', 'enum', 'properties', 'required', 'additionalProperties', 'items', 'minItems', 'minLength', 'minimum', 'pattern', 'oneOf', 'anyOf', 'format']);
 
 export function loadSchemas(dirUrl) {
   const out = {};

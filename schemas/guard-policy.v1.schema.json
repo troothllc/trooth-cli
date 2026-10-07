@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/guard-policy.v1.schema.json",
+  "title": "GuardPolicy",
+  "description": "A customer's guard policy (docs/GUARD.md section 3), written in YAML (the strict subset bin/lib/yaml-lite.mjs reads) or JSON. The guard refuses unknown keys, wrong types, duplicate rule ids, on_fail deny without absolute, and allow for source_unreachable or failMode. The policy's sha256 is the SHA-256 of the RFC 8785 canonical JSON of the document as parsed.",
+  "type": "object",
+  "required": ["policy", "version", "applies_to", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "policy": { "description": "The policy's name.", "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+    "version": { "description": "The policy's version number; raise it on every change.", "type": "integer", "minimum": 1 },
+    "description": { "description": "Free text for people; the guard never reads it.", "type": "string" },
+    "applies_to": { "description": "Which actions are checked. Everything else passes straight through.", "$ref": "#/$defs/appliesTo" },
+    "host_from": { "description": "Typed argument fields (dotted paths allowed) the target host is read from, in order. Default: url, endpoint, host, domain, base_url, webhook_url, email, to.", "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)*$" } },
+    "log": { "description": "What the guard needs from Trooth's log. Default: required true, min_witnesses 1.", "$ref": "#/$defs/logRequirement" },
+    "rules": { "description": "The rules, each tested against signed, logged facts. Rule ids are unique.", "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rule" } },
+    "destinations": { "description": "Hosts for CI mode (trooth guard ci).", "$ref": "#/$defs/destinations" },
+    "unknown_counterparty": { "description": "The decision when no Trooth record exists for the host. Default hold.", "enum": ["hold", "deny"] },
+    "source_unreachable": { "description": "The decision when no Trooth source answers and no cached bundle is held. Default hold. allow is refused.", "enum": ["hold", "deny"] }
+  },
+  "$defs": {
+    "appliesTo": {
+      "title": "GuardAppliesTo",
+      "description": "The tools and HTTP destinations the policy covers.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tools": { "description": "Tool names; \"*\" stands for any run of characters (mcp__bank__*).", "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "http": { "description": "For the http adapter: methods and host patterns whose requests are checked.", "type": "array", "items": { "$ref": "#/$defs/httpTarget" } }
+      }
+    },
+    "httpTarget": {
+      "title": "GuardHttpTarget",
+      "description": "One method and host pattern (an exact host, or *. followed by a domain of at least two labels).",
+      "type": "object",
+      "required": ["method", "host"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "description": "The HTTP method, or * for any.", "type": "string" },
+        "host": { "description": "The host pattern.", "type": "string", "minLength": 1 }
+      }
+    },
+    "logRequirement": {
+      "title": "GuardLogRequirement",
+      "description": "Log inclusion and witness cosignatures the policy asks for.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": { "description": "Whether a statement must be shown in the log (hold NOT_IN_LOG otherwise). A failed proof denies either way.", "type": "boolean" },
+        "min_witnesses": { "description": "How many pinned witnesses must have cosigned a checkpoint covering the statement.", "type": "integer", "minimum": 0 }
+      }
+    },
+    "rule": {
+      "title": "GuardRule",
+      "description": "One rule. A claim missing, stale or disputed holds; a rule marked absolute that fails denies.",
+      "type": "object",
+      "required": ["id", "require"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "description": "The rule's id, unique in the policy.", "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+        "description": { "description": "Free text for people; the guard never reads it.", "type": "string" },
+        "require": { "description": "A claim with an optional maximum age, or a valid signature by a key in an accepted state.", "anyOf": [{ "$ref": "#/$defs/claimRequire" }, { "$ref": "#/$defs/signatureRequire" }] },
+        "on_fail": { "description": "hold (default), or deny for a rule marked absolute.", "enum": ["hold", "deny"] },
+        "absolute": { "description": "When true, the rule failing denies the action (ABSOLUTE_RULE_FAILED).", "type": "boolean" }
+      }
+    },
+    "claimRequire": {
+      "title": "GuardClaimRequire",
+      "description": "A claim read from a signed, logged Trooth artifact.",
+      "type": "object",
+      "required": ["claim"],
+      "additionalProperties": false,
+      "properties": {
+        "claim": { "description": "trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (not a signed claim today, so always missing).", "type": "string", "pattern": "^(trooth_reading|legal_entity_registry_record|no_sanctions_name_match|no_sam_exclusion_name_match|domain_registration_record|security_txt_published|domain_control_confirmed|check:[A-Za-z0-9][A-Za-z0-9_.-]{0,63})$" },
+        "max_age_days": { "description": "The oldest observation the rule accepts, in days. Default: the evidence class's stale-after.", "type": "integer", "minimum": 1 }
+      }
+    },
+    "signatureRequire": {
+      "title": "GuardSignatureRequire",
+      "description": "A valid signature by a key in one of the accepted states at signing time.",
+      "type": "object",
+      "required": ["signature"],
+      "additionalProperties": false,
+      "properties": {
+        "signature": { "description": "Always valid.", "const": "valid" },
+        "key_status": { "description": "Accepted key states. Default both.", "type": "array", "minItems": 1, "items": { "enum": ["active", "retired_before_use"] } }
+      }
+    },
+    "destinations": {
+      "title": "GuardDestinations",
+      "description": "For CI mode: hosts a build may add, and the hosts to watch.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": { "description": "Host patterns a build may add without failing.", "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "watch": { "description": "Host patterns CI mode reports when added and not allowed. Default (empty): every new external host.", "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

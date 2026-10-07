@@ -1,6 +1,6 @@
 # Trooth stable identifiers
 
-Version 1.3, October 7, 2026. Version 1.3 adds `jurisdiction`, `registry`, `uei`, `repo`, `api` and `mcp`, the subjects a public record reading or an MCP tool reading names. Version 1.2 defined `entity`. Version 1.1 added `cik` and `lei`.
+Version 1.4, October 7, 2026. Version 1.4 adds `contact`, a contact a site publishes in security.txt, named as a `representative` subject in a public record reading. Version 1.3 added `jurisdiction`, `registry`, `uei`, `repo`, `api` and `mcp`, the subjects a public record reading or an MCP tool reading names. Version 1.2 defined `entity`. Version 1.1 added `cik` and `lei`.
 
 One grammar names everything Trooth publishes about a reading, so a reference means the same thing in a statement, a bundle, an SDK, a log entry and a citation, and never depends on a URL that could move:
 
@@ -24,10 +24,12 @@ trooth:<type>:<value>
 | `repo` | A code host and an owner, lower case | `trooth:repo:github.com/troothllc` | An organization or user on a code host |
 | `api` | A host and an optional path, lower case, without scheme, query or fragment | `trooth:api:developer.nvidia.com` | A company's API or its documentation |
 | `mcp` | A host and a path, lower case, without scheme, query or fragment | `trooth:mcp:api.trooth.co/public/mcp` | An MCP server endpoint ([EVIDENCE.md](EVIDENCE.md) section 9) |
+| `contact` | `mailto:` and an address with the domain lower case, or a host (lower case) and an optional path, without scheme, query, fragment or trailing slash | `trooth:contact:mailto:psirt@example.com`, `trooth:contact:security.example.com/report` | A contact a site publishes in security.txt ([EVIDENCE.md](EVIDENCE.md) section 10). It is a contact the site publishes, not a person authorized to act for the entity. Only `mailto:` and `https:` contacts are kept |
 
 Rules:
 
-- An id is compared as an exact string. `formatId` lowercases a domain and drops a trailing dot before it builds one; `parseId` accepts only the canonical form.
+- An id is compared as an exact string. `formatId` lowercases a domain and drops a trailing dot before it builds one; for a `contact` it lowercases the mail domain, or turns an `https:` address into its host and path without query, fragment or trailing slash. `parseId` accepts only the canonical form.
+- The `contact` value matches `^(?:mailto:[^\s?#@]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]|(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?)$`. The local part of an address keeps its case, as mail does.
 - A `statement` id is derived, not assigned: anyone holding the payload bytes computes the same id, and different bytes always give a different id.
 - A `registry` or `uei` id that a reading found by searching a legal name is a name match; the reading says so beside it, and it is not an identification.
 - A `cik` or `lei` id names a registry entry. Whether it belongs to a domain is a separate question, answered with evidence in a public-record reading ([EVIDENCE.md](EVIDENCE.md)).
