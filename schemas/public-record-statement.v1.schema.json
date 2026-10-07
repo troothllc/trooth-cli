@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/public-record-statement.v1.schema.json",
+  "title": "PublicRecordStatement",
+  "description": "The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true.",
+  "type": "object",
+  "required": [
+    "statement",
+    "subject_id",
+    "domain",
+    "read_at",
+    "record_sha256",
+    "record_canonicalization",
+    "entity_id",
+    "bindings",
+    "sources",
+    "issued_at",
+    "signer"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "statement": {
+      "type": "string",
+      "description": "The payload type.",
+      "const": "trooth.public-record.v1"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "trooth:domain:<domain>.",
+      "pattern": "^trooth:domain:[a-z0-9.-]+$"
+    },
+    "domain": {
+      "type": "string",
+      "description": "The domain read."
+    },
+    "read_at": {
+      "type": "string",
+      "description": "The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "record_sha256": {
+      "type": "string",
+      "description": "SHA-256, hex, of the reading's RFC 8785 bytes without `signed`.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "record_canonicalization": {
+      "type": "string",
+      "description": "How those bytes were made.",
+      "const": "RFC8785"
+    },
+    "entity_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The reading's entity id, or null."
+    },
+    "bindings": {
+      "type": "array",
+      "description": "Each binding's id and status.",
+      "items": {
+        "$ref": "#/$defs/BindingStatus"
+      }
+    },
+    "sources": {
+      "type": "integer",
+      "description": "How many responses the reading read.",
+      "minimum": 0
+    },
+    "issued_at": {
+      "type": "string",
+      "description": "When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "signer": {
+      "$ref": "#/$defs/StatementSigner",
+      "description": "The signing key, inside the signed bytes."
+    }
+  },
+  "$defs": {
+    "BindingStatus": {
+      "title": "BindingStatus",
+      "type": "object",
+      "description": "A binding as the statement names it.",
+      "required": [
+        "id",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "trooth:cik or trooth:lei id."
+        },
+        "status": {
+          "type": "string",
+          "description": "The binding status."
+        }
+      }
+    },
+    "StatementSigner": {
+      "title": "StatementSigner",
+      "type": "object",
+      "description": "The signing key.",
+      "required": [
+        "key_id",
+        "issuer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "type": "string",
+          "description": "The kid on https://api.trooth.co/public/keys."
+        },
+        "issuer": {
+          "type": "string",
+          "description": "Always trooth.co.",
+          "const": "trooth.co"
+        }
+      }
+    }
+  }
+}

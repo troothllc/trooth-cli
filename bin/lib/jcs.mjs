@@ -44,3 +44,23 @@ export function isCanonical(text) {
   try { parsed = JSON.parse(text); } catch { return false; }
   try { return canonicalize(parsed) === text; } catch { return false; }
 }
+
+/**
+ * RFC 8785 for a public record reading (docs/EVIDENCE.md section 5): the same
+ * rules, but a finite number of any size is written in ECMAScript's shortest
+ * form, which is what RFC 8785 specifies for numbers. Used only to recompute
+ * the SHA-256 a public record statement names.
+ */
+export function canonicalizeRecord(value) {
+  if (value === null || value === true || value === false || typeof value === 'string') return canonicalize(value);
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new CanonicalizationError('a number is not finite');
+    return Object.is(value, -0) ? '0' : JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalizeRecord).join(',')}]`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((k) => `${str(k)}:${canonicalizeRecord(value[k])}`).join(',')}}`;
+  }
+  throw new CanonicalizationError(`a ${typeof value} has no JSON form`);
+}

@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "The Trooth Network in your terminal. Read a company's public record with no key and no account: each fact with its provenance, the evidence state and the record version, as the API serves it. Also reads what your repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
@@ -42,7 +42,7 @@
   "scripts": {
     "check": "node ./bin/trooth.mjs check",
     "lint": "node ./bin/trooth.mjs lint",
-    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs && node tests/check-projection.test.mjs && node tests/audit-1004.test.mjs && node tests/output-delivery.test.mjs && node tests/verify.test.mjs && node tests/log.test.mjs && node tests/public-record.test.mjs && node tests/vectors/generate.mjs --check && node tests/schemas.test.mjs",
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs && node tests/check-projection.test.mjs && node tests/audit-1004.test.mjs && node tests/output-delivery.test.mjs && node tests/verify.test.mjs && node tests/log.test.mjs && node tests/witness-cose.test.mjs && node tests/public-record.test.mjs && node tests/vectors/generate.mjs --check && node tests/schemas.test.mjs",
     "types": "node scripts/gen-types.mjs"
   },
   "license": "Apache-2.0",
@@ -74,7 +74,10 @@
     "infrastructure-as-code",
     "terraform",
     "kubernetes",
-    "cli"
+    "cli",
+    "cose",
+    "scitt",
+    "witness"
   ],
   "dependencies": {
     "yaml": "2.9.1"

@@ -2,6 +2,18 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.11.0 (2026-10-07)
+
+### Witnesses, COSE receipts and a signed public record
+
+- The log asks the staging witnesses of the witness network (Geomys, Mullvad, TrustFabric) to cosign its checkpoints over c2sp.org/tlog-witness and serves their cosignatures as further signature lines on `/checkpoint`; `/witnesses` says what each last did. `bin/lib/log-trust.mjs` pins their Ed25519 cosigner keys. `trooth log checkpoint` and `trooth log monitor` report which cosigned (the monitor also saves them), and `--witnesses <n>` exits 9 when fewer did. A witness answers 404 until the witness network follows the log, so the first checkpoints carry no cosignature.
+- `trooth log receipt <index> [--out <file>]` fetches `/receipt/<index>`, an RFC 9942 COSE receipt of inclusion (COSE_Sign1, EdDSA, vds RFC9162_SHA256, detached payload), checks it against the entry and the pinned log key, and confirms `https://api.trooth.co/.well-known/scitt-keys` (a COSE Key Set, kid = RFC 9679 thumbprint) lists that key. `bin/lib/cose.mjs` holds a small CBOR reader and the check.
+- Log entries gain the kind `public_record`. The Python and Go packages accept it.
+- `trooth public-record` checks the `signed` block each reading now carries: the reading's RFC 8785 SHA-256 (`canonicalizeRecord` in `bin/lib/jcs.mjs`, which writes non-integer numbers in ECMAScript's shortest form), a `trooth.public-record.v1` statement signed with a key trusted at `issued_at`, and its log receipt. Exit 8 when the signature or key does not hold, 9 when the reading is not the one named or the receipt does not check. `--log-vkey` checks the receipt against another log key. `--json` adds `cli_check`.
+- The reading adds `entity` (`trooth:entity:lei:<LEI>` or `trooth:entity:cik:<CIK>`, `docs/IDS.md` 1.2), `certificates` from Certificate Transparency logs, `security_txt`, `site.links` (investor relations, trust center, security, status, sustainability: linked, not read), `sanctions` (exact-name check against the OFAC SDN list; a name match is not an identification) and `sources` (each response read and the SHA-256 of its bytes). The output's financial labels are no longer cut short.
+- Schemas: `public-record.v1` gains those fields (all optional for older readings); new `public-record-statement.v1`. 57 generated types.
+- `docs/LOG.md` 1.1 (witnesses, COSE), `docs/EVIDENCE.md` 1.1 (new sources, the signed statement), `docs/KEY-CEREMONY.md` 1.1 (drills; a witnessed log changes key by changing origin; what hardware custody and two-person control need). `tests/vectors/witness-cose.json`: 6 cosignature cases and 9 COSE receipt cases, which Trooth's log reproduces byte for byte.
+
 ## 0.10.0 (2026-10-07)
 
 ### The public record: what a company publishes outside its own site

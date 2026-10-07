@@ -242,4 +242,70 @@ const write = (file, value, count, what) => {
 };
 write('vectors.json', doc, vectors.length, 'cases');
 write('log.json', logDoc, logCases.length + consistency.length, 'log cases');
+// ----------------------------------------------------- witnesses and COSE ----
+// Cosignatures (c2sp.org/tlog-cosignature, Ed25519, key type 0x04) on the
+// size-5 checkpoint above, by a test witness, at a fixed time; and RFC 9942
+// COSE receipts of inclusion for the five entries, signed with the log's test
+// key. `now` is the reader's clock for the time rule (a cosignature more than
+// an hour in the future is not counted).
+const W = keyPair('witness-key');
+const WX = keyPair('witness-key-impostor');
+const WNAME = 'witness.vectors.example/w';
+const witnessId = (name, pub) => createHash('sha256').update(Buffer.concat([Buffer.from(name), Buffer.from([0x0a, 0x04]), pub])).digest().subarray(0, 4);
+const WVKEY = `${WNAME}+${witnessId(WNAME, W.pub).toString('hex')}+${Buffer.concat([Buffer.from([4]), W.pub]).toString('base64')}`;
+const COSIGN_TIME = 1791331200; // 2026-10-07T00:00:00Z
+function cosign(body, kp = W, name = WNAME, ts = COSIGN_TIME, idOf = W.pub) {
+  const t = Buffer.alloc(8); t.writeBigUInt64BE(BigInt(ts));
+  const s = sign(null, Buffer.from(`cosignature/v1\ntime ${ts}\n${body}`, 'utf8'), kp.priv);
+  return `\u2014 ${name} ${Buffer.concat([witnessId(name, idOf), t, s]).toString('base64')}\n`;
+}
+const BODY5 = checkpointText(5, ROOT5);
+const NOW = Date.parse('2026-10-07T00:30:00Z');
+const cosignCases = [
+  { name: 'cosigned', note: 'The witness cosigned this checkpoint.', checkpoint: CP5 + cosign(BODY5), expect: { valid: true, timestamp: COSIGN_TIME } },
+  { name: 'other-tree', note: 'A cosignature over another tree, appended to this checkpoint.', checkpoint: CP5 + cosign(checkpointText(5, ROOT3)), expect: { valid: false } },
+  { name: 'impostor-key', note: "Signed by another key under the witness's name and key id.", checkpoint: CP5 + cosign(BODY5, WX), expect: { valid: false } },
+  { name: 'other-name', note: 'A valid cosignature by a witness that is not configured is ignored.', checkpoint: CP5 + cosign(BODY5, W, 'witness.other.example/w'), expect: { valid: false } },
+  { name: 'future', note: 'Dated two hours after the reader\'s clock.', checkpoint: CP5 + cosign(BODY5, W, WNAME, COSIGN_TIME + 9000), expect: { valid: false } },
+  { name: 'zero-time', note: 'A cosignature must carry a time.', checkpoint: CP5 + cosign(BODY5, W, WNAME, 0), expect: { valid: false } },
+];
+
+const cborHead = (major, n) => {
+  if (n < 24) return Buffer.from([(major << 5) | n]);
+  if (n < 0x100) return Buffer.from([(major << 5) | 24, n]);
+  if (n < 0x10000) { const x = Buffer.alloc(3); x[0] = (major << 5) | 25; x.writeUInt16BE(n, 1); return x; }
+  const x = Buffer.alloc(5); x[0] = (major << 5) | 26; x.writeUInt32BE(n, 1); return x;
+};
+const cInt = (n) => (n >= 0 ? cborHead(0, n) : cborHead(1, -1 - n));
+const cBytes = (b) => Buffer.concat([cborHead(2, b.length), b]);
+const cText = (t) => { const b = Buffer.from(t, 'utf8'); return Buffer.concat([cborHead(3, b.length), b]); };
+const cArr = (items) => Buffer.concat([cborHead(4, items.length), ...items]);
+const cMap = (pairs) => Buffer.concat([cborHead(5, pairs.length), ...pairs.flat()]); // pairs given in deterministic order
+const thumb = (pub) => createHash('sha256').update(Buffer.concat([Buffer.from([0xa3, 0x01, 0x01, 0x20, 0x06, 0x21, 0x58, 0x20]), pub])).digest();
+function coseReceipt(i, { kp = L, kidOf = L.pub, path = inclusionPath(i, LEAVES), size = 5, index = i } = {}) {
+  const prot = cMap([[cInt(1), cInt(-8)], [cInt(4), cBytes(thumb(kidOf))], [cInt(395), cInt(1)]]);
+  const proof = cArr([cInt(size), cInt(index), cArr(path.map((p) => cBytes(Buffer.from(p))))]);
+  const unprot = cMap([[cInt(396), cMap([[cInt(-1), cArr([cBytes(proof)])]])]]);
+  const root = rootOf(LEAVES);
+  const sigStructure = cArr([cText('Signature1'), cBytes(prot), cBytes(Buffer.alloc(0)), cBytes(root)]);
+  const s = sign(null, sigStructure, kp.priv);
+  return Buffer.concat([Buffer.from([0xd2]), cArr([cBytes(prot), unprot, Buffer.from([0xf6]), cBytes(s)])]).toString('base64');
+}
+const coseCases = [
+  ...ENTRIES.map((_, i) => ({ name: `entry-${i}`, note: `The receipt for entry ${i}.`, index: i, receipt: coseReceipt(i), expect: { valid: true, tree_size: 5 } })),
+  { name: 'other-entry', note: "Entry 1's receipt checked against entry 2's bytes.", index: 2, receipt: coseReceipt(1), expect: { valid: false } },
+  { name: 'path-tampered', note: 'One path hash changed.', index: 2, receipt: coseReceipt(2, { path: inclusionPath(2, LEAVES).map((p, k) => { const b = Buffer.from(p); if (k === 0) b[0] ^= 1; return b; }) }), expect: { valid: false } },
+  { name: 'impostor-key', note: 'Signed by another key, naming the log key as kid.', index: 2, receipt: coseReceipt(2, { kp: LX }), expect: { valid: false } },
+  { name: 'kid-mismatch', note: "The log key's signature, but a kid naming another key.", index: 2, receipt: coseReceipt(2, { kidOf: LX.pub }), expect: { valid: false } },
+];
+const witnessDoc = {
+  description: 'Test vectors for docs/LOG.md sections 6 and 7. `cosignatures`: each checkpoint is the size-5 checkpoint of log.json with one cosignature line appended; check it against `witness_vkey` with the reader clock `now`. `cose_receipts`: each receipt (base64 of the CBOR bytes) is checked against the bytes of log.json entry `index` (RFC 8785 of {kind, statement}) and the log public key of log.json. Keys are test keys whose seeds are public in generate.mjs.',
+  witness_vkey: WVKEY,
+  now: new Date(NOW).toISOString(),
+  log_vkey: VKEY,
+  log_key_thumbprint: thumb(L.pub).toString('base64url'),
+  cosignatures: cosignCases,
+  cose_receipts: coseCases,
+};
+write('witness-cose.json', witnessDoc, cosignCases.length + coseCases.length, 'witness and COSE cases');
 write('bundles.json', { description: 'Verification bundles (trooth.verification-bundle.v1) and the verdict each must reach when checked with no network. `domain`, when present, is the domain the reader asks about in place of the one the bundle names. The keys are the same test keys as vectors.json.', bundles }, bundles.length, 'bundles');

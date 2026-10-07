@@ -41,14 +41,20 @@
 //                           statement log (docs/LOG.md). trooth log monitor --state
 //                           <file> checks the log only grew since the checkpoint saved
 //                           in <file>, and saves the new one. Anyone can run a monitor.
+//                           Both count the cosignatures of the pinned witnesses;
+//                           --witnesses <n> requires n of them. trooth log receipt
+//                           <index> fetches and checks an entry's RFC 9942 COSE receipt.
 //   trooth public-record <domain>
 //                           What the company has published outside its own site,
 //                           read by Trooth from the authorities that hold it: its SEC
 //                           filer record, filings (10-K, 10-Q, 8-K items, proxy),
 //                           annual XBRL values, its LEI record, DNS mail
-//                           authentication, and the evidence tying each identifier to
-//                           the domain. docs/EVIDENCE.md. --cik, --lei, --ticker name
-//                           the identifier when the site does not.
+//                           authentication, certificates in CT logs, security.txt,
+//                           the OFAC list, and the evidence tying each identifier to
+//                           the domain. The statement naming the reading's SHA-256 is
+//                           checked: its signature, its key, and its log entry.
+//                           docs/EVIDENCE.md. --cik, --lei, --ticker name the
+//                           identifier when the site does not.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
@@ -96,8 +102,13 @@ import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from '
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
 import { verifyStatement, bundleInputs, makeBundle, BundleError } from './lib/verify.mjs';
-import { openCheckpoint, verifyConsistency, fromB64, toB64, parseVkey, LOG_ORIGIN } from './lib/tlog.mjs';
-import { PINNED_LOG_VKEYS } from './lib/log-trust.mjs';
+import { openCheckpoint, verifyConsistency, fromB64, toB64, parseVkey, checkReceipt, LOG_ORIGIN } from './lib/tlog.mjs';
+import { PINNED_LOG_VKEYS, PINNED_WITNESSES } from './lib/log-trust.mjs';
+import { checkCosignatures } from './lib/witness.mjs';
+import { checkCoseReceipt, keysFromKeySet } from './lib/cose.mjs';
+import { canonicalize, canonicalizeRecord, isCanonical } from './lib/jcs.mjs';
+import { keyTrust, keyBytes } from './lib/verify.mjs';
+import { statementId } from './lib/ids.mjs';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -113,7 +124,7 @@ const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, 
 const PROJECTION_CONTRACT = 2;
 const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.10.0';
+let VERSION = '0.11.0';
 try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10 };
@@ -212,8 +223,8 @@ const FLAGS = {
   check: { bool: ['--json', '--no-fallback'], value: [] },
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
   verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
-  log: { bool: ['--json'], value: ['--state', '--log-vkey'] },
-  'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker'] },
+  log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
+  'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -265,7 +276,8 @@ ${B}Usage${X}
   trooth verify <domain>    Check the record's signed witness statement yourself
   trooth log checkpoint     Read and check the witness statement log's signed checkpoint
   trooth log monitor --state <file>   Check the log only grew since the checkpoint in <file>
-  trooth public-record <domain>  What the company published to regulators and registries
+  trooth log receipt <index>  Fetch and check the COSE receipt (RFC 9942) for one log entry
+  trooth public-record <domain>  What the company published to regulators and registries, signed
   trooth --help | --version
 
 ${B}Examples${X}
@@ -292,8 +304,10 @@ ${B}Flags${X}
                             mapping bytes to one file (refuses to overwrite)
   --bundle <path>           verify: check a saved bundle; sends nothing
   --no-log                  verify: do not ask the witness statement log
-  --log-vkey <key>          verify, log: check checkpoints against this log key, not the pinned one
+  --log-vkey <key>          verify, log, public-record: check checkpoints against this log key, not the pinned one
   --state <path>            log monitor: the last checkpoint seen; written when the log only grew
+  --witnesses <n>           log checkpoint, log monitor: require cosignatures from n pinned witnesses
+  --out <path>              log receipt: write the COSE receipt bytes to a new file
   --cik, --lei, --ticker    public-record: name the SEC filer or LEI to read for the domain
 
 ${B}Exit codes${X}
@@ -303,6 +317,9 @@ ${B}Exit codes${X}
   8 verify: signature does not check, or the key is not trusted
   9 verify: signature checks, but the domain, mapping, manifest, counts or log proof do not match
     log monitor: the log is not an extension of the checkpoint in --state
+    log: fewer pinned witnesses cosigned than --witnesses asks; a COSE receipt does not check
+    public-record: the record is not the one its statement names, or its log receipt does not check
+  8 also: public-record: the statement's signature or key does not hold
   10 verify: a correction Trooth signed and logged withdraws or replaces the statement
 
 ${D}check reads only public, already-published records. No key, no account. It reads
@@ -311,7 +328,8 @@ the API and the MCP connector read, and sends the domain you ask about in the re
 URL, with your IP address and a user agent naming this CLI; see
 https://trooth.co/privacy for what is kept. When that projection cannot be reached it
 reads api.trooth.co's directory feed instead and says so. check reads; verify checks
-the one signed object, the witness statement, on your machine.
+the witness statement Trooth signed, on your machine; public-record checks the
+signed statement that names its reading, the same way.
 lint is entirely local: it opens files, and opens no sockets. Your source never leaves.
 Trooth publishes facts and counts, never one number that sums a company up.
 Trooth signs what it witnessed. It never signs on a company's behalf.${X}
@@ -1371,6 +1389,8 @@ function reportVerify({ statement, keys, keysReadAt, mappingBytes, manifest, dom
 
 /* -------------------------------------------------------- public-record ---- */
 
+const PUBLIC_RECORD_STATEMENT = 'trooth.public-record.v1';
+
 async function publicRecordCmd() {
   const { flags, positional } = parseArgs('public-record');
   if (positional.length !== 1) fail(EXIT.USAGE, 'trooth public-record takes one <domain>. Try: trooth public-record apple.com');
@@ -1391,7 +1411,10 @@ async function publicRecordCmd() {
     if (r.status !== 200) throw new Upstream(`the public-record reading answered HTTP ${r.status}`, { http_status: r.status });
     const d = parseJsonBody(r);
     if (d?.format !== 'trooth.public-record.v1' || d.domain !== domain) throw new Upstream('the answer is not a public-record reading of the domain asked about');
-    if (asJson) emitJson(d); else printPublicRecord(d);
+    const sig = await checkPublicRecordSignature(d, flags);
+    if (asJson) emitJson({ ...d, cli_check: sig }); else printPublicRecord(d, sig);
+    if (sig.status === 'not_trusted') return EXIT.NOT_TRUSTED;
+    if (sig.status === 'mismatch') return EXIT.MISMATCH;
     return d.bindings.length ? EXIT.OK : EXIT.FINDING;
   } catch (e) {
     if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
@@ -1399,13 +1422,71 @@ async function publicRecordCmd() {
   }
 }
 
-function printPublicRecord(d) {
+/**
+ * Check what the answer says about its own signature (docs/EVIDENCE.md
+ * section 5): the record's RFC 8785 SHA-256 is the one the statement names,
+ * the statement is signed by a key on the key list that was trusted when it
+ * was issued, and the statement is an entry of the log. Returns
+ * {status, reason, key, statement_id, log}. status: signed (all hold),
+ * unsigned (the answer says it is not signed), not_trusted (the signature or
+ * key does not hold), mismatch (the record or the log proof does not match).
+ */
+async function checkPublicRecordSignature(d, flags) {
+  const res = { status: 'unsigned', reason: null, key: null, statement_id: null, log: null };
+  const s = d.signed;
+  if (!s || typeof s !== 'object') return { ...res, reason: 'the answer carries no signed block (a reading from before trooth 0.11.0)' };
+  const { signed, ...record } = d;
+  void signed;
+  let sha;
+  try { sha = createHash('sha256').update(canonicalizeRecord(record), 'utf8').digest('hex'); }
+  catch (e) { return { ...res, status: 'mismatch', reason: `the record has no RFC 8785 form: ${e.message}` }; }
+  if (sha !== s.record_sha256) return { ...res, status: 'mismatch', reason: 'the record is not the one the statement names: its SHA-256 differs' };
+  const st = s.statement;
+  if (!st) return { ...res, reason: s.problem || 'the reading was not signed' };
+  let p;
+  try { p = JSON.parse(String(st.payload)); } catch { return { ...res, status: 'not_trusted', reason: 'the statement payload is not JSON' }; }
+  res.statement_id = statementId(st.payload);
+  if (p?.statement !== PUBLIC_RECORD_STATEMENT) return { ...res, status: 'not_trusted', reason: `the payload is not a ${PUBLIC_RECORD_STATEMENT} statement` };
+  if (st.alg !== 'Ed25519' || st.canonicalization !== 'RFC8785' || !isCanonical(st.payload)) return { ...res, status: 'not_trusted', reason: 'the statement is not RFC 8785 bytes signed with Ed25519' };
+  if (p.signer?.key_id !== st.key_id || p.signer?.issuer !== 'trooth.co') return { ...res, status: 'not_trusted', reason: 'the signer inside the statement is not the envelope key' };
+  if (p.record_sha256 !== sha || p.domain !== d.domain || p.read_at !== d.read_at || p.subject_id !== d.subject_id) return { ...res, status: 'mismatch', reason: 'the statement names another reading' };
+  res.key = st.key_id;
+  let keys;
+  try {
+    const kr = await getFrom(API, '/public/keys', MAX_BODY_SMALL);
+    if (kr.status !== 200) throw new Error(`HTTP ${kr.status}`);
+    keys = parseJsonBody(kr).keys;
+  } catch (e) { return { ...res, status: 'unsigned', reason: `the key list could not be read, so the signature was not checked: ${e.message}` }; }
+  const published = (Array.isArray(keys) ? keys : []).find((k) => k && k.kid === st.key_id);
+  const m = /^ed25519:([A-Za-z0-9+/]+={0,2})$/.exec(String(st.signature));
+  const { createPublicKey, verify: edVerify } = await import('node:crypto');
+  let valid = false;
+  try { valid = !!(m && published && edVerify(null, Buffer.from(st.payload, 'utf8'), createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: keyBytes(published).toString('base64url') }, format: 'jwk' }), Buffer.from(m[1], 'base64'))); } catch { valid = false; }
+  if (!valid) return { ...res, status: 'not_trusted', reason: 'the signature does not check against the published key' };
+  const kt = keyTrust(st.key_id, keys, typeof p.issued_at === 'string' ? p.issued_at : null);
+  if (!kt.trusted) return { ...res, status: 'not_trusted', reason: kt.reason };
+  if (s.log) {
+    let { vkeys, source } = logVkeys(flags);
+    if (!vkeys.length) {
+      const v = await getFrom(LOG_BASE, '/vkey', 4096);
+      vkeys = v.status === 200 ? [v.text.trim()] : [];
+      source = 'served by the log (not pinned in this release)';
+    }
+    const r = checkReceipt({ kind: 'public_record', statement: st, receipt: s.log, vkeys });
+    res.log = { ...r, vkey_source: source };
+    if (r.status !== 'included') return { ...res, status: 'mismatch', reason: `the log receipt does not check: ${r.reason}` };
+  }
+  return { ...res, status: 'signed', reason: s.log ? `signed by ${st.key_id}, and entry ${s.log.index} of the log` : `signed by ${st.key_id}; ${s.problem || 'not logged'}` };
+}
+
+function printPublicRecord(d, sig) {
   const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
   const st = (s) => (s === 'corroborated' ? ok(s) : s === 'contradicted' || s === 'not_found' ? bad(s.replace('_', ' ')) : warn(s.replace(/_/g, ' ')));
   const fact = (list, k) => (list || []).find((x) => x.key === k)?.value;
   const num = (n) => Number(n).toLocaleString('en-US');
   out(`${B}${d.domain}${X}  ${D}public record, read ${fmtDate(d.read_at)}${X}`);
   out(`  site names   ${d.site.legal_names.length ? d.site.legal_names.map((x) => `${x.name} ${D}(${x.source})${X}`).join('; ') : warn(d.site.reason || 'no legal name stated')}`);
+  if (d.entity) out(`  entity       ${ok(d.entity.id)}${d.entity.name ? ` ${d.entity.name}` : ''} ${D}(${d.entity.basis})${X}`);
   for (const b of d.bindings) {
     const label = b.identifier === 'cik' ? 'SEC filer ' : 'LEI       ';
     const best = b.for.find((x) => ['filing_namespace_names_domain', 'registry_lists_domain', 'through_corroborated_filer'].includes(x.kind)) || b.against[0] || b.for[0];
@@ -1419,7 +1500,8 @@ function printPublicRecord(d) {
     const latest = ['10-K', '20-F', '10-Q', '8-K', 'DEF 14A'].filter((k) => d.sec.latest[k]).map((k) => `${k} ${d.sec.latest[k].filed}`);
     if (latest.length) out(`  filings      ${latest.join(' · ')}`);
     out(`  8-K events   ${d.sec.events.length} since ${d.sec.events_cover_since} · cybersecurity incidents (1.05): ${d.sec.cybersecurity_incidents.length} · auditor changes (4.01): ${d.sec.auditor_changes.length} · non-reliance (4.02): ${d.sec.non_reliance.length}`);
-    for (const x of d.sec.financials) out(`  ${x.label.padEnd(11).slice(0, 11)}  ${num(x.value)} ${x.unit} ${D}(${x.period_start ? `year ending ${x.period_end}` : `at ${x.period_end}`}, ${x.form} filed ${x.filed})${X}`);
+    const short = { 'Revenue': 'revenue', 'Net income (loss)': 'net income', 'Total assets': 'assets' };
+    for (const x of d.sec.financials) out(`  ${(short[x.label] || x.label).padEnd(11)}  ${num(x.value)} ${x.unit} ${D}(${x.period_start ? `year ending ${x.period_end}` : `at ${x.period_end}`}, ${x.form} filed ${x.filed})${X}`);
   }
   if (d.lei) {
     const f = d.lei.facts;
@@ -1430,7 +1512,16 @@ function printPublicRecord(d) {
     const v = (k) => fact(d.dns, k);
     out(`  DNS          DNSSEC ${v('dns.dnssec') ? 'yes' : 'no'} · MTA-STS ${v('dns.mta_sts') ? v('dns.mta_sts_mode') || 'published' : 'no'} · TLS-RPT ${v('dns.tls_rpt') ? 'yes' : 'no'} · BIMI ${v('dns.bimi') ? 'yes' : 'no'} · DMARC ${v('dns.dmarc_policy') || 'none'}`);
   }
+  if (d.certificates) out(`  certificates ${d.certificates.unexpired}${d.certificates.page_full ? ' or more' : ''} unexpired for ${d.domain} in CT logs · issuers ${d.certificates.issuers.join(', ') || 'none'}${d.certificates.soonest_expiry ? ` · soonest expiry ${d.certificates.soonest_expiry.slice(0, 10)}` : ''}`);
+  if (d.security_txt) out(`  security.txt ${d.security_txt.contacts.join(', ')}${d.security_txt.expired ? ` ${bad('expired')}` : d.security_txt.expires ? ` ${D}(expires ${d.security_txt.expires.slice(0, 10)})${X}` : ''}`);
+  if (d.site.links?.length) out(`  linked       ${d.site.links.map((l) => `${l.kind.replace(/_/g, ' ')} ${D}${l.url}${X}`).join(' · ')}`);
+  if (d.sanctions) out(`  sanctions    ${d.sanctions.matches.length ? warn(`${d.sanctions.matches.length} OFAC SDN entr${d.sanctions.matches.length === 1 ? 'y' : 'ies'} with the same name: ${d.sanctions.matches.map((x) => `${x.name} (${x.programs})`).join('; ')}. A name match is not an identification.`) : `no OFAC SDN entity with the name ${d.sanctions.names_checked.join(' or ')}`}`);
+  if (Array.isArray(d.sources)) out(`  ${D}sources      ${d.sources.length} responses read, each kept by its SHA-256${X}`);
   out(`  ${D}not read     ${d.not_read.map((x) => x.source).join('; ')}${X}`);
+  if (sig) {
+    const line = sig.status === 'signed' ? ok(sig.reason) : sig.status === 'unsigned' ? warn(sig.reason) : bad(sig.reason);
+    out(`  signature    ${line}${sig.log?.vkey_source ? ` ${D}(log key ${sig.log.vkey_source})${X}` : ''}`);
+  }
   out(`\n${D}${d.note}${X}`);
 }
 
@@ -1490,27 +1581,83 @@ async function readCheckpoint(flags) {
   return { cp, why, note: r.text, vkeys, source };
 }
 
+/** --witnesses <n>: how many pinned witnesses must have cosigned. */
+function witnessesRequired(flags) {
+  if (flags['--witnesses'] === undefined) return 0;
+  if (!/^(0|[1-9][0-9]?)$/.test(flags['--witnesses'])) fail(EXIT.USAGE, '--witnesses is a whole number: how many pinned witnesses must have cosigned.');
+  const n = Number(flags['--witnesses']);
+  if (n > PINNED_WITNESSES.length) fail(EXIT.USAGE, `--witnesses ${n}: this release pins ${PINNED_WITNESSES.length} witnesses.`);
+  return n;
+}
+
+function cosignLines(cos) {
+  const valid = cos.filter((c) => c.valid);
+  if (!valid.length) return `  witnesses  ${A}no cosignature from the ${cos.length} pinned witnesses yet${X}`;
+  return `  witnesses  ${J}cosigned by ${valid.length} of ${cos.length}${X}: ${valid.map((c) => `${c.operator || c.name} ${D}(${c.time})${X}`).join(', ')}`;
+}
+
+async function logReceiptCmd(flags, positional) {
+  if (positional.length !== 2 || !/^(0|[1-9][0-9]{0,15})$/.test(positional[1])) fail(EXIT.USAGE, 'trooth log receipt takes one entry index. Try: trooth log receipt 0');
+  if (flags['--out'] && existsSync(flags['--out'])) fail(EXIT.USAGE, `--out will not overwrite ${flags['--out']}; choose a new path.`);
+  const index = Number(positional[1]);
+  let { vkeys, source } = logVkeys(flags);
+  if (!vkeys.length) {
+    const v = await getFrom(LOG_BASE, '/vkey', 4096);
+    if (v.status !== 200) throw new Upstream(`the log key answered HTTP ${v.status}`, { http_status: v.status });
+    vkeys = [v.text.trim()];
+    source = 'served by the log (not pinned in this release)';
+  }
+  const e = await getFrom(LOG_BASE, `/entries/${index}`, MAX_BODY_SMALL);
+  if (e.status === 404) fail(EXIT.FINDING, `the log has no entry ${index}.`);
+  if (e.status !== 200) throw new Upstream(`the log entry answered HTTP ${e.status}`, { http_status: e.status });
+  const entry = parseJsonBody(e);
+  const entryBytes = Buffer.from(canonicalize(entry.entry), 'utf8');
+  const receipt = await getBytes(`${LOG_BASE}/receipt/${index}`, 64 * 1024);
+  let published = null;
+  try { published = keysFromKeySet(await getBytes(`${API}/.well-known/scitt-keys`, 64 * 1024)); } catch { published = null; }
+  let result = null;
+  for (const k of vkeys) { result = checkCoseReceipt(receipt, entryBytes, parseVkey(k).key); if (result.valid) break; }
+  const listed = published ? vkeys.some((k) => published.some((p) => p.key.equals(parseVkey(k).key))) : null;
+  if (flags['--out'] && result.valid) writeFileSync(flags['--out'], receipt);
+  const doc = { log: LOG_ORIGIN, index, kind: entry.kind, statement_id: entry.statement_id, receipt: { valid: result.valid, reason: result.reason, tree_size: result.tree_size, root_hash: result.root, bytes: receipt.length, format: 'RFC 9942 COSE receipt of inclusion (COSE_Sign1, vds RFC9162_SHA256)' }, scitt_keys_lists_log_key: listed, vkey_source: source, written: flags['--out'] && result.valid ? flags['--out'] : null };
+  if (asJson) emitJson(doc);
+  else {
+    out(`${B}${LOG_ORIGIN}${X}  entry ${index} ${D}(${entry.kind}, ${entry.statement_id})${X}`);
+    out(`  COSE receipt  ${result.valid ? `${J}checks${X}: ${result.reason}` : `${R}does not check${X}: ${result.reason}`}`);
+    out(`  scitt-keys    ${listed === null ? `${A}not read${X}` : listed ? `${J}lists the log key${X}` : `${R}does not list the log key${X}`} ${D}(${API}/.well-known/scitt-keys)${X}`);
+    out(`  ${D}log key ${source}${doc.written ? `; receipt written to ${doc.written}` : ''}${X}`);
+  }
+  return result.valid && listed !== false ? EXIT.OK : EXIT.MISMATCH;
+}
+
 async function logCmd() {
   const sub = argv[1];
   const { flags, positional } = parseArgs('log');
-  if (sub !== 'checkpoint' && sub !== 'monitor') fail(EXIT.USAGE, 'trooth log takes checkpoint or monitor. Try: trooth log checkpoint');
-  if (positional.length > 1) fail(EXIT.USAGE, `unexpected argument: ${positional.slice(1).join(' ')}`);
-  if (sub === 'monitor' && !flags['--state']) fail(EXIT.USAGE, 'trooth log monitor needs --state <file>: where the last checkpoint seen is kept.');
+  if (sub !== 'checkpoint' && sub !== 'monitor' && sub !== 'receipt') fail(EXIT.USAGE, 'trooth log takes checkpoint, monitor or receipt. Try: trooth log checkpoint');
   try {
+    if (sub === 'receipt') return await logReceiptCmd(flags, positional);
+    if (positional.length > 1) fail(EXIT.USAGE, `unexpected argument: ${positional.slice(1).join(' ')}`);
+    if (sub === 'monitor' && !flags['--state']) fail(EXIT.USAGE, 'trooth log monitor needs --state <file>: where the last checkpoint seen is kept.');
+    const need = witnessesRequired(flags);
     const { cp, why, note, source } = await readCheckpoint(flags);
     if (!cp) {
       const doc = { log: LOG_ORIGIN, consistent: false, problem: `the checkpoint does not check: ${why}` };
       if (asJson) emitJson(doc); else out(`${R}The log's checkpoint does not check.${X} ${why}`);
       return EXIT.MISMATCH;
     }
+    const cos = checkCosignatures(note, PINNED_WITNESSES);
+    const cosigned = cos.filter((c) => c.valid).length;
+    const witnessDoc = { required: need, cosigned, pinned: cos.length, cosignatures: cos };
+    const short = need > cosigned ? `${cosigned} of the pinned witnesses cosigned this checkpoint; --witnesses asked for ${need}` : null;
     const now = { size: Number(cp.size), root: toB64(cp.root), checkpoint: note };
     if (sub === 'checkpoint') {
-      const doc = { log: LOG_ORIGIN, tree_size: now.size, root_hash: now.root, vkey_source: source, checkpoint: note };
+      const doc = { log: LOG_ORIGIN, tree_size: now.size, root_hash: now.root, vkey_source: source, witnesses: witnessDoc, problem: short, checkpoint: note };
       if (asJson) emitJson(doc); else out(`${B}${LOG_ORIGIN}${X}  ${J}checkpoint checks${X}
   tree size  ${now.size}
   root hash  ${now.root}
-  ${D}log key ${source}${X}`);
-      return EXIT.OK;
+${cosignLines(cos)}${short ? `\n  ${R}${short}${X}` : ''}
+  ${D}log key ${source}; witness keys pinned in trooth ${VERSION}${X}`);
+      return short ? EXIT.MISMATCH : EXIT.OK;
     }
     const path = flags['--state'];
     let prior = null;
@@ -1529,13 +1676,17 @@ async function logCmd() {
         if (proof.some((h) => !h) || !verifyConsistency(prior.size, now.size, fromB64(prior.root), cp.root, proof)) { consistent = false; problem = `the tree of ${now.size} is not an extension of the tree of ${prior.size}`; }
       }
     }
-    if (consistent) writeFileSync(path, JSON.stringify({ log: LOG_ORIGIN, size: now.size, root: now.root, checkpoint: now.checkpoint, seen_at: new Date().toISOString() }, null, 2) + '\n');
-    const doc = { log: LOG_ORIGIN, consistent, previous_size: prior?.size ?? null, tree_size: now.size, root_hash: now.root, problem, vkey_source: source };
+    if (consistent) writeFileSync(path, JSON.stringify({ log: LOG_ORIGIN, size: now.size, root: now.root, checkpoint: now.checkpoint, cosigned_by: cos.filter((c) => c.valid).map((c) => c.name), seen_at: new Date().toISOString() }, null, 2) + '\n');
+    const doc = { log: LOG_ORIGIN, consistent, previous_size: prior?.size ?? null, tree_size: now.size, root_hash: now.root, problem: problem || short, vkey_source: source, witnesses: witnessDoc };
     if (asJson) emitJson(doc);
-    else if (!prior) out(`${B}${LOG_ORIGIN}${X}  first checkpoint recorded: size ${now.size}\n  ${D}saved to ${path}; the next run checks the log only grew from here${X}`);
-    else if (consistent) out(`${B}${LOG_ORIGIN}${X}  ${J}consistent${X}: size ${prior.size} to ${now.size}, append-only`);
-    else out(`${B}${LOG_ORIGIN}${X}  ${R}NOT CONSISTENT${X}: ${problem}. The state file was left as it was.`);
-    return consistent ? EXIT.OK : EXIT.MISMATCH;
+    else {
+      if (!prior) out(`${B}${LOG_ORIGIN}${X}  first checkpoint recorded: size ${now.size}\n  ${D}saved to ${path}; the next run checks the log only grew from here${X}`);
+      else if (consistent) out(`${B}${LOG_ORIGIN}${X}  ${J}consistent${X}: size ${prior.size} to ${now.size}, append-only`);
+      else out(`${B}${LOG_ORIGIN}${X}  ${R}NOT CONSISTENT${X}: ${problem}. The state file was left as it was.`);
+      out(cosignLines(cos));
+      if (short) out(`  ${R}${short}${X}`);
+    }
+    return consistent && !short ? EXIT.OK : EXIT.MISMATCH;
   } catch (e) {
     if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
     throw e;

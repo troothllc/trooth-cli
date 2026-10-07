@@ -1,6 +1,6 @@
 # Checking a Trooth witness statement
 
-Version 1.2, October 6, 2026. Normative for `trooth verify`, the SDKs in `sdk/` and any other implementation. Version 1.2 adds the witness statement log and corrections (section 10, with the log itself in [LOG.md](LOG.md)) and the verdict `superseded`. Version 1.1 added statement v3 (RFC 8785 bytes, section 2.1), stable ids, verification bundles (section 7) and the published schemas (section 8). Every v1 and v2 statement checks exactly as under 1.0.
+Version 1.2, October 6, 2026, revised October 7, 2026 (section 9: the log's witnesses). Normative for `trooth verify`, the SDKs in `sdk/` and any other implementation. Version 1.2 adds the witness statement log and corrections (section 10, with the log itself in [LOG.md](LOG.md)) and the verdict `superseded`. Version 1.1 added statement v3 (RFC 8785 bytes, section 2.1), stable ids, verification bundles (section 7) and the published schemas (section 8). Every v1 and v2 statement checks exactly as under 1.0.
 
 Trooth signs one object: the **witness statement** for a reading it took of a company's public surface. Everything else on a Trooth profile is unsigned. This document says how to check a witness statement without trusting Trooth's website, API or any summary of the result. An implementation that follows it must reach the verdict given for every case in [`tests/vectors/vectors.json`](../tests/vectors/vectors.json) [`tests/vectors/bundles.json`](../tests/vectors/bundles.json) and [`tests/vectors/log.json`](../tests/vectors/log.json). The JavaScript core (`bin/lib/verify.mjs`), the Python package (`sdk/python`) and the Go package (`sdk/go`) all do, in their own test suites.
 
@@ -108,7 +108,7 @@ A bundle (`trooth.verification-bundle.v1`, [schema](../schemas/verification-bund
 
 ## 9. Limits of this version
 
-- The log has one operator and no independent witness co-signatures yet ([LOG.md](LOG.md) section 10).
+- The log has one operator; witness cosignatures begin when the witness network follows it ([LOG.md](LOG.md) sections 7 and 12).
 - Statements and receipts are JSON, not COSE (RFC 9052); a COSE form for SCITT (RFC 9943) receipts is planned.
 - There is no external timestamp.
 - The witness worker still signs v2; see section 2.1.

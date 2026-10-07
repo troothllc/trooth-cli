@@ -20,7 +20,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 11);
+  assert.equal(Object.keys(schemas).length, 12);
   for (const [f, s] of Object.entries(schemas)) {
     assert.equal(s.$id, `https://trooth.co/schemas/${f}`);
     assert.equal(s.$schema, 'https://json-schema.org/draft/2020-12/schema');
@@ -120,6 +120,15 @@ test('public-record readings built by the scan worker validate (docs/EVIDENCE.md
   for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com']) {
     ok('public-record.v1.schema.json', JSON.parse(readFileSync(new URL(`./fixtures/public-record/${n}.json`, import.meta.url), 'utf8')), n);
   }
+  // A signed answer, as a local run of the scan worker served it on 2026-10-07
+  // (signed with that run's throwaway keys): the reading, its statement and its receipt.
+  const signed = JSON.parse(readFileSync(new URL('./fixtures/public-record/apple.com.signed.json', import.meta.url), 'utf8'));
+  ok('public-record.v1.schema.json', signed, 'a signed reading');
+  ok('public-record-statement.v1.schema.json', JSON.parse(signed.signed.statement.payload), 'its statement payload');
+  ok('witness-statement.schema.json', signed.signed.statement, 'its envelope');
+  ok('log-receipt.schema.json', signed.signed.log, 'its receipt');
+  assert.equal(signed.entity.id, 'trooth:entity:lei:HWUPKR0MPOU8FGXBT394');
+  assert.notDeepEqual(validate('public-record-statement.v1.schema.json', { ...JSON.parse(signed.signed.statement.payload), extra: 1 }), [], 'no field outside the schema is signed');
 });
 
 test('stable ids: format, parse and refuse', () => {

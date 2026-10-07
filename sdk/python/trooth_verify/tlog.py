@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from .jcs import canonicalize
 
 LOG_ORIGIN = "trooth.co/witness-log/v1"
-ENTRY_KINDS = ("witness_statement", "correction")
+ENTRY_KINDS = ("witness_statement", "correction", "public_record")
 
 
 def _h(*parts: bytes) -> bytes:

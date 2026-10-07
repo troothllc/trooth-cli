@@ -823,5 +823,26 @@
       "reason": "read only through the registry number the LEI record carries; there is no common API across the states"
     }
   ],
-  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. A sanctions entry with the same name is not an identification. Nothing here grades, rates or ranks the company. Trooth signs a statement that names this reading by its SHA-256 and logs it; the signature says what Trooth read and when, not that what the sources say is true."
+  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. A sanctions entry with the same name is not an identification. Nothing here grades, rates or ranks the company. Trooth signs a statement that names this reading by its SHA-256 and logs it; the signature says what Trooth read and when, not that what the sources say is true.",
+  "signed": {
+    "record_sha256": "173c13ee71fbe48b2309eb067bea4b19f3122e03b921dff8b83348c900835d3a",
+    "record_canonicalization": "RFC8785",
+    "statement": {
+      "payload": "{\"bindings\":[{\"id\":\"trooth:cik:0000320193\",\"status\":\"corroborated\"},{\"id\":\"trooth:lei:HWUPKR0MPOU8FGXBT394\",\"status\":\"corroborated\"}],\"domain\":\"apple.com\",\"entity_id\":\"trooth:entity:lei:HWUPKR0MPOU8FGXBT394\",\"issued_at\":\"2026-10-07T01:33:02.855Z\",\"read_at\":\"2026-10-07T01:32:55.261Z\",\"record_canonicalization\":\"RFC8785\",\"record_sha256\":\"173c13ee71fbe48b2309eb067bea4b19f3122e03b921dff8b83348c900835d3a\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"trooth-master-2026-09\"},\"sources\":20,\"statement\":\"trooth.public-record.v1\",\"subject_id\":\"trooth:domain:apple.com\"}",
+      "signature": "ed25519:yLKtvONlio+aEwrtH2SIRV07ONKiwSnZRRZl/tcyMeWQcJqjO8JC1n298k8yVuCPfL0faqHairvcV1ELM1ozBA==",
+      "key_id": "trooth-master-2026-09",
+      "alg": "Ed25519",
+      "canonicalization": "RFC8785"
+    },
+    "statement_id": "trooth:statement:399912e0f19861304eb6ce3151a8117d299f895e70bd22bf08576d978eaf1c2a",
+    "log": {
+      "log": "trooth.co/witness-log/v1",
+      "index": 0,
+      "tree_size": 1,
+      "root_hash": "cLb77dtE0MiM0OatcKabtxq1WLqfX8fadI2wjo4D/XA=",
+      "inclusion_proof": [],
+      "checkpoint": "trooth.co/witness-log/v1\n1\ncLb77dtE0MiM0OatcKabtxq1WLqfX8fadI2wjo4D/XA=\n\n— trooth.co/witness-log/v1 FHejjNmESgKXBHw6TTu6QVZVxuVeB9T5PFGE0mQCZ+RnjdsETCXOrCayWYhDCPXfzODrrvVH48Z7UsLcdPQPyP0WAgI=\n"
+    },
+    "problem": null
+  }
 }

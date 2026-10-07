@@ -94,8 +94,41 @@ class LogReceipt(BaseModel):
     inclusion_proof: List[str] = Field(..., description="The RFC 9162 audit path, leaf to root, each a 32-byte hash in standard base64.")
     checkpoint: str = Field(..., description="A C2SP checkpoint (origin, size, base64 root, each on its own line) followed by a blank line and C2SP signed-note signature lines; the log key's line is an em dash, the key name and base64 of the 4-byte key hash and the 64-byte Ed25519 signature.")
 
+class PublicRecordStatement(BaseModel):
+    "The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    statement: Literal["trooth.public-record.v1"] = Field(..., description="The payload type.")
+    subject_id: str = Field(..., description="trooth:domain:<domain>.")
+    domain: str = Field(..., description="The domain read.")
+    read_at: str = Field(..., description="The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    record_sha256: str = Field(..., description="SHA-256, hex, of the reading's RFC 8785 bytes without `signed`.")
+    record_canonicalization: Literal["RFC8785"] = Field(..., description="How those bytes were made.")
+    entity_id: Optional[str] = Field(..., description="The reading's entity id, or null.")
+    bindings: List[BindingStatus] = Field(..., description="Each binding's id and status.")
+    sources: int = Field(..., description="How many responses the reading read.")
+    issued_at: str = Field(..., description="When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    signer: StatementSigner = Field(..., description="The signing key, inside the signed bytes.")
+
+class BindingStatus(BaseModel):
+    "A binding as the statement names it."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="trooth:cik or trooth:lei id.")
+    status: str = Field(..., description="The binding status.")
+
+class StatementSigner(BaseModel):
+    "The signing key."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    key_id: str = Field(..., description="The kid on https://api.trooth.co/public/keys.")
+    issuer: Literal["trooth.co"] = Field(..., description="Always trooth.co.")
+
 class PublicRecordReading(BaseModel):
-    "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text."
+    "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text."
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -108,8 +141,93 @@ class PublicRecordReading(BaseModel):
     sec: Optional[SecRecord] = Field(..., description="The SEC filer's record, or null when no filer was identified.")
     lei: Optional[LeiRecord] = Field(..., description="The LEI record, or null when none was identified.")
     dns: List[PublicFact] = Field(..., description="Mail-authentication records beyond SPF and DMARC, and DNSSEC.")
+    entity: Optional[Entity] = Field(None, description="The legal entity the domain is tied to, when a binding is corroborated; null otherwise. Added in trooth 0.11.0.")
+    certificates: Optional[Certificates] = Field(None, description="Unexpired certificates for the exact domain name in Certificate Transparency logs, as a CT monitor returned them; null when it did not answer. Added in trooth 0.11.0.")
+    security_txt: Optional[SecurityTxt] = Field(None, description="The site's /.well-known/security.txt (RFC 9116), or null when there is none or the site opted out of being read. Added in trooth 0.11.0.")
+    sanctions: Optional[Sanctions] = Field(None, description="Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0.")
+    sources: Optional[List[Source]] = Field(None, description="Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.")
     not_read: List[NotRead] = Field(..., description="Each source that was not read, or did not answer, and why. A source not read is never guessed at.")
     note: str = Field(..., description="What the reading is and is not, as a paragraph.")
+    signed: Optional[Signed] = Field(None, description="The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.")
+
+class Entity(BaseModel):
+    "A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md)."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="trooth:entity:lei:<LEI> when the LEI binding is corroborated, otherwise trooth:entity:cik:<CIK>.")
+    name: Optional[str] = Field(..., description="The legal name the registry holds.")
+    identifiers: List[str] = Field(..., description="The corroborated identifiers (trooth:lei, trooth:cik).")
+    basis: str = Field(..., description="Which bindings are corroborated.")
+
+class Certificates(BaseModel):
+    "Certificates for the exact domain name in Certificate Transparency logs."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The CT monitor URL read.")
+    unexpired: int = Field(..., description="How many unexpired certificates the monitor returned.")
+    issuers: List[str] = Field(..., description="The issuing authorities, at most 10.")
+    newest_issued: Optional[str] = Field(..., description="The latest not-before time.")
+    soonest_expiry: Optional[str] = Field(..., description="The earliest not-after time.")
+    page_full: bool = Field(..., description="True when the monitor's first page was full, so there may be more.")
+
+class SecurityTxt(BaseModel):
+    "A security.txt file (RFC 9116)."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    url: str = Field(..., description="Where it was read.")
+    contacts: List[str] = Field(..., description="Contact fields, at most 5.")
+    expires: Optional[str] = Field(..., description="The Expires field.")
+    expired: Optional[bool] = Field(..., description="Whether Expires was in the past when read; null when it does not parse.")
+    policy: Optional[str] = Field(..., description="The Policy field.")
+    canonical: List[str] = Field(..., description="Canonical fields.")
+    signed: bool = Field(..., description="Whether the file is OpenPGP clear-signed. The signature is not checked.")
+
+class Sanctions(BaseModel):
+    "An exact-name check against a sanctions list."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    list: str = Field(..., description="The list and the part of it read.")
+    source: str = Field(..., description="The list URL.")
+    read_at: str = Field(..., description="When the list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    names_checked: List[str] = Field(..., description="The legal names checked.")
+    matches: List[SanctionsEntry] = Field(..., description="Entries with exactly one of those names (case, punctuation and suffix spellings folded). A name match is not an identification.")
+
+class SanctionsEntry(BaseModel):
+    "A list entry."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    uid: str = Field(..., description="The entry number on the list.")
+    name: str = Field(..., description="The name as listed.")
+    programs: str = Field(..., description="The sanctions programs.")
+
+class Source(BaseModel):
+    "One response read."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    url: str = Field(..., description="The URL requested.")
+    status: int = Field(..., description="The HTTP status.")
+    sha256: str = Field(..., description="SHA-256 of the bytes read, hex.")
+    bytes: int = Field(..., description="How many bytes were read.")
+    complete: bool = Field(..., description="False when only the start of the document was read (a filing's first 256 KB).")
+    fetched_at: str = Field(..., description="When it was requested. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+
+class Signed(BaseModel):
+    "The statement naming the reading, and its log receipt."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    record_sha256: str = Field(..., description="SHA-256, hex, of the RFC 8785 bytes of the reading without `signed` (finite numbers in ECMAScript shortest form).")
+    record_canonicalization: Literal["RFC8785"] = Field(..., description="How those bytes were made.")
+    statement: Optional[WitnessStatement] = Field(..., description="The signed envelope; its payload is a public-record-statement.v1 document. Null when the reading could not be signed.")
+    statement_id: Optional[str] = Field(..., description="trooth:statement:<sha256 of the payload>.")
+    log: Optional[LogReceipt] = Field(..., description="The receipt of the statement as a public_record entry of the witness statement log, or null when it was not logged.")
+    problem: Optional[str] = Field(..., description="What could not be done (not signed, or signed and not logged), or null.")
 
 class PublicFact(BaseModel):
     "One fact as its source published it, with the URL it was read from."
@@ -179,6 +297,15 @@ class SiteRead(BaseModel):
     legal_names: List[SiteName] = Field(..., description="Each legal name stated, with the page.")
     read: bool = Field(..., description="Whether any page of the site could be read.")
     reason: Optional[str] = Field(..., description="Why no name was found, or why the site was not read (for example its robots.txt opts out).")
+    links: Optional[List[SiteLink]] = Field(None, description="Pages the home page links to on the company's own domain: investor relations, trust center, security, status, sustainability. Linked, not read. Added in trooth 0.11.0.")
+
+class SiteLink(BaseModel):
+    "A page the home page links to."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kind: Literal["investor_relations", "trust_center", "security", "status", "sustainability"] = Field(..., description="What the page is.")
+    url: str = Field(..., description="The link, without query or fragment.")
 
 class SiteName(BaseModel):
     "A legal name a page states."
@@ -525,13 +652,24 @@ KeyList.model_rebuild()
 PublicKey.model_rebuild()
 KeyEvent.model_rebuild()
 LogReceipt.model_rebuild()
+PublicRecordStatement.model_rebuild()
+BindingStatus.model_rebuild()
+StatementSigner.model_rebuild()
 PublicRecordReading.model_rebuild()
+Entity.model_rebuild()
+Certificates.model_rebuild()
+SecurityTxt.model_rebuild()
+Sanctions.model_rebuild()
+SanctionsEntry.model_rebuild()
+Source.model_rebuild()
+Signed.model_rebuild()
 PublicFact.model_rebuild()
 BindingEvidence.model_rebuild()
 EntityBinding.model_rebuild()
 Filing.model_rebuild()
 FinancialFact.model_rebuild()
 SiteRead.model_rebuild()
+SiteLink.model_rebuild()
 SiteName.model_rebuild()
 SecRecord.model_rebuild()
 LeiRecord.model_rebuild()
