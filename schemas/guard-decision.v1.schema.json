@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/guard-decision.v1.json",
+  "title": "GuardDecision",
+  "description": "One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string.",
+  "type": "object",
+  "required": ["decision", "reasons", "subject", "policy", "evidence", "decided_at"],
+  "properties": {
+    "decision": { "description": "allow: every required check held and every rule passed. hold: route the action to a person. deny: a proof failed or a rule the customer marked absolute failed (or the customer's policy chose deny for no record or no source).", "enum": ["allow", "hold", "deny"] },
+    "reasons": { "description": "Why, one entry per check or rule. An allow carries only RULE_PASSED.", "type": "array", "items": { "$ref": "#/$defs/reason" } },
+    "subject": { "description": "Exact entity ID checked, e.g. trooth:domain:acme.com. Empty when the action named no host.", "type": "string" },
+    "policy": { "description": "The policy the decision was made under.", "$ref": "#/$defs/policyRef" },
+    "evidence": { "description": "The signed, logged facts the rules read.", "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "action": { "description": "The intercepted tool call: name, target host, amount or data class. Stored locally, never sent to Trooth.", "type": "object" },
+    "decided_at": { "description": "When the decision was made (RFC 3339).", "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "reason": {
+      "title": "GuardReason",
+      "description": "One reason code, with what it is about.",
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": { "description": "The reason code.", "enum": ["RULE_PASSED", "EVIDENCE_MISSING", "EVIDENCE_STALE", "EVIDENCE_DISPUTED", "NO_RECORD", "SIGNATURE_INVALID", "KEY_NOT_TRUSTED", "NOT_IN_LOG", "SUBJECT_MISMATCH", "SCHEMA_UNSUPPORTED", "ABSOLUTE_RULE_FAILED", "SOURCE_UNREACHABLE"] },
+        "fact_id": { "type": "string", "description": "Stable ID of the fact this reason is about" },
+        "rule_id": { "type": "string", "description": "The customer's rule that produced this reason" },
+        "needed": { "type": "string", "description": "For EVIDENCE_MISSING: the claim type that would satisfy the rule" },
+        "detail": { "type": "string", "description": "A plain sentence on what was found. Written by the guard, never copied from vendor content." }
+      }
+    },
+    "policyRef": {
+      "title": "GuardPolicyRef",
+      "description": "Which policy, by id, version and the SHA-256 of its RFC 8785 canonical JSON.",
+      "type": "object",
+      "required": ["id", "version", "sha256"],
+      "properties": {
+        "id": { "description": "The policy's name (its `policy` key).", "type": "string" },
+        "version": { "description": "The policy's version number.", "type": "integer" },
+        "sha256": { "description": "SHA-256 (hex) of the RFC 8785 canonical JSON of the policy as parsed.", "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "evidence": {
+      "title": "GuardEvidence",
+      "description": "One signed, logged fact a rule read.",
+      "type": "object",
+      "required": ["fact_id", "statement_sha256", "log_index", "observed_at", "stale_after"],
+      "properties": {
+        "fact_id": { "description": "trooth:statement:<sha256>#<claim>: the statement and the claim read from it.", "type": "string" },
+        "statement_sha256": { "description": "SHA-256 (hex) of the statement's exact payload bytes.", "type": "string" },
+        "log_index": { "description": "The statement's entry in Trooth's log, or null when it is not shown in the log.", "type": ["integer", "null"] },
+        "observed_at": { "description": "When the fact was observed.", "type": "string" },
+        "stale_after": { "description": "When the fact stops being fresh for this rule (the rule's max_age_days, else the evidence class's stale-after), or null when unknown.", "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -44,6 +44,148 @@ export interface ManifestEntry {
   commitment?: string;
 }
 
+/** One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string. */
+export interface GuardDecision {
+  /** allow: every required check held and every rule passed. hold: route the action to a person. deny: a proof failed or a rule the customer marked absolute failed (or the customer's policy chose deny for no record or no source). */
+  decision: "allow" | "hold" | "deny";
+  /** Why, one entry per check or rule. An allow carries only RULE_PASSED. */
+  reasons: GuardReason[];
+  /** Exact entity ID checked, e.g. trooth:domain:acme.com. Empty when the action named no host. */
+  subject: string;
+  /** The policy the decision was made under. */
+  policy: GuardPolicyRef;
+  /** The signed, logged facts the rules read. */
+  evidence: GuardEvidence[];
+  /** The intercepted tool call: name, target host, amount or data class. Stored locally, never sent to Trooth. */
+  action?: Record<string, unknown>;
+  /** When the decision was made (RFC 3339). */
+  decided_at: string;
+}
+
+/** One reason code, with what it is about. */
+export interface GuardReason {
+  /** The reason code. */
+  code: "RULE_PASSED" | "EVIDENCE_MISSING" | "EVIDENCE_STALE" | "EVIDENCE_DISPUTED" | "NO_RECORD" | "SIGNATURE_INVALID" | "KEY_NOT_TRUSTED" | "NOT_IN_LOG" | "SUBJECT_MISMATCH" | "SCHEMA_UNSUPPORTED" | "ABSOLUTE_RULE_FAILED" | "SOURCE_UNREACHABLE";
+  /** Stable ID of the fact this reason is about */
+  fact_id?: string;
+  /** The customer's rule that produced this reason */
+  rule_id?: string;
+  /** For EVIDENCE_MISSING: the claim type that would satisfy the rule */
+  needed?: string;
+  /** A plain sentence on what was found. Written by the guard, never copied from vendor content. */
+  detail?: string;
+}
+
+/** Which policy, by id, version and the SHA-256 of its RFC 8785 canonical JSON. */
+export interface GuardPolicyRef {
+  /** The policy's name (its `policy` key). */
+  id: string;
+  /** The policy's version number. */
+  version: number;
+  /** SHA-256 (hex) of the RFC 8785 canonical JSON of the policy as parsed. */
+  sha256: string;
+}
+
+/** One signed, logged fact a rule read. */
+export interface GuardEvidence {
+  /** trooth:statement:<sha256>#<claim>: the statement and the claim read from it. */
+  fact_id: string;
+  /** SHA-256 (hex) of the statement's exact payload bytes. */
+  statement_sha256: string;
+  /** The statement's entry in Trooth's log, or null when it is not shown in the log. */
+  log_index: number | null;
+  /** When the fact was observed. */
+  observed_at: string;
+  /** When the fact stops being fresh for this rule (the rule's max_age_days, else the evidence class's stale-after), or null when unknown. */
+  stale_after: string | null;
+}
+
+/** A customer's guard policy (docs/GUARD.md section 3), written in YAML (the strict subset bin/lib/yaml-lite.mjs reads) or JSON. The guard refuses unknown keys, wrong types, duplicate rule ids, on_fail deny without absolute, and allow for source_unreachable or failMode. The policy's sha256 is the SHA-256 of the RFC 8785 canonical JSON of the document as parsed. */
+export interface GuardPolicy {
+  /** The policy's name. */
+  policy: string;
+  /** The policy's version number; raise it on every change. */
+  version: number;
+  /** Free text for people; the guard never reads it. */
+  description?: string;
+  /** Which actions are checked. Everything else passes straight through. */
+  applies_to: GuardAppliesTo;
+  /** Typed argument fields (dotted paths allowed) the target host is read from, in order. Default: url, endpoint, host, domain, base_url, webhook_url, email, to. */
+  host_from?: string[];
+  /** What the guard needs from Trooth's log. Default: required true, min_witnesses 1. */
+  log?: GuardLogRequirement;
+  /** The rules, each tested against signed, logged facts. Rule ids are unique. */
+  rules: GuardRule[];
+  /** Hosts for CI mode (trooth guard ci). */
+  destinations?: GuardDestinations;
+  /** The decision when no Trooth record exists for the host. Default hold. */
+  unknown_counterparty?: "hold" | "deny";
+  /** The decision when no Trooth source answers and no cached bundle is held. Default hold. allow is refused. */
+  source_unreachable?: "hold" | "deny";
+}
+
+/** The tools and HTTP destinations the policy covers. */
+export interface GuardAppliesTo {
+  /** Tool names; "*" stands for any run of characters (mcp__bank__*). */
+  tools?: string[];
+  /** For the http adapter: methods and host patterns whose requests are checked. */
+  http?: GuardHttpTarget[];
+}
+
+/** One method and host pattern (an exact host, or *. followed by a domain of at least two labels). */
+export interface GuardHttpTarget {
+  /** The HTTP method, or * for any. */
+  method: string;
+  /** The host pattern. */
+  host: string;
+}
+
+/** Log inclusion and witness cosignatures the policy asks for. */
+export interface GuardLogRequirement {
+  /** Whether a statement must be shown in the log (hold NOT_IN_LOG otherwise). A failed proof denies either way. */
+  required?: boolean;
+  /** How many pinned witnesses must have cosigned a checkpoint covering the statement. */
+  min_witnesses?: number;
+}
+
+/** One rule. A claim missing, stale or disputed holds; a rule marked absolute that fails denies. */
+export interface GuardRule {
+  /** The rule's id, unique in the policy. */
+  id: string;
+  /** Free text for people; the guard never reads it. */
+  description?: string;
+  /** A claim with an optional maximum age, or a valid signature by a key in an accepted state. */
+  require: GuardClaimRequire | GuardSignatureRequire;
+  /** hold (default), or deny for a rule marked absolute. */
+  on_fail?: "hold" | "deny";
+  /** When true, the rule failing denies the action (ABSOLUTE_RULE_FAILED). */
+  absolute?: boolean;
+}
+
+/** A claim read from a signed, logged Trooth artifact. */
+export interface GuardClaimRequire {
+  /** trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (not a signed claim today, so always missing). */
+  claim: string;
+  /** The oldest observation the rule accepts, in days. Default: the evidence class's stale-after. */
+  max_age_days?: number;
+}
+
+/** A valid signature by a key in one of the accepted states at signing time. */
+export interface GuardSignatureRequire {
+  /** Always valid. */
+  signature: "valid";
+  /** Accepted key states. Default both. */
+  key_status?: Array<"active" | "retired_before_use">;
+}
+
+/** For CI mode: hosts a build may add, and the hosts to watch. */
+export interface GuardDestinations {
+  /** Host patterns a build may add without failing. */
+  allowed?: string[];
+  /** Host patterns CI mode reports when added and not allowed. Default (empty): every new external host. */
+  watch?: string[];
+}
+
 /** The body of https://api.trooth.co/public/keys, or a saved copy of it. Save it with the time you read it: a saved list cannot show a compromise announced later. */
 export interface KeyList {
   /** Every key, current and past. */
@@ -338,6 +480,10 @@ export interface PublicRecordReading {
   changes?: Change[];
   /** Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0. */
   subjects?: NamedSubject[];
+  /** Each class of evidence in this reading with its stale-after rule, when it was observed and what it does not establish (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0. */
+  evidence_classes?: EvidenceClass[];
+  /** What changed since the previous cached reading of the same domain (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0. */
+  continuity?: Continuity;
   /** The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0. */
   signed?: Signed;
 }
@@ -514,8 +660,8 @@ export interface Change {
 export interface NamedSubject {
   /** The Trooth id. */
   id: string;
-  /** What it names. */
-  kind: "domain" | "entity" | "sec_filer" | "lei" | "jurisdiction" | "state_registry" | "sam_uei" | "code_repository" | "api" | "mcp_server";
+  /** What it names. representative: a contact the site publishes in security.txt (a trooth:contact id); not a person authorized to act for the entity. signing_authority: the key that signed this reading's statement (a trooth:key id), named at signing. */
+  kind: "domain" | "entity" | "sec_filer" | "lei" | "jurisdiction" | "state_registry" | "sam_uei" | "code_repository" | "api" | "mcp_server" | "representative" | "signing_authority";
   /** Why the reading names it. */
   basis: string;
 }
@@ -656,6 +802,8 @@ export interface EntityBinding {
   found_by: "asked" | "ticker" | "site_legal_name" | "edgar_lei_field" | "registry_name_match";
   /** corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier. */
   status: "corroborated" | "claimed_by_site" | "registries_only" | "uncorroborated" | "contradicted" | "not_found";
+  /** What ties the identifier to the domain, strongest first. regulator_filing: the company's 10-K XBRL namespace names the domain. registry_record: the LEI registry record lists the domain. site_statement: the site states the legal name; this is the site's claim. registry_name_match: a name match only; nothing ties the domain. asked: the caller supplied the identifier and nothing above ties it. none: no evidence ties it. Optional; added in trooth 0.13.0 (docs/EVIDENCE.md section 10). */
+  proof_method?: "regulator_filing" | "registry_record" | "site_statement" | "registry_name_match" | "asked" | "none";
   /** Evidence for the binding. */
   for: BindingEvidence[];
   /** Evidence against it. */
@@ -780,6 +928,48 @@ export interface NotRead {
   source: string;
   /** Why. */
   reason: string;
+}
+
+/** One class of evidence in the reading, kept apart from the others, with its own freshness rule and a line saying what it does not establish. */
+export interface EvidenceClass {
+  /** The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. */
+  class: "regulator_filing" | "registry_record" | "sanctions_list" | "procurement_exclusion" | "domain_registration" | "dns_configuration" | "certificate_transparency" | "site_publication" | "patent_record" | "merger_review";
+  /** The sections of this record that hold this class of evidence. */
+  sections: string[];
+  /** After this many days from observed_at a reader should take the evidence as stale and read again. */
+  stale_after_days: number;
+  /** What this class of evidence does not show, in one sentence. */
+  does_not_establish: string;
+  /** Whether this reading read any of the sections. */
+  read: boolean;
+  /** When the evidence was observed: the reading's read_at, or the source's own earlier read time when a cached answer was used. Null when not read. */
+  observed_at: string | null;
+  /** observed_at plus stale_after_days, as an ISO 8601 time. Null when not read. */
+  stale_after: string | null;
+}
+
+/** One difference between this reading and the previous reading of the same domain. */
+export interface ContinuityEvent {
+  /** What differs. entity_changed: the domain now ties to a different legal entity. entity_appeared: it now ties to one and did not before. entity_disappeared: it tied to one and now ties to none. renamed: the same entity under a new name. parent_changed: the LEI record names a different direct or ultimate parent. registrar_changed: RDAP names a different registrar. domain_transferred: RDAP records a transfer after the previous reading. unchanged: none of these. */
+  kind: "entity_changed" | "entity_appeared" | "entity_disappeared" | "renamed" | "parent_changed" | "registrar_changed" | "domain_transferred" | "unchanged";
+  /** The difference in words, naming both readings' values. */
+  detail: string;
+}
+
+/** The previous cached reading of the same domain this reading was compared with. */
+export interface ContinuityPrevious {
+  /** When the previous reading was taken. */
+  read_at: string;
+  /** Lowercase hex SHA-256 of the previous record as it was cached. */
+  record_sha256: string;
+}
+
+/** This reading compared with the previous cached reading of the same domain. A changed entity is never merged: the new reading carries only what it read now, and the event names both. */
+export interface Continuity {
+  /** The previous reading compared with; null when there is none. */
+  previous: ContinuityPrevious | null;
+  /** What differs; empty when there is no previous reading, and a single unchanged event when nothing listed differs. */
+  events: ContinuityEvent[];
 }
 
 /** Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list. */

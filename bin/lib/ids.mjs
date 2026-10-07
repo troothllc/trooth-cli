@@ -23,15 +23,37 @@ export const ID_TYPES = {
   repo: /^(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)\/[a-z0-9_.-]{1,100}$/,
   api: /^(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?$/,
   mcp: /^(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?$/,
+  contact: /^(?:mailto:[^\s?#@]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]|(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?)$/,
 };
 
 /** Build an id; throws when the value is not in its type's form. */
 export function formatId(type, value) {
   const re = ID_TYPES[type];
   if (!re) throw new Error(`unknown Trooth id type: ${type}`);
-  const v = type === 'domain' ? String(value).toLowerCase().replace(/\.$/, '') : type === 'cik' ? String(value).padStart(10, '0') : type === 'lei' ? String(value).toUpperCase() : String(value);
+  const v = type === 'domain' ? String(value).toLowerCase().replace(/\.$/, '') : type === 'cik' ? String(value).padStart(10, '0') : type === 'lei' ? String(value).toUpperCase() : type === 'contact' ? contactValue(value) : String(value);
   if (!re.test(v)) throw new Error(`not a valid ${type} value for a Trooth id: ${value}`);
   return `trooth:${type}:${v}`;
+}
+
+/**
+ * The canonical value of a `contact` id (docs/IDS.md 1.4): a mailto address with
+ * the domain lowercased, or an https address as host and path, without scheme,
+ * query, fragment or trailing slash. Anything else is returned as given, so the
+ * pattern refuses it.
+ *   mailto:Security@Example.COM?subject=x  ->  mailto:Security@example.com
+ *   https://Example.com/Report/?a=1#b      ->  example.com/Report
+ */
+function contactValue(raw) {
+  const c = String(raw).trim();
+  const mail = /^mailto:([^?#\s@]{1,64})@([A-Za-z0-9.-]{1,253})(?:[?#].*)?$/i.exec(c);
+  if (mail) return `mailto:${mail[1]}@${mail[2].toLowerCase().replace(/\.$/, '')}`;
+  if (/^https:\/\//i.test(c)) {
+    let u;
+    try { u = new URL(c); } catch { return c; }
+    if (u.username || u.password) return c;
+    return `${u.hostname.toLowerCase()}${u.pathname}`.replace(/\/+$/, '');
+  }
+  return c;
 }
 
 /** Parse an id into {type, value}, or null when it is not one. */

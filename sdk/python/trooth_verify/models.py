@@ -41,6 +41,125 @@ class ManifestEntry(BaseModel):
     source: Optional[str] = Field(None, description="The public URL the check read.")
     commitment: Optional[str] = Field(None, description="`sha256:` plus the hex SHA-256 of salt, a newline byte and the private reference. Only its holder can open it.")
 
+class GuardDecision(BaseModel):
+    "One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    decision: Literal["allow", "hold", "deny"] = Field(..., description="allow: every required check held and every rule passed. hold: route the action to a person. deny: a proof failed or a rule the customer marked absolute failed (or the customer's policy chose deny for no record or no source).")
+    reasons: List[GuardReason] = Field(..., description="Why, one entry per check or rule. An allow carries only RULE_PASSED.")
+    subject: str = Field(..., description="Exact entity ID checked, e.g. trooth:domain:acme.com. Empty when the action named no host.")
+    policy: GuardPolicyRef = Field(..., description="The policy the decision was made under.")
+    evidence: List[GuardEvidence] = Field(..., description="The signed, logged facts the rules read.")
+    action: Optional[Dict[str, Any]] = Field(None, description="The intercepted tool call: name, target host, amount or data class. Stored locally, never sent to Trooth.")
+    decided_at: str = Field(..., description="When the decision was made (RFC 3339).")
+
+class GuardReason(BaseModel):
+    "One reason code, with what it is about."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    code: Literal["RULE_PASSED", "EVIDENCE_MISSING", "EVIDENCE_STALE", "EVIDENCE_DISPUTED", "NO_RECORD", "SIGNATURE_INVALID", "KEY_NOT_TRUSTED", "NOT_IN_LOG", "SUBJECT_MISMATCH", "SCHEMA_UNSUPPORTED", "ABSOLUTE_RULE_FAILED", "SOURCE_UNREACHABLE"] = Field(..., description="The reason code.")
+    fact_id: Optional[str] = Field(None, description="Stable ID of the fact this reason is about")
+    rule_id: Optional[str] = Field(None, description="The customer's rule that produced this reason")
+    needed: Optional[str] = Field(None, description="For EVIDENCE_MISSING: the claim type that would satisfy the rule")
+    detail: Optional[str] = Field(None, description="A plain sentence on what was found. Written by the guard, never copied from vendor content.")
+
+class GuardPolicyRef(BaseModel):
+    "Which policy, by id, version and the SHA-256 of its RFC 8785 canonical JSON."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="The policy's name (its `policy` key).")
+    version: int = Field(..., description="The policy's version number.")
+    sha256: str = Field(..., description="SHA-256 (hex) of the RFC 8785 canonical JSON of the policy as parsed.")
+
+class GuardEvidence(BaseModel):
+    "One signed, logged fact a rule read."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    fact_id: str = Field(..., description="trooth:statement:<sha256>#<claim>: the statement and the claim read from it.")
+    statement_sha256: str = Field(..., description="SHA-256 (hex) of the statement's exact payload bytes.")
+    log_index: Optional[int] = Field(..., description="The statement's entry in Trooth's log, or null when it is not shown in the log.")
+    observed_at: str = Field(..., description="When the fact was observed.")
+    stale_after: Optional[str] = Field(..., description="When the fact stops being fresh for this rule (the rule's max_age_days, else the evidence class's stale-after), or null when unknown.")
+
+class GuardPolicy(BaseModel):
+    "A customer's guard policy (docs/GUARD.md section 3), written in YAML (the strict subset bin/lib/yaml-lite.mjs reads) or JSON. The guard refuses unknown keys, wrong types, duplicate rule ids, on_fail deny without absolute, and allow for source_unreachable or failMode. The policy's sha256 is the SHA-256 of the RFC 8785 canonical JSON of the document as parsed."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    policy: str = Field(..., description="The policy's name.")
+    version: int = Field(..., description="The policy's version number; raise it on every change.")
+    description: Optional[str] = Field(None, description="Free text for people; the guard never reads it.")
+    applies_to: GuardAppliesTo = Field(..., description="Which actions are checked. Everything else passes straight through.")
+    host_from: Optional[List[str]] = Field(None, description="Typed argument fields (dotted paths allowed) the target host is read from, in order. Default: url, endpoint, host, domain, base_url, webhook_url, email, to.")
+    log: Optional[GuardLogRequirement] = Field(None, description="What the guard needs from Trooth's log. Default: required true, min_witnesses 1.")
+    rules: List[GuardRule] = Field(..., description="The rules, each tested against signed, logged facts. Rule ids are unique.")
+    destinations: Optional[GuardDestinations] = Field(None, description="Hosts for CI mode (trooth guard ci).")
+    unknown_counterparty: Optional[Literal["hold", "deny"]] = Field(None, description="The decision when no Trooth record exists for the host. Default hold.")
+    source_unreachable: Optional[Literal["hold", "deny"]] = Field(None, description="The decision when no Trooth source answers and no cached bundle is held. Default hold. allow is refused.")
+
+class GuardAppliesTo(BaseModel):
+    "The tools and HTTP destinations the policy covers."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    tools: Optional[List[str]] = Field(None, description="Tool names; \"*\" stands for any run of characters (mcp__bank__*).")
+    http: Optional[List[GuardHttpTarget]] = Field(None, description="For the http adapter: methods and host patterns whose requests are checked.")
+
+class GuardHttpTarget(BaseModel):
+    "One method and host pattern (an exact host, or *. followed by a domain of at least two labels)."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    method: str = Field(..., description="The HTTP method, or * for any.")
+    host: str = Field(..., description="The host pattern.")
+
+class GuardLogRequirement(BaseModel):
+    "Log inclusion and witness cosignatures the policy asks for."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    required: Optional[bool] = Field(None, description="Whether a statement must be shown in the log (hold NOT_IN_LOG otherwise). A failed proof denies either way.")
+    min_witnesses: Optional[int] = Field(None, description="How many pinned witnesses must have cosigned a checkpoint covering the statement.")
+
+class GuardRule(BaseModel):
+    "One rule. A claim missing, stale or disputed holds; a rule marked absolute that fails denies."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="The rule's id, unique in the policy.")
+    description: Optional[str] = Field(None, description="Free text for people; the guard never reads it.")
+    require: Union[GuardClaimRequire, GuardSignatureRequire] = Field(..., description="A claim with an optional maximum age, or a valid signature by a key in an accepted state.")
+    on_fail: Optional[Literal["hold", "deny"]] = Field(None, description="hold (default), or deny for a rule marked absolute.")
+    absolute: Optional[bool] = Field(None, description="When true, the rule failing denies the action (ABSOLUTE_RULE_FAILED).")
+
+class GuardClaimRequire(BaseModel):
+    "A claim read from a signed, logged Trooth artifact."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    claim: str = Field(..., description="trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (not a signed claim today, so always missing).")
+    max_age_days: Optional[int] = Field(None, description="The oldest observation the rule accepts, in days. Default: the evidence class's stale-after.")
+
+class GuardSignatureRequire(BaseModel):
+    "A valid signature by a key in one of the accepted states at signing time."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    signature: Literal["valid"] = Field(..., description="Always valid.")
+    key_status: Optional[List[Literal["active", "retired_before_use"]]] = Field(None, description="Accepted key states. Default both.")
+
+class GuardDestinations(BaseModel):
+    "For CI mode: hosts a build may add, and the hosts to watch."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    allowed: Optional[List[str]] = Field(None, description="Host patterns a build may add without failing.")
+    watch: Optional[List[str]] = Field(None, description="Host patterns CI mode reports when added and not allowed. Default (empty): every new external host.")
+
 class KeyList(BaseModel):
     "The body of https://api.trooth.co/public/keys, or a saved copy of it. Save it with the time you read it: a saved list cannot show a compromise announced later."
 
@@ -256,6 +375,8 @@ class PublicRecordReading(BaseModel):
     domain_registration: Optional[DomainRegistration] = Field(None, description="The domain's registration, from RDAP, or null when no RDAP service answered. Added in trooth 0.12.0.")
     changes: Optional[List[Change]] = Field(None, description="What the sources in this reading record as having changed (renames, acquisitions and dispositions, changes in control, previous legal names, parents, merger review, domain registration), newest first. Added in trooth 0.12.0.")
     subjects: Optional[List[NamedSubject]] = Field(None, description="Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0.")
+    evidence_classes: Optional[List[EvidenceClass]] = Field(None, description="Each class of evidence in this reading with its stale-after rule, when it was observed and what it does not establish (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.")
+    continuity: Optional[Continuity] = Field(None, description="What changed since the previous cached reading of the same domain (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.")
     signed: Optional[Signed] = Field(None, description="The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.")
 
 class SamReading(BaseModel):
@@ -388,7 +509,7 @@ class NamedSubject(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     id: str = Field(..., description="The Trooth id.")
-    kind: Literal["domain", "entity", "sec_filer", "lei", "jurisdiction", "state_registry", "sam_uei", "code_repository", "api", "mcp_server"] = Field(..., description="What it names.")
+    kind: Literal["domain", "entity", "sec_filer", "lei", "jurisdiction", "state_registry", "sam_uei", "code_repository", "api", "mcp_server", "representative", "signing_authority"] = Field(..., description="What it names. representative: a contact the site publishes in security.txt (a trooth:contact id); not a person authorized to act for the entity. signing_authority: the key that signed this reading's statement (a trooth:key id), named at signing.")
     basis: str = Field(..., description="Why the reading names it.")
 
 class Entity(BaseModel):
@@ -499,6 +620,7 @@ class EntityBinding(BaseModel):
     id: str = Field(..., description="The stable id: trooth:cik:<10 digits> or trooth:lei:<LEI> (docs/IDS.md).")
     found_by: Literal["asked", "ticker", "site_legal_name", "edgar_lei_field", "registry_name_match"] = Field(..., description="How the identifier was found: asked (given by the requester), ticker, site_legal_name (the legal name the site states matched exactly one listed SEC filer), edgar_lei_field, registry_name_match (exact legal name and, when the SEC gives one, the jurisdiction).")
     status: Literal["corroborated", "claimed_by_site", "registries_only", "uncorroborated", "contradicted", "not_found"] = Field(..., description="corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier.")
+    proof_method: Optional[Literal["regulator_filing", "registry_record", "site_statement", "registry_name_match", "asked", "none"]] = Field(None, description="What ties the identifier to the domain, strongest first. regulator_filing: the company's 10-K XBRL namespace names the domain. registry_record: the LEI registry record lists the domain. site_statement: the site states the legal name; this is the site's claim. registry_name_match: a name match only; nothing ties the domain. asked: the caller supplied the identifier and nothing above ties it. none: no evidence ties it. Optional; added in trooth 0.13.0 (docs/EVIDENCE.md section 10).")
     for_: List[BindingEvidence] = Field(..., alias="for", description="Evidence for the binding.")
     against: List[BindingEvidence] = Field(..., description="Evidence against it.")
 
@@ -597,6 +719,43 @@ class NotRead(BaseModel):
 
     source: str = Field(..., description="The source.")
     reason: str = Field(..., description="Why.")
+
+class EvidenceClass(BaseModel):
+    "One class of evidence in the reading, kept apart from the others, with its own freshness rule and a line saying what it does not establish."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30.")
+    sections: List[str] = Field(..., description="The sections of this record that hold this class of evidence.")
+    stale_after_days: int = Field(..., description="After this many days from observed_at a reader should take the evidence as stale and read again.")
+    does_not_establish: str = Field(..., description="What this class of evidence does not show, in one sentence.")
+    read: bool = Field(..., description="Whether this reading read any of the sections.")
+    observed_at: Optional[str] = Field(..., description="When the evidence was observed: the reading's read_at, or the source's own earlier read time when a cached answer was used. Null when not read.")
+    stale_after: Optional[str] = Field(..., description="observed_at plus stale_after_days, as an ISO 8601 time. Null when not read.")
+
+class ContinuityEvent(BaseModel):
+    "One difference between this reading and the previous reading of the same domain."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kind: Literal["entity_changed", "entity_appeared", "entity_disappeared", "renamed", "parent_changed", "registrar_changed", "domain_transferred", "unchanged"] = Field(..., description="What differs. entity_changed: the domain now ties to a different legal entity. entity_appeared: it now ties to one and did not before. entity_disappeared: it tied to one and now ties to none. renamed: the same entity under a new name. parent_changed: the LEI record names a different direct or ultimate parent. registrar_changed: RDAP names a different registrar. domain_transferred: RDAP records a transfer after the previous reading. unchanged: none of these.")
+    detail: str = Field(..., description="The difference in words, naming both readings' values.")
+
+class ContinuityPrevious(BaseModel):
+    "The previous cached reading of the same domain this reading was compared with."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    read_at: str = Field(..., description="When the previous reading was taken.")
+    record_sha256: str = Field(..., description="Lowercase hex SHA-256 of the previous record as it was cached.")
+
+class Continuity(BaseModel):
+    "This reading compared with the previous cached reading of the same domain. A changed entity is never merged: the new reading carries only what it read now, and the event names both."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    previous: Optional[ContinuityPrevious] = Field(..., description="The previous reading compared with; null when there is none.")
+    events: List[ContinuityEvent] = Field(..., description="What differs; empty when there is no previous reading, and a single unchanged event when nothing listed differs.")
 
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
@@ -889,6 +1048,18 @@ EvidenceManifest = List[ManifestEntry]
 CorrectionPayload.model_rebuild()
 CorrectionReason.model_rebuild()
 ManifestEntry.model_rebuild()
+GuardDecision.model_rebuild()
+GuardReason.model_rebuild()
+GuardPolicyRef.model_rebuild()
+GuardEvidence.model_rebuild()
+GuardPolicy.model_rebuild()
+GuardAppliesTo.model_rebuild()
+GuardHttpTarget.model_rebuild()
+GuardLogRequirement.model_rebuild()
+GuardRule.model_rebuild()
+GuardClaimRequire.model_rebuild()
+GuardSignatureRequire.model_rebuild()
+GuardDestinations.model_rebuild()
 KeyList.model_rebuild()
 PublicKey.model_rebuild()
 KeyEvent.model_rebuild()
@@ -936,6 +1107,10 @@ SecRecord.model_rebuild()
 LeiRecord.model_rebuild()
 Parent.model_rebuild()
 NotRead.model_rebuild()
+EvidenceClass.model_rebuild()
+ContinuityEvent.model_rebuild()
+ContinuityPrevious.model_rebuild()
+Continuity.model_rebuild()
 VerificationBundle.model_rebuild()
 BundleLog.model_rebuild()
 LoggedCorrection.model_rebuild()

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trooth-verify"
-version = "0.2.0"
-description = "Check a Trooth witness statement yourself: Ed25519 signature, key lifecycle, subject, counts, mapping and manifest digests, offline bundles. The rules of docs/VERIFY.md."
+version = "0.3.0"
+description = "Check a Trooth witness statement yourself: Ed25519 signature, key lifecycle, subject, counts, mapping and manifest digests, offline bundles. The rules of docs/VERIFY.md. Also trooth_guard, the guard for Python agent frameworks."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Trooth, LLC" }]
@@ -20,4 +20,4 @@ Homepage = "https://trooth.co"
 Source = "https://github.com/troothllc/trooth-cli/tree/main/sdk/python"
 
 [tool.setuptools]
-packages = ["trooth_verify"]
+packages = ["trooth_verify", "trooth_guard"]
