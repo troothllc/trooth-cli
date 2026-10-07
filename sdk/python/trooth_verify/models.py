@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class CorrectionPayload(BaseModel):
     "The JSON a trooth.correction.v1 payload holds: Trooth withdrawing or replacing a statement it signed. Signed like a v3 statement (RFC 8785 bytes, Ed25519, the signer inside the signed bytes) and entered in the witness statement log. The statement it corrects stays in the log; nothing is deleted."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     statement: Literal["trooth.correction.v1"] = Field(..., description="The payload type.")
     correction_id: str = Field(..., description="An identifier for this correction, unique in the log.")
@@ -27,7 +27,7 @@ class CorrectionPayload(BaseModel):
 class CorrectionReason(BaseModel):
     "The reason for a correction."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     code: Literal["evaluator_defect", "mapping_defect", "source_misread", "signing_key_compromised", "dispute_upheld", "withdrawn_by_trooth"] = Field(..., description="evaluator_defect: the evaluator read wrongly. mapping_defect: the check mapping was wrong. source_misread: a source was misread. signing_key_compromised: the key that signed it is compromised. dispute_upheld: a dispute about the reading was upheld. withdrawn_by_trooth: withdrawn for another stated reason.")
     explanation: str = Field(..., description="The reason in words, 10 to 1000 characters.")
@@ -35,7 +35,7 @@ class CorrectionReason(BaseModel):
 class ManifestEntry(BaseModel):
     "One check and the evidence behind it: a public `source`, or a `commitment` to a private one. Exactly one of the two."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     check_id: str = Field(..., description="The check id. Unique in the manifest.")
     source: Optional[str] = Field(None, description="The public URL the check read.")
@@ -44,7 +44,7 @@ class ManifestEntry(BaseModel):
 class KeyList(BaseModel):
     "The body of https://api.trooth.co/public/keys, or a saved copy of it. Save it with the time you read it: a saved list cannot show a compromise announced later."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     keys: List[PublicKey] = Field(..., description="Every key, current and past.")
     list_read_at: Optional[str] = Field(None, description="When the list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
@@ -54,7 +54,7 @@ class KeyList(BaseModel):
 class PublicKey(BaseModel):
     "One published key and its lifecycle. Only `kid`, `alg`, `encoding`, `public_key`, `status` and the three lifecycle times decide trust (docs/VERIFY.md section 3)."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     kid: str = Field(..., description="The key id a statement names in key_id.")
     alg: Literal["Ed25519"] = Field(..., description="Always Ed25519.")
@@ -76,7 +76,7 @@ class PublicKey(BaseModel):
 class KeyEvent(BaseModel):
     "One lifecycle event of a key."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     event: str = Field(..., description="What happened (for example first_listed, retired, compromised).")
     at: str = Field(..., description="When. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
@@ -85,7 +85,7 @@ class KeyEvent(BaseModel):
 class LogReceipt(BaseModel):
     "A receipt from Trooth's witness statement log (docs/LOG.md): the entry index, a checkpoint signed by the log key, and an RFC 9162 inclusion proof from the entry to the checkpoint root. The entry is RFC 8785 JSON of {kind, statement}; its leaf hash is SHA-256(0x00 || entry)."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     log: Literal["trooth.co/witness-log/v1"] = Field(..., description="The log origin, which the checkpoint must also name.")
     index: int = Field(..., description="The zero-based entry index.")
@@ -94,10 +94,146 @@ class LogReceipt(BaseModel):
     inclusion_proof: List[str] = Field(..., description="The RFC 9162 audit path, leaf to root, each a 32-byte hash in standard base64.")
     checkpoint: str = Field(..., description="A C2SP checkpoint (origin, size, base64 root, each on its own line) followed by a blank line and C2SP signed-note signature lines; the log key's line is an em dash, the key name and base64 of the 4-byte key hash and the 64-byte Ed25519 signature.")
 
+class PublicRecordReading(BaseModel):
+    "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    format: Literal["trooth.public-record.v1"] = Field(..., description="The format.")
+    domain: str = Field(..., description="The domain read.")
+    subject_id: str = Field(..., description="trooth:domain:<domain>.")
+    read_at: str = Field(..., description="When Trooth read the sources. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    site: SiteRead = Field(..., description="What the company's own pages say about which legal entity it is.")
+    bindings: List[EntityBinding] = Field(..., description="Each identifier found and the evidence for and against tying it to the domain.")
+    sec: Optional[SecRecord] = Field(..., description="The SEC filer's record, or null when no filer was identified.")
+    lei: Optional[LeiRecord] = Field(..., description="The LEI record, or null when none was identified.")
+    dns: List[PublicFact] = Field(..., description="Mail-authentication records beyond SPF and DMARC, and DNSSEC.")
+    not_read: List[NotRead] = Field(..., description="Each source that was not read, or did not answer, and why. A source not read is never guessed at.")
+    note: str = Field(..., description="What the reading is and is not, as a paragraph.")
+
+class PublicFact(BaseModel):
+    "One fact as its source published it, with the URL it was read from."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    key: str = Field(..., description="A stable key, source.field (for example sec.tickers, lei.jurisdiction, dns.mta_sts).")
+    label: str = Field(..., description="The fact as words.")
+    value: Union[str, float, bool, None, List[str]] = Field(..., description="The value as published: text, a number, true or false, a list of text, or null when the source states nothing.")
+    source: str = Field(..., description="Where it was read: a URL, or dns:<name> <type> for a DNS record.")
+
+class BindingEvidence(BaseModel):
+    "One piece of evidence for or against a binding."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kind: str = Field(..., description="For: filing_namespace_names_domain, registry_lists_domain, through_corroborated_filer (these tie the identifier to the domain), site_names_registry_name (a claim by the site), registries_agree, edgar_names_lei. Against: registry_lists_other_domain, registries_disagree, edgar_names_other_lei.")
+    detail: str = Field(..., description="What was seen, as a sentence.")
+    source: Optional[str] = Field(..., description="Where it was seen, or null when it follows from other evidence.")
+
+class EntityBinding(BaseModel):
+    "A link between the domain and a legal-entity identifier, with the evidence for and against it. Nothing is asserted beyond the evidence."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    identifier: Literal["cik", "lei"] = Field(..., description="cik (SEC Central Index Key) or lei (Legal Entity Identifier).")
+    value: str = Field(..., description="The identifier: 10 digits for a CIK, 20 characters for an LEI.")
+    id: str = Field(..., description="The stable id: trooth:cik:<10 digits> or trooth:lei:<LEI> (docs/IDS.md).")
+    found_by: Literal["asked", "ticker", "site_legal_name", "edgar_lei_field", "registry_name_match"] = Field(..., description="How the identifier was found: asked (given by the requester), ticker, site_legal_name (the legal name the site states matched exactly one listed SEC filer), edgar_lei_field, registry_name_match (exact legal name and, when the SEC gives one, the jurisdiction).")
+    status: Literal["corroborated", "claimed_by_site", "registries_only", "uncorroborated", "contradicted", "not_found"] = Field(..., description="corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier.")
+    for_: List[BindingEvidence] = Field(..., alias="for", description="Evidence for the binding.")
+    against: List[BindingEvidence] = Field(..., description="Evidence against it.")
+
+class Filing(BaseModel):
+    "One SEC filing, as EDGAR lists it."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    form: str = Field(..., description="The form type (10-K, 10-Q, 8-K, DEF 14A, 20-F ...).")
+    filed: str = Field(..., description="The filing date, YYYY-MM-DD.")
+    report_date: Optional[str] = Field(..., description="The period or event date, when EDGAR gives one.")
+    items: List[str] = Field(..., description="For an 8-K, the item numbers it reports (for example 1.05, 4.01).")
+    description: Optional[str] = Field(..., description="EDGAR's description of the primary document.")
+    url: str = Field(..., description="The primary document on www.sec.gov.")
+
+class FinancialFact(BaseModel):
+    "A value the company filed in XBRL, as it filed it: the latest annual (10-K, full fiscal year) value of the concept."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    tag: str = Field(..., description="The XBRL concept, taxonomy:Name.")
+    label: str = Field(..., description="The concept as words.")
+    value: float = Field(..., description="The value as filed.")
+    unit: str = Field(..., description="The unit (USD).")
+    period_start: Optional[str] = Field(..., description="The period start for a flow such as revenue; null for a balance such as assets.")
+    period_end: str = Field(..., description="The period end.")
+    form: str = Field(..., description="The form the value was filed in.")
+    filed: str = Field(..., description="The filing date.")
+    accession: str = Field(..., description="The accession number of that filing.")
+    source: str = Field(..., description="The data.sec.gov URL the value was read from.")
+
+class SiteRead(BaseModel):
+    "The legal names the company's pages state in copyright notices."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    legal_names: List[SiteName] = Field(..., description="Each legal name stated, with the page.")
+    read: bool = Field(..., description="Whether any page of the site could be read.")
+    reason: Optional[str] = Field(..., description="Why no name was found, or why the site was not read (for example its robots.txt opts out).")
+
+class SiteName(BaseModel):
+    "A legal name a page states."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str = Field(..., description="The name as written.")
+    source: str = Field(..., description="The page.")
+
+class SecRecord(BaseModel):
+    "The SEC filer's registration facts, filings and annual XBRL values."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    cik: str = Field(..., description="The Central Index Key, 10 digits.")
+    facts: List[PublicFact] = Field(..., description="Registration facts on file with the SEC.")
+    latest: Dict[str, Filing] = Field(..., description="The latest filing of each key form type, keyed by form.")
+    events: List[Filing] = Field(..., description="8-K filings of the last two years, newest first, at most 50.")
+    events_cover_since: Optional[str] = Field(..., description="The earliest date the events cover.")
+    cybersecurity_incidents: List[Filing] = Field(..., description="8-K filings reporting Item 1.05, a material cybersecurity incident.")
+    auditor_changes: List[Filing] = Field(..., description="8-K filings reporting Item 4.01, a change of certifying accountant.")
+    non_reliance: List[Filing] = Field(..., description="8-K filings reporting Item 4.02, non-reliance on financial statements issued before.")
+    insider_forms_last_90_days: int = Field(..., description="Forms 3, 4 and 5 filed in the last 90 days.")
+    financials: List[FinancialFact] = Field(..., description="Annual values as filed.")
+
+class LeiRecord(BaseModel):
+    "The Legal Entity Identifier record."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    lei: str = Field(..., description="The LEI.")
+    facts: List[PublicFact] = Field(..., description="The record's facts.")
+    direct_parent: Optional[Parent] = Field(..., description="The direct parent the record reports, or null.")
+    ultimate_parent: Optional[Parent] = Field(..., description="The ultimate parent the record reports, or null.")
+
+class Parent(BaseModel):
+    "A parent entity."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    lei: str = Field(..., description="The parent's LEI.")
+    name: Optional[str] = Field(..., description="Its legal name.")
+
+class NotRead(BaseModel):
+    "A source not read."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The source.")
+    reason: str = Field(..., description="Why.")
+
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     bundle: Literal["trooth.verification-bundle.v1"] = Field(..., description="The bundle format.")
     created_at: str = Field(..., description="When the bundle was written. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
@@ -111,7 +247,7 @@ class VerificationBundle(BaseModel):
 class BundleLog(BaseModel):
     "The log answer, carried so the log part can be checked offline too."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     vkey: str = Field(..., description="The log verifier key the receipt was checked against, as a signed-note key (name+hash+key). A pinned key, when the checker has one, replaces it.")
     receipt: Optional[LogReceipt] = Field(..., description="The receipt for the statement, or null when the log held no entry for it.")
@@ -120,7 +256,7 @@ class BundleLog(BaseModel):
 class LoggedCorrection(BaseModel):
     "A correction envelope and its receipt."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     statement: WitnessStatement = Field(..., description="The correction envelope: its payload is a trooth.correction.v1 document in RFC 8785 bytes.")
     receipt: LogReceipt = Field(..., description="The receipt for the correction.")
@@ -128,7 +264,7 @@ class LoggedCorrection(BaseModel):
 class BundleKeys(BaseModel):
     "The key list as read."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     keys: List[PublicKey] = Field(..., description="The keys array of the key list.")
     list_read_at: Optional[str] = Field(..., description="When the key list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
@@ -137,7 +273,7 @@ class BundleKeys(BaseModel):
 class BundleMapping(BaseModel):
     "The mapping document, byte for byte."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     url: Optional[str] = Field(..., description="Where the bytes were read from.")
     digest: str = Field(..., description="The digest of the carried bytes, for display. A checker hashes the bytes itself and compares with the signed digest.")
@@ -146,7 +282,7 @@ class BundleMapping(BaseModel):
 class VerifyResult(BaseModel):
     "The JSON document `trooth verify --json` writes, and the shape the SDKs return. The verdict is the only conclusion; everything else says how it was reached."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     domain: Optional[str] = Field(..., description="The domain asked about, or the signed domain when none was asked.")
     verdict: Literal["checked", "checked_v1", "partially_checked", "signature_not_trusted", "mismatch", "superseded"] = Field(..., description="checked: v2 or v3, everything bound and matching. checked_v1: a v1 statement that checks. partially_checked: a mapping or manifest was not supplied. signature_not_trusted: malformed, invalid or untrusted key. mismatch: trusted, but a count, the domain, the mapping, the manifest or a log receipt disagrees. superseded: everything held, and a correction Trooth signed and logged withdraws or replaces the statement.")
@@ -167,7 +303,7 @@ class VerifyResult(BaseModel):
 class KeyTrust(BaseModel):
     "The key decision."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     kid: str = Field(..., description="The key id the envelope names.")
     state: Literal["active", "retired", "compromised", "revoked_unrecorded", "unknown"] = Field(..., description="The lifecycle state found on the key list.")
@@ -177,7 +313,7 @@ class KeyTrust(BaseModel):
 class Subject(BaseModel):
     "The subject decision."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     signed: Optional[str] = Field(..., description="The domain in the signed payload.")
     asked: Optional[str] = Field(..., description="The domain asked about.")
@@ -186,7 +322,7 @@ class Subject(BaseModel):
 class Binding(BaseModel):
     "The binding decision."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     status: Literal["bound", "partially_checked", "mismatch", "absent", "unchecked"] = Field(..., description="bound, partially_checked, mismatch, absent (v1 binds neither) or unchecked (signature not trusted).")
     mapping: Literal["match", "mismatch", "not_supplied", "absent"] = Field(..., description="The mapping result.")
@@ -195,7 +331,7 @@ class Binding(BaseModel):
 class LogCheck(BaseModel):
     "What the log showed about the statement."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     status: Literal["included", "not_logged", "unavailable", "checkpoint_invalid", "proof_invalid"] = Field(..., description="included: the receipt checks against a checkpoint signed by the log key. not_logged: the log holds no entry for it (reported, not a failure in this version). unavailable: the log could not be read. checkpoint_invalid: the checkpoint is not signed by the log key or names another log. proof_invalid: the receipt does not take this statement to the signed root.")
     index: Optional[int] = Field(..., description="The entry index the receipt names, or null.")
@@ -208,7 +344,7 @@ class LogCheck(BaseModel):
 class CorrectionCheck(BaseModel):
     "One correction and whether it is relied on."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     valid: bool = Field(..., description="True when it is signed by a trusted key, in RFC 8785 bytes, names this statement, and is included in the log.")
     correction_statement_id: Optional[str] = Field(..., description="The statement id of the correction itself.")
@@ -221,7 +357,7 @@ class CorrectionCheck(BaseModel):
 class CountCheck(BaseModel):
     "The count decision."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     identities_hold: bool = Field(..., description="True when every identity holds.")
     problems: List[str] = Field(..., description="Each identity that does not hold, in words.")
@@ -229,7 +365,7 @@ class CountCheck(BaseModel):
 class WitnessPayloadV1(BaseModel):
     "The JSON a trooth.witness-statement.v1 payload holds. v1 binds the outcomes and counts only: no mapping, manifest, evaluator or subject scope."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     statement: Literal["trooth.witness-statement.v1"] = Field(..., description="The statement version.")
     reading_id: str = Field(..., description="The id of the reading. Also usable as trooth:reading:<reading_id> (docs/IDS.md).")
@@ -241,7 +377,7 @@ class WitnessPayloadV1(BaseModel):
 class CheckV1(BaseModel):
     "One check in a v1 reading. v1 carries no reason."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     id: str = Field(..., description="The check id.")
     category: str = Field(..., description="The check category.")
@@ -251,7 +387,7 @@ class CheckV1(BaseModel):
 class CountsV1(BaseModel):
     "The two counts a v1 payload carries."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     read: int = Field(..., description="Checks whose outcome is not `not read`.")
     as_expected: int = Field(..., description="Checks whose outcome is `as expected`.")
@@ -259,7 +395,7 @@ class CountsV1(BaseModel):
 class WitnessPayloadV2(BaseModel):
     "The JSON a trooth.witness-statement.v2 payload holds. Its members are signed in exactly this order with no whitespace. It binds the check mapping, the evaluator, the subject scope and the evidence manifest."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     statement: Literal["trooth.witness-statement.v2"] = Field(..., description="The statement version.")
     reading_id: str = Field(..., description="The id of the reading. Also usable as trooth:reading:<reading_id> (docs/IDS.md).")
@@ -275,7 +411,7 @@ class WitnessPayloadV2(BaseModel):
 class Check(BaseModel):
     "One check in the reading and its outcome."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     id: str = Field(..., description="The check id in the check mapping the payload names (for example S1, L2).")
     category: str = Field(..., description="The check category in the mapping (for example security, legal, ai, ip, business).")
@@ -286,7 +422,7 @@ class Check(BaseModel):
 class CheckReason(BaseModel):
     "Why a check is not `as expected`. Present on every check whose outcome is `not read` or `not as expected`."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     code: Literal["source_unavailable", "timeout", "evaluator_limitation", "carried_from_earlier_reading", "check_misconfigured", "contrary_observation", "expected_item_absent"] = Field(..., description="The reason code. source_unavailable, timeout, evaluator_limitation, carried_from_earlier_reading and check_misconfigured go with `not read`; contrary_observation and expected_item_absent go with `not as expected`.")
     version: Literal["trooth.check-explanations.v1"] = Field(..., description="The version of the reason vocabulary.")
@@ -297,7 +433,7 @@ class CheckReason(BaseModel):
 class Counts(BaseModel):
     "Counts that MUST agree with the checks: read + not_read = in_reading; as_expected + not_as_expected = read; in_reading = the number of checks. They are reported apart and never added into one number."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     read: int = Field(..., description="Checks whose outcome is not `not read`.")
     as_expected: int = Field(..., description="Checks whose outcome is `as expected`.")
@@ -308,7 +444,7 @@ class Counts(BaseModel):
 class SubjectScope(BaseModel):
     "What the reading covered."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     domain: str = Field(..., description="The domain read. Equals the payload domain.")
     surface: str = Field(..., description="Which surface was read. `public`: only what anyone can fetch.")
@@ -317,7 +453,7 @@ class SubjectScope(BaseModel):
 class Methodology(BaseModel):
     "The exact check mapping the reading used, bound by digest."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     standard: str = Field(..., description="The name of the standard the mapping belongs to.")
     mapping_version: str = Field(..., description="The mapping version.")
@@ -327,7 +463,7 @@ class Methodology(BaseModel):
 class Evaluator(BaseModel):
     "The software that took the reading."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str = Field(..., description="The evaluator name.")
     version: str = Field(..., description="The evaluator version.")
@@ -335,7 +471,7 @@ class Evaluator(BaseModel):
 class EvidenceManifestRef(BaseModel):
     "The evidence manifest the reading binds, by digest."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     digest: str = Field(..., description="`sha256:` plus the hex SHA-256 of the canonical manifest bytes (evidence-manifest.schema.json).")
     entries: int = Field(..., description="The number of manifest entries.")
@@ -344,7 +480,7 @@ class EvidenceManifestRef(BaseModel):
 class WitnessPayloadV3(BaseModel):
     "The JSON a trooth.witness-statement.v3 payload holds: the v2 content plus subject_id and signer, serialized as RFC 8785 (JCS). Every number is an integer between -(2^53 - 1) and 2^53 - 1, so every implementation produces the same bytes."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     checks: List[Check] = Field(..., description="Every check in the reading.")
     counts: Counts = Field(..., description="Counts that must agree with the checks.")
@@ -362,7 +498,7 @@ class WitnessPayloadV3(BaseModel):
 class Signer(BaseModel):
     "The signing key, named inside the signed bytes so the envelope cannot point at another key."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     key_id: str = Field(..., description="The kid of the signing key. MUST equal the envelope key_id.")
     issuer: Literal["trooth.co"] = Field(..., description="Who signs: trooth.co.")
@@ -370,7 +506,7 @@ class Signer(BaseModel):
 class WitnessStatement(BaseModel):
     "The signed envelope Trooth publishes as `witnessStatement` on a record. The signature covers the exact UTF-8 bytes of `payload`, nothing else. How to check it: docs/VERIFY.md in github.com/troothllc/trooth-cli."
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     payload: str = Field(..., description="The signing input: the exact JSON text that was signed. Parse it to read it; never re-serialize it to check it. Its `statement` field names the version (witness-payload.v1, v2 or v3).")
     signature: str = Field(..., description="The Ed25519 signature over the payload bytes: `ed25519:` followed by standard base64 of the 64 signature bytes.")
@@ -389,6 +525,18 @@ KeyList.model_rebuild()
 PublicKey.model_rebuild()
 KeyEvent.model_rebuild()
 LogReceipt.model_rebuild()
+PublicRecordReading.model_rebuild()
+PublicFact.model_rebuild()
+BindingEvidence.model_rebuild()
+EntityBinding.model_rebuild()
+Filing.model_rebuild()
+FinancialFact.model_rebuild()
+SiteRead.model_rebuild()
+SiteName.model_rebuild()
+SecRecord.model_rebuild()
+LeiRecord.model_rebuild()
+Parent.model_rebuild()
+NotRead.model_rebuild()
 VerificationBundle.model_rebuild()
 BundleLog.model_rebuild()
 LoggedCorrection.model_rebuild()

@@ -41,6 +41,14 @@
 //                           statement log (docs/LOG.md). trooth log monitor --state
 //                           <file> checks the log only grew since the checkpoint saved
 //                           in <file>, and saves the new one. Anyone can run a monitor.
+//   trooth public-record <domain>
+//                           What the company has published outside its own site,
+//                           read by Trooth from the authorities that hold it: its SEC
+//                           filer record, filings (10-K, 10-Q, 8-K items, proxy),
+//                           annual XBRL values, its LEI record, DNS mail
+//                           authentication, and the evidence tying each identifier to
+//                           the domain. docs/EVIDENCE.md. --cik, --lei, --ticker name
+//                           the identifier when the site does not.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
@@ -105,7 +113,7 @@ const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, 
 const PROJECTION_CONTRACT = 2;
 const PROJECTION_SCHEMA = 'https://trooth.co/schemas/network-profile.v2.schema.json';
 const require = createRequire(import.meta.url);
-let VERSION = '0.9.0';
+let VERSION = '0.10.0';
 try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10 };
@@ -205,6 +213,7 @@ const FLAGS = {
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
   verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
   log: { bool: ['--json'], value: ['--state', '--log-vkey'] },
+  'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -256,6 +265,7 @@ ${B}Usage${X}
   trooth verify <domain>    Check the record's signed witness statement yourself
   trooth log checkpoint     Read and check the witness statement log's signed checkpoint
   trooth log monitor --state <file>   Check the log only grew since the checkpoint in <file>
+  trooth public-record <domain>  What the company published to regulators and registries
   trooth --help | --version
 
 ${B}Examples${X}
@@ -284,6 +294,7 @@ ${B}Flags${X}
   --no-log                  verify: do not ask the witness statement log
   --log-vkey <key>          verify, log: check checkpoints against this log key, not the pinned one
   --state <path>            log monitor: the last checkpoint seen; written when the log only grew
+  --cik, --lei, --ticker    public-record: name the SEC filer or LEI to read for the domain
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
@@ -1358,6 +1369,71 @@ function reportVerify({ statement, keys, keysReadAt, mappingBytes, manifest, dom
   return { checked: EXIT.OK, checked_v1: EXIT.OK, partially_checked: EXIT.INCOMPLETE, signature_not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH, superseded: EXIT.SUPERSEDED }[r.verdict] ?? EXIT.UPSTREAM;
 }
 
+/* -------------------------------------------------------- public-record ---- */
+
+async function publicRecordCmd() {
+  const { flags, positional } = parseArgs('public-record');
+  if (positional.length !== 1) fail(EXIT.USAGE, 'trooth public-record takes one <domain>. Try: trooth public-record apple.com');
+  const norm = normalizeDomain(positional[0]);
+  if (norm.error) fail(EXIT.USAGE, norm.error.replace('trooth check', 'trooth public-record'));
+  const domain = norm.domain;
+  const q = new URLSearchParams();
+  if (flags['--cik'] !== undefined) { if (!/^\d{1,10}$/.test(flags['--cik'])) fail(EXIT.USAGE, '--cik is the SEC Central Index Key, 1 to 10 digits.'); q.set('cik', flags['--cik']); }
+  if (flags['--lei'] !== undefined) { if (!/^[A-Za-z0-9]{20}$/.test(flags['--lei'])) fail(EXIT.USAGE, '--lei is a 20-character Legal Entity Identifier.'); q.set('lei', flags['--lei'].toUpperCase()); }
+  if (flags['--ticker'] !== undefined) { if (!/^[A-Za-z][A-Za-z0-9.-]{0,9}$/.test(flags['--ticker'])) fail(EXIT.USAGE, '--ticker is 1 to 10 letters, digits, dots or dashes.'); q.set('ticker', flags['--ticker'].toUpperCase()); }
+  try {
+    const qs = q.toString();
+    const r = await getFrom(API, `/scan/public-record/${encodeURIComponent(domain)}${qs ? `?${qs}` : ''}`, MAX_BODY_SMALL);
+    if (r.status === 429 || r.status === 400) {
+      let why = `HTTP ${r.status}`; try { why = JSON.parse(r.text).error || why; } catch {}
+      fail(r.status === 400 ? EXIT.USAGE : EXIT.UPSTREAM, why, { http_status: r.status });
+    }
+    if (r.status !== 200) throw new Upstream(`the public-record reading answered HTTP ${r.status}`, { http_status: r.status });
+    const d = parseJsonBody(r);
+    if (d?.format !== 'trooth.public-record.v1' || d.domain !== domain) throw new Upstream('the answer is not a public-record reading of the domain asked about');
+    if (asJson) emitJson(d); else printPublicRecord(d);
+    return d.bindings.length ? EXIT.OK : EXIT.FINDING;
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+}
+
+function printPublicRecord(d) {
+  const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
+  const st = (s) => (s === 'corroborated' ? ok(s) : s === 'contradicted' || s === 'not_found' ? bad(s.replace('_', ' ')) : warn(s.replace(/_/g, ' ')));
+  const fact = (list, k) => (list || []).find((x) => x.key === k)?.value;
+  const num = (n) => Number(n).toLocaleString('en-US');
+  out(`${B}${d.domain}${X}  ${D}public record, read ${fmtDate(d.read_at)}${X}`);
+  out(`  site names   ${d.site.legal_names.length ? d.site.legal_names.map((x) => `${x.name} ${D}(${x.source})${X}`).join('; ') : warn(d.site.reason || 'no legal name stated')}`);
+  for (const b of d.bindings) {
+    const label = b.identifier === 'cik' ? 'SEC filer ' : 'LEI       ';
+    const best = b.for.find((x) => ['filing_namespace_names_domain', 'registry_lists_domain', 'through_corroborated_filer'].includes(x.kind)) || b.against[0] || b.for[0];
+    out(`  ${label}   ${b.identifier === 'cik' ? `CIK ${b.value}` : b.value}  ${st(b.status)}${best ? ` ${D}${best.detail}${X}` : ''}`);
+  }
+  if (d.sec) {
+    const f = d.sec.facts;
+    const tick = (fact(f, 'sec.tickers') || []).join(', ');
+    const exch = (fact(f, 'sec.exchanges') || []).join(', ');
+    out(`               ${fact(f, 'sec.name')}${tick ? ` · ${tick}${exch ? ` (${exch})` : ''}` : ''}${fact(f, 'sec.filer_category') ? ` · ${fact(f, 'sec.filer_category')}` : ''}${fact(f, 'sec.state_of_incorporation') ? ` · incorporated ${fact(f, 'sec.state_of_incorporation')}` : ''}`);
+    const latest = ['10-K', '20-F', '10-Q', '8-K', 'DEF 14A'].filter((k) => d.sec.latest[k]).map((k) => `${k} ${d.sec.latest[k].filed}`);
+    if (latest.length) out(`  filings      ${latest.join(' · ')}`);
+    out(`  8-K events   ${d.sec.events.length} since ${d.sec.events_cover_since} · cybersecurity incidents (1.05): ${d.sec.cybersecurity_incidents.length} · auditor changes (4.01): ${d.sec.auditor_changes.length} · non-reliance (4.02): ${d.sec.non_reliance.length}`);
+    for (const x of d.sec.financials) out(`  ${x.label.padEnd(11).slice(0, 11)}  ${num(x.value)} ${x.unit} ${D}(${x.period_start ? `year ending ${x.period_end}` : `at ${x.period_end}`}, ${x.form} filed ${x.filed})${X}`);
+  }
+  if (d.lei) {
+    const f = d.lei.facts;
+    out(`               ${fact(f, 'lei.legal_name')} · ${fact(f, 'lei.jurisdiction') || 'no jurisdiction'} · ${fact(f, 'lei.registration_status')}${fact(f, 'lei.registry_number') ? ` · registry number ${fact(f, 'lei.registry_number')}` : ''}`);
+    if (d.lei.direct_parent) out(`               parent ${d.lei.direct_parent.name || ''} ${D}(${d.lei.direct_parent.lei})${X}`);
+  }
+  if (d.dns.length) {
+    const v = (k) => fact(d.dns, k);
+    out(`  DNS          DNSSEC ${v('dns.dnssec') ? 'yes' : 'no'} · MTA-STS ${v('dns.mta_sts') ? v('dns.mta_sts_mode') || 'published' : 'no'} · TLS-RPT ${v('dns.tls_rpt') ? 'yes' : 'no'} · BIMI ${v('dns.bimi') ? 'yes' : 'no'} · DMARC ${v('dns.dmarc_policy') || 'none'}`);
+  }
+  out(`  ${D}not read     ${d.not_read.map((x) => x.source).join('; ')}${X}`);
+  out(`\n${D}${d.note}${X}`);
+}
+
 /* ----------------------------------------------------------------- log ---- */
 
 const LOG_BASE = `${API}/scan/log/v1`;
@@ -1508,12 +1584,13 @@ async function main() {
   if (cmd === 'lint') return lint();
   if (cmd === 'verify') return verifyCmd();
   if (cmd === 'log') return logCmd();
+  if (cmd === 'public-record') return publicRecordCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only

@@ -1,0 +1,633 @@
+{
+  "format": "trooth.public-record.v1",
+  "domain": "cloudflare.com",
+  "subject_id": "trooth:domain:cloudflare.com",
+  "read_at": "2026-10-06T23:55:21.737Z",
+  "site": {
+    "legal_names": [
+      {
+        "name": "Cloudflare, Inc.",
+        "source": "https://cloudflare.com/"
+      }
+    ],
+    "read": true,
+    "reason": null
+  },
+  "bindings": [
+    {
+      "identifier": "cik",
+      "value": "0001477333",
+      "id": "trooth:cik:0001477333",
+      "found_by": "site_legal_name",
+      "status": "corroborated",
+      "for": [
+        {
+          "kind": "site_names_registry_name",
+          "detail": "https://cloudflare.com/ names Cloudflare, Inc.; the SEC record names Cloudflare, Inc.. A site can name any company, so this alone ties nothing.",
+          "source": "https://cloudflare.com/"
+        },
+        {
+          "kind": "filing_namespace_names_domain",
+          "detail": "the 10-K filed 2026-02-26 declares its extension taxonomy under www.cloudflare.com",
+          "source": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000016/cloud-20251231.htm"
+        }
+      ],
+      "against": []
+    },
+    {
+      "identifier": "lei",
+      "value": "5493007DY18BGNLDWU14",
+      "id": "trooth:lei:5493007DY18BGNLDWU14",
+      "found_by": "registry_name_match",
+      "status": "corroborated",
+      "for": [
+        {
+          "kind": "site_names_registry_name",
+          "detail": "https://cloudflare.com/ names Cloudflare, Inc.; the LEI record names CLOUDFLARE, INC.",
+          "source": "https://cloudflare.com/"
+        },
+        {
+          "kind": "registries_agree",
+          "detail": "the SEC and the LEI registry both name CLOUDFLARE, INC., jurisdiction US-DE",
+          "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+        },
+        {
+          "kind": "through_corroborated_filer",
+          "detail": "the LEI record and the SEC filer 0001477333 name the same entity, and the filer's own filing ties it to cloudflare.com",
+          "source": null
+        }
+      ],
+      "against": []
+    }
+  ],
+  "sec": {
+    "cik": "0001477333",
+    "facts": [
+      {
+        "key": "sec.name",
+        "label": "Name on file with the SEC",
+        "value": "Cloudflare, Inc.",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.cik",
+        "label": "SEC Central Index Key",
+        "value": "0001477333",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.tickers",
+        "label": "Ticker symbols",
+        "value": [
+          "NET"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.exchanges",
+        "label": "Exchanges",
+        "value": [
+          "NYSE"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.entity_type",
+        "label": "Entity type",
+        "value": "operating",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.filer_category",
+        "label": "Filer category",
+        "value": "Large accelerated filer",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.sic",
+        "label": "Standard Industrial Classification",
+        "value": "7372 Services-Prepackaged Software",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.state_of_incorporation",
+        "label": "State or country of incorporation",
+        "value": "DE",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.fiscal_year_end",
+        "label": "Fiscal year end (MMDD)",
+        "value": "1231",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.business_address",
+        "label": "Business address",
+        "value": "101 TOWNSEND ST., SAN FRANCISCO, CA, 94107",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.phone",
+        "label": "Phone on file",
+        "value": "888.993.5273",
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.website",
+        "label": "Website on file",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.investor_website",
+        "label": "Investor website on file",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.lei",
+        "label": "LEI on file with the SEC",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.former_names",
+        "label": "Former names",
+        "value": [],
+        "source": "https://data.sec.gov/submissions/CIK0001477333.json"
+      },
+      {
+        "key": "sec.xbrl_namespace_authorities",
+        "label": "Authorities of the extension taxonomy in the 10-K filed 2026-02-26",
+        "value": [
+          "www.cloudflare.com"
+        ],
+        "source": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000016/cloud-20251231.htm"
+      }
+    ],
+    "latest": {
+      "8-K": {
+        "form": "8-K",
+        "filed": "2026-08-13",
+        "report_date": "2026-08-10",
+        "items": [
+          "1.01",
+          "2.03",
+          "3.02",
+          "8.01",
+          "9.01"
+        ],
+        "description": "FORM 8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000095010326012340/dp251721_8k.htm"
+      },
+      "10-Q": {
+        "form": "10-Q",
+        "filed": "2026-08-06",
+        "report_date": "2026-06-30",
+        "items": [],
+        "description": "10-Q",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000054/cloud-20260630.htm"
+      },
+      "ARS": {
+        "form": "ARS",
+        "filed": "2026-06-09",
+        "report_date": "2025-12-31",
+        "items": [],
+        "description": "ARS",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000119312526263824/d47757dars.pdf"
+      },
+      "DEF 14A": {
+        "form": "DEF 14A",
+        "filed": "2026-06-09",
+        "report_date": "2026-06-30",
+        "items": [],
+        "description": "DEF 14A",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000119312526263809/d160227ddef14a.htm"
+      },
+      "10-K": {
+        "form": "10-K",
+        "filed": "2026-02-26",
+        "report_date": "2025-12-31",
+        "items": [],
+        "description": "10-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000016/cloud-20251231.htm"
+      }
+    },
+    "events": [
+      {
+        "form": "8-K",
+        "filed": "2026-08-13",
+        "report_date": "2026-08-10",
+        "items": [
+          "1.01",
+          "2.03",
+          "3.02",
+          "8.01",
+          "9.01"
+        ],
+        "description": "FORM 8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000095010326012340/dp251721_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-08-06",
+        "report_date": "2026-08-06",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000053/cloud-20260806.htm"
+      },
+      {
+        "form": "8-K/A",
+        "filed": "2026-07-01",
+        "report_date": "2026-06-30",
+        "items": [
+          "5.02",
+          "5.07",
+          "9.01"
+        ],
+        "description": "8-K/A",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000044/cloud-20260630.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-06-30",
+        "report_date": "2026-06-30",
+        "items": [
+          "5.02",
+          "5.07",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000042/cloud-20260630.htm"
+      },
+      {
+        "form": "8-K/A",
+        "filed": "2026-05-07",
+        "report_date": "2026-05-07",
+        "items": [
+          "2.02",
+          "2.05",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K/A",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000035/cloud-20260507.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-05-07",
+        "report_date": "2026-05-07",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000033/cloud-20260507.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-02-10",
+        "report_date": "2026-02-06",
+        "items": [
+          "5.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000009/cloud-20260206.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-02-10",
+        "report_date": "2026-02-10",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000008/cloud-20260210.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-10-30",
+        "report_date": "2025-10-30",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000140/cloud-20251030.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-07-31",
+        "report_date": "2025-07-31",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000136/cloud-20250731.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-06-17",
+        "report_date": "2025-06-11",
+        "items": [
+          "1.01",
+          "2.03",
+          "3.02",
+          "8.01",
+          "9.01"
+        ],
+        "description": "FORM 8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000110465925060250/tm2518033d1_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-06-09",
+        "report_date": "2025-06-05",
+        "items": [
+          "5.07",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000096/cloud-20250605.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-05-08",
+        "report_date": "2025-05-08",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000081/cloud-20250508.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-03-27",
+        "report_date": "2025-03-25",
+        "items": [
+          "5.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000054/cloud-20250325.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-02-06",
+        "report_date": "2025-02-05",
+        "items": [
+          "5.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000018/cloud-20250205.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-02-06",
+        "report_date": "2025-02-06",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733325000017/cloud-20250206.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2024-11-07",
+        "report_date": "2024-11-07",
+        "items": [
+          "2.02",
+          "7.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1477333/000147733324000083/cloud-20241107.htm"
+      }
+    ],
+    "events_cover_since": "2024-10-06",
+    "cybersecurity_incidents": [],
+    "auditor_changes": [],
+    "non_reliance": [],
+    "insider_forms_last_90_days": 27,
+    "financials": [
+      {
+        "tag": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+        "label": "Revenue",
+        "value": 2167937000,
+        "unit": "USD",
+        "period_start": "2025-01-01",
+        "period_end": "2025-12-31",
+        "form": "10-K",
+        "filed": "2026-02-26",
+        "accession": "0001477333-26-000016",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001477333/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json"
+      },
+      {
+        "tag": "us-gaap:NetIncomeLoss",
+        "label": "Net income (loss)",
+        "value": -102267000,
+        "unit": "USD",
+        "period_start": "2025-01-01",
+        "period_end": "2025-12-31",
+        "form": "10-K",
+        "filed": "2026-02-26",
+        "accession": "0001477333-26-000016",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001477333/us-gaap/NetIncomeLoss.json"
+      },
+      {
+        "tag": "us-gaap:Assets",
+        "label": "Total assets",
+        "value": 6036256000,
+        "unit": "USD",
+        "period_start": null,
+        "period_end": "2025-12-31",
+        "form": "10-K",
+        "filed": "2026-02-26",
+        "accession": "0001477333-26-000016",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001477333/us-gaap/Assets.json"
+      }
+    ]
+  },
+  "lei": {
+    "lei": "5493007DY18BGNLDWU14",
+    "facts": [
+      {
+        "key": "lei.lei",
+        "label": "Legal Entity Identifier",
+        "value": "5493007DY18BGNLDWU14",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.legal_name",
+        "label": "Legal name",
+        "value": "CLOUDFLARE, INC.",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.other_names",
+        "label": "Other and previous names",
+        "value": [],
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.jurisdiction",
+        "label": "Jurisdiction",
+        "value": "US-DE",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.legal_form",
+        "label": "Legal form (ISO 20275 code)",
+        "value": "XTIQ",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.registry",
+        "label": "Business registry (GLEIF registration authority code)",
+        "value": "RA000602",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.registry_number",
+        "label": "Number in that registry",
+        "value": "4710875",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.entity_status",
+        "label": "Entity status",
+        "value": "ACTIVE",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.created",
+        "label": "Entity created",
+        "value": "2009-07-17T00:00:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.legal_address",
+        "label": "Legal address (city, region, country)",
+        "value": "DOVER, US-DE, US",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.headquarters",
+        "label": "Headquarters (city, region, country)",
+        "value": "San Francisco, US-CA, US",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.registration_status",
+        "label": "LEI registration status",
+        "value": "ISSUED",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.first_registered",
+        "label": "LEI first registered",
+        "value": "2020-05-06T14:29:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.last_updated",
+        "label": "LEI record last updated",
+        "value": "2025-12-02T05:43:36Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.next_renewal",
+        "label": "LEI next renewal due",
+        "value": "2026-12-08T16:47:24Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      },
+      {
+        "key": "lei.corroboration",
+        "label": "How the LEI issuer corroborated the record",
+        "value": "FULLY_CORROBORATED",
+        "source": "https://api.gleif.org/api/v1/lei-records/5493007DY18BGNLDWU14"
+      }
+    ],
+    "direct_parent": null,
+    "ultimate_parent": null
+  },
+  "dns": [
+    {
+      "key": "dns.dnssec",
+      "label": "Zone signed with DNSSEC and validated",
+      "value": true,
+      "source": "dns:cloudflare.com A/DS"
+    },
+    {
+      "key": "dns.mta_sts",
+      "label": "MTA-STS record",
+      "value": "v=STSv1;id=1769609691387;",
+      "source": "dns:_mta-sts.cloudflare.com TXT"
+    },
+    {
+      "key": "dns.mta_sts_mode",
+      "label": "MTA-STS policy mode",
+      "value": null,
+      "source": "https://mta-sts.cloudflare.com/.well-known/mta-sts.txt"
+    },
+    {
+      "key": "dns.tls_rpt",
+      "label": "SMTP TLS reporting record",
+      "value": "v=TLSRPTv1; rua=mailto:rua@cloudflare.com;",
+      "source": "dns:_smtp._tls.cloudflare.com TXT"
+    },
+    {
+      "key": "dns.bimi",
+      "label": "BIMI record",
+      "value": "v=BIMI1; l=https://www.cloudflare.com/cloudflare_1171114652.svg; a=https://www.cloudflare.com/cloudflare_1171114652.pem",
+      "source": "dns:default._bimi.cloudflare.com TXT"
+    },
+    {
+      "key": "dns.dmarc_policy",
+      "label": "DMARC policy",
+      "value": "reject",
+      "source": "dns:_dmarc.cloudflare.com TXT"
+    }
+  ],
+  "not_read": [
+    {
+      "source": "Certificate Transparency logs",
+      "reason": "not read in this version"
+    },
+    {
+      "source": "Investor relations, sustainability and trust-center pages",
+      "reason": "not read in this version: they are often served behind bot protection, and a page that cannot be read is never guessed at"
+    },
+    {
+      "source": "SAM.gov registrations and exclusions, sanctions lists",
+      "reason": "not read in this version"
+    },
+    {
+      "source": "Patent and trademark offices",
+      "reason": "not read in this version"
+    },
+    {
+      "source": "State business registries",
+      "reason": "read only through the registry number the LEI record carries"
+    }
+  ],
+  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. Nothing here grades, rates or ranks the company. This reading is not signed."
+}

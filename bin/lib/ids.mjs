@@ -15,13 +15,15 @@ export const ID_TYPES = {
   mapping: /^\d+\.\d+\.\d+$/,
   statement: /^[0-9a-f]{64}$/,
   entity: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+  cik: /^[0-9]{10}$/,
+  lei: /^[A-Z0-9]{18}[0-9]{2}$/,
 };
 
 /** Build an id; throws when the value is not in its type's form. */
 export function formatId(type, value) {
   const re = ID_TYPES[type];
   if (!re) throw new Error(`unknown Trooth id type: ${type}`);
-  const v = type === 'domain' ? String(value).toLowerCase().replace(/\.$/, '') : String(value);
+  const v = type === 'domain' ? String(value).toLowerCase().replace(/\.$/, '') : type === 'cik' ? String(value).padStart(10, '0') : type === 'lei' ? String(value).toUpperCase() : String(value);
   if (!re.test(v)) throw new Error(`not a valid ${type} value for a Trooth id: ${value}`);
   return `trooth:${type}:${v}`;
 }

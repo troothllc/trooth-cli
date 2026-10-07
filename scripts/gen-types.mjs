@@ -41,6 +41,7 @@ function ir(s, file) {
   if (s.oneOf && s.oneOf.length === 2 && s.oneOf.some((b) => b.type === 'null') && !s.type) {
     return { k: 'null', of: ir(s.oneOf.find((b) => b.type !== 'null'), file) };
   }
+  if (s.anyOf && !s.type) return { k: 'union', of: s.anyOf.map((b) => ir(b, file)) };
   let t = s.type;
   if (Array.isArray(t)) {
     const rest = t.filter((x) => x !== 'null');
@@ -51,6 +52,8 @@ function ir(s, file) {
   if (s.enum) return { k: 'lit', values: s.enum };
   if (t === 'string') return { k: 'str' };
   if (t === 'integer') return { k: 'int' };
+  if (t === 'number') return { k: 'num' };
+  if (t === 'null') return { k: 'nul' };
   if (t === 'boolean') return { k: 'bool' };
   if (t === 'array') return { k: 'arr', of: ir(s.items, file) };
   if (t === 'object' && !s.properties) return { k: 'map', of: s.additionalProperties && typeof s.additionalProperties === 'object' ? ir(s.additionalProperties, file) : { k: 'any' } };
@@ -65,6 +68,9 @@ function ts(x) {
     case 'ref': return x.name;
     case 'str': return 'string';
     case 'int': return 'number';
+    case 'num': return 'number';
+    case 'nul': return 'null';
+    case 'union': return x.of.map(ts).join(' | ');
     case 'bool': return 'boolean';
     case 'any': return 'unknown';
     case 'lit': return x.values.map((v) => JSON.stringify(v)).join(' | ');
@@ -93,6 +99,9 @@ function py(x) {
     case 'ref': return x.name;
     case 'str': return 'str';
     case 'int': return 'int';
+    case 'num': return 'float';
+    case 'nul': return 'None';
+    case 'union': return `Union[${x.of.map(py).join(', ')}]`;
     case 'bool': return 'bool';
     case 'any': return 'Any';
     case 'lit': return `Literal[${x.values.map((v) => JSON.stringify(v)).join(', ')}]`;
@@ -102,17 +111,19 @@ function py(x) {
   }
 }
 const pystr = (s) => JSON.stringify(String(s));
-let P = HEAD('#') + '"""Pydantic v2 models for the documents Trooth publishes about a witness statement."""\n\nfrom __future__ import annotations\n\nfrom typing import Any, Dict, List, Literal, Optional\n\nfrom pydantic import BaseModel, ConfigDict, Field\n\n';
+const PY_KEYWORDS = new Set(['for', 'from', 'class', 'def', 'global', 'import', 'in', 'is', 'lambda', 'not', 'or', 'pass', 'return', 'try', 'while', 'with', 'yield', 'and', 'as', 'assert', 'break', 'continue', 'del', 'elif', 'else', 'except', 'finally', 'if', 'nonlocal', 'raise', 'None', 'True', 'False', 'async', 'await']);
+let P = HEAD('#') + '"""Pydantic v2 models for the documents Trooth publishes about a witness statement."""\n\nfrom __future__ import annotations\n\nfrom typing import Any, Dict, List, Literal, Optional, Union\n\nfrom pydantic import BaseModel, ConfigDict, Field\n\n';
 const models = [];
 const aliases = []; // after the classes they name, before model_rebuild resolves them
 for (const t of types) {
   if (t.schema.type === 'object' && t.schema.properties) {
     const req = new Set(t.schema.required || []);
-    P += `\nclass ${t.name}(BaseModel):\n    ${pystr(t.schema.description)}\n\n    model_config = ConfigDict(extra="allow")\n\n`;
+    P += `\nclass ${t.name}(BaseModel):\n    ${pystr(t.schema.description)}\n\n    model_config = ConfigDict(extra="allow", populate_by_name=True)\n\n`;
     for (const [k, p] of Object.entries(t.schema.properties)) {
       const x = ir(p, t.file);
       const typ = req.has(k) ? py(x) : (x.k === 'null' ? py(x) : `Optional[${py(x)}]`);
-      P += `    ${k}: ${typ} = Field(${req.has(k) ? '...' : 'None'}, description=${pystr(p.description)})\n`;
+      const kw = PY_KEYWORDS.has(k);
+      P += `    ${kw ? `${k}_` : k}: ${typ} = Field(${req.has(k) ? '...' : 'None'}, ${kw ? `alias=${pystr(k)}, ` : ''}description=${pystr(p.description)})\n`;
     }
     models.push(t.name);
   } else {
@@ -128,6 +139,8 @@ function go(x) {
     case 'ref': return x.name;
     case 'str': case 'lit': return 'string';
     case 'int': return 'int64';
+    case 'num': return 'float64';
+    case 'nul': case 'union': return 'any';
     case 'bool': return 'bool';
     case 'any': return 'any';
     case 'arr': return `[]${go(x.of)}`;

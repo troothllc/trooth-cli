@@ -32,13 +32,14 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 |---|---|
 | `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
 | `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all; `--save-bundle` keeps every input in one file and `--bundle` checks it later with no network. Statements v1, v2 and v3 (RFC 8785 bytes) are checked. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 27 cases plus 7 bundles any other implementation must agree on. New in 0.7.0; bundles and v3 new in 0.8.0; the witness statement log and corrections new in 0.9.0. |
+| `trooth public-record <domain>` | What the company has published outside its own site, read by Trooth from the authorities that hold it: its SEC filer record and filings (10-K, 10-Q, 8-K with item numbers, including material cybersecurity incidents and auditor changes), annual revenue, net income and assets as filed in XBRL, its LEI record and parents, DNS mail authentication beyond SPF and DMARC, and the evidence tying each identifier to the domain (its own 10-K's XBRL namespace, or the registry naming the domain). A look-alike site that copies a company's name is reported as a claim, never tied. `--cik`, `--lei` and `--ticker` name the identifier when the site does not. Rules in [docs/EVIDENCE.md](docs/EVIDENCE.md). New in 0.10.0. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, and `log monitor` takes `--state`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, `log monitor` takes `--state`, and `public-record` takes `--cik`, `--lei` and `--ticker`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 Any other flag is a usage error. The message names the flag, and for a `--` flag given to `check` or `lint` it also lists the ones that exist.
 
@@ -330,9 +331,30 @@ The same checks, passing the same test vectors, in three languages:
 | Python 3.9+ | `pip install "git+https://github.com/troothllc/trooth-cli#subdirectory=sdk/python"` | `from trooth_verify import verify_bundle` ([sdk/python](sdk/python)) |
 | Go 1.21+ | `go get github.com/troothllc/trooth-cli/sdk/go@latest` | `trooth.VerifyBundle(doc, nil)` ([sdk/go](sdk/go)) |
 
-[schemas/](schemas) holds JSON Schema for every document involved (statement, payload v1 to v3, key list, evidence manifest, bundle, result, log receipt, correction), each served at `https://trooth.co/schemas/<file>`, with TypeScript, Pydantic and Go types generated from them.
+[schemas/](schemas) holds JSON Schema for every document involved (statement, payload v1 to v3, key list, evidence manifest, bundle, result, log receipt, correction, public record), each served at `https://trooth.co/schemas/<file>`, with TypeScript, Pydantic and Go types generated from them.
 
 A checked statement means Trooth's key signed that reading for that domain. It does not mean the company is safe, compliant or authorized for anything; what to do with it is your decision.
+
+## `trooth public-record`
+
+```
+$ trooth public-record apple.com
+apple.com  public record, read 2026-10-07
+  site names   Apple Inc. (https://apple.com/)
+  SEC filer    CIK 0000320193  corroborated the 10-K filed 2025-10-31 declares its extension taxonomy under www.apple.com
+               Apple Inc. · AAPL (Nasdaq) · Large accelerated filer · incorporated CA
+  LEI          HWUPKR0MPOU8FGXBT394  corroborated the LEI record and the SEC filer 0000320193 name the same entity, and the filer's own filing ties it to apple.com
+  filings      10-K 2025-10-31 · 10-Q 2026-07-31 · 8-K 2026-07-30 · DEF 14A 2026-01-08
+  8-K events   18 since 2024-10-07 · cybersecurity incidents (1.05): 0 · auditor changes (4.01): 0 · non-reliance (4.02): 0
+  Revenue      416,161,000,000 USD (year ending 2025-09-27, 10-K filed 2025-10-31)
+```
+
+Every fact carries the URL of the regulator or registry it came from (`--json`). A filing is the company's own statement to its regulator, not Trooth's finding. The reading is not signed; it is cached for a day. Exit 0 when an identifier was found, 1 when none was (a private company files nothing with the SEC).
+
+## Changed in 0.10.0
+
+- New `trooth public-record <domain>`: the company's SEC filer record and filings, annual XBRL values, LEI record and parents, and DNS mail authentication, each with its source, and each identifier tied to the domain only by evidence ([docs/EVIDENCE.md](docs/EVIDENCE.md), which also lists everything a company publishes and what Trooth reads of it).
+- Schema `public-record.v1` with generated types; stable ids `trooth:cik:` and `trooth:lei:` ([docs/IDS.md](docs/IDS.md) 1.1).
 
 ## Changed in 0.9.0
 
