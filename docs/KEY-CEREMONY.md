@@ -1,6 +1,6 @@
 # Trooth signing keys: ceremony, custody, rotation and revocation
 
-Version 1.2, October 7, 2026. Version 1.2 records ceremony v2: the log's hardware key, made inside AWS Key Management Service, which co-signs every checkpoint (section 5), what two-person control still needs (section 6), and drill 4 (section 7). Version 1.1 recorded the first key drills, the rule for changing the key of a witnessed log (section 4), and the hardware custody plan.
+Version 1.2, October 7, 2026. Version 1.2 records ceremony v2: the log's hardware key, made inside AWS Key Management Service, which co-signs every checkpoint (section 5), why two-person control is not adopted and what stands in its place (section 6), and drill 4 (section 7). Version 1.1 recorded the first key drills, the rule for changing the key of a witnessed log (section 4), and the hardware custody plan.
 
 Trooth holds two kinds of signing key. This document says how each is made, where it is held, who can use it, and what happens when it is replaced or compromised. It describes what is in place now, and separately what is planned; nothing planned is described as done.
 
@@ -68,15 +68,16 @@ Performed by the founder's release publisher (`~/dev/.trooth-publish-phase23b.sh
 
 **Custody of the hardware key.** Key administration (changing the key policy, disabling or scheduling deletion of the key) needs the AWS account's administrators, who sign in with multi-factor authentication. Deletion in KMS waits at least 7 days and can be cancelled in that time. Every `Sign` call is recorded by AWS CloudTrail with the calling identity and time.
 
-## 6. Planned: two-person control
+## 6. Two-person control: not adopted
 
-Not in place. Today one person, the founder, can use or change every key. Two-person control needs a second named person with their own credentials:
+Trooth has one person, the founder, who can use or change every key, and no second person with their own AWS and Cloudflare credentials. Two-person control (a second approver for changing or deleting the hardware key, and for the log Worker's secrets and deploys) is therefore not adopted, and Trooth does not describe it as done or planned. If a second person joins, this section says who and from when.
 
-- **AWS.** A key policy on the hardware key under which `kms:PutKeyPolicy`, `kms:DisableKey` and `kms:ScheduleKeyDeletion` are allowed only to a role whose use needs two approvers (for example an AWS Organizations service control policy, or a role whose trust policy names two people, each with multi-factor authentication).
-- **Cloudflare.** Worker secrets and deploys of the log Worker require a second account's approval.
-- **This document.** The second person is named here, with the date.
+What stands in its place, so that one operator cannot quietly rewrite what the log has said:
 
-Until a second person is named, the log's protection against its own operator is the witnesses and the monitors, not the operator's process. Trooth does not describe this as done.
+- **The log is append-only and checkable by anyone.** Every checkpoint is signed and every receipt carries an inclusion proof; a monitor that keeps a checkpoint detects any rewritten history ([LOG.md](LOG.md) section 9), and witnesses refuse to cosign one (section 7 there).
+- **The hardware key cannot be copied.** It never leaves AWS KMS; the credential the Worker holds can only sign with it. Deleting it waits at least 7 days and can be cancelled.
+- **Every use is recorded outside Trooth's own systems.** AWS CloudTrail records each `Sign` call with the calling identity and time; Cloudflare records each deploy and secret change.
+- **Accounts are protected by multi-factor authentication**, on AWS, Cloudflare and GitHub.
 
 ## 7. Drills
 

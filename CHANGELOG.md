@@ -12,7 +12,7 @@ Each release of `trooth` on npm. The README's "Changed in" sections summarise th
 - `trooth log checkpoint` reports the hardware key's signature line (`hardware_key` in `--json`), checked against `HARDWARE_LOG_VKEY` in `bin/lib/log-trust.mjs`.
 - Ids (`docs/IDS.md` 1.3): `jurisdiction`, `registry`, `uei`, `repo`, `api`, `mcp`.
 - Schemas: `public-record.v1` gains the new sections (all optional for older readings); new `mcp-tools.v1` and `mcp-tools-statement.v1`. Fixtures: a reading of nvidia.com built by the scan worker's reader, and a signed reading of Trooth's own MCP server built by the scan worker's code.
-- `docs/KEY-CEREMONY.md` 1.2 (ceremony v2: the hardware key in AWS KMS, which co-signs every checkpoint; what two-person control still needs; drill 4), `docs/LOG.md` 1.2, `docs/EVIDENCE.md` 1.2 (sections 7 to 9).
+- `docs/KEY-CEREMONY.md` 1.2 (ceremony v2: the hardware key in AWS KMS, which co-signs every checkpoint; why two-person control is not adopted and what stands in its place; drill 4), `docs/LOG.md` 1.2, `docs/EVIDENCE.md` 1.2 (sections 7 to 9).
 
 ## 0.11.0 (2026-10-07)
 
