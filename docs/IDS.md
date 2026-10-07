@@ -1,6 +1,6 @@
 # Trooth stable identifiers
 
-Version 1.1, October 7, 2026. Version 1.1 adds `cik` and `lei`.
+Version 1.2, October 7, 2026. Version 1.2 defines `entity`. Version 1.1 added `cik` and `lei`.
 
 One grammar names everything Trooth publishes about a reading, so a reference means the same thing in a statement, a bundle, an SDK, a log entry and a citation, and never depends on a URL that could move:
 
@@ -17,7 +17,7 @@ trooth:<type>:<value>
 | `mapping` | A check mapping version | `trooth:mapping:1.0.1` | The immutable document at https://trooth.co/standard/check-mapping/1.0.1.json |
 | `cik` | The SEC Central Index Key, 10 digits with leading zeros | `trooth:cik:0000320193` | An SEC filer (EDGAR) |
 | `lei` | An ISO 17442 Legal Entity Identifier: 20 characters, upper case (a checker also tests its ISO 7064 check digits) | `trooth:lei:HWUPKR0MPOU8FGXBT394` | A legal entity in the GLEIF register |
-| `entity` | A lowercase UUID | `trooth:entity:00000000-0000-4000-8000-000000000000` | Reserved for the entity graph; not issued yet |
+| `entity` | `lei:` and an LEI, or `cik:` and a 10-digit CIK | `trooth:entity:lei:HWUPKR0MPOU8FGXBT394` | A legal entity, named by its own registry identifier: the LEI when a public record reading corroborates the LEI binding, otherwise the SEC CIK when that is corroborated. Trooth mints no number of its own for an entity, so anyone holding the LEI or CIK derives the same id. The UUID form reserved in version 1.0 was never issued |
 
 Rules:
 

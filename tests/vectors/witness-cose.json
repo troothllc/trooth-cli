@@ -1,0 +1,146 @@
+{
+  "description": "Test vectors for docs/LOG.md sections 6 and 7. `cosignatures`: each checkpoint is the size-5 checkpoint of log.json with one cosignature line appended; check it against `witness_vkey` with the reader clock `now`. `cose_receipts`: each receipt (base64 of the CBOR bytes) is checked against the bytes of log.json entry `index` (RFC 8785 of {kind, statement}) and the log public key of log.json. Keys are test keys whose seeds are public in generate.mjs.",
+  "witness_vkey": "witness.vectors.example/w+012ce4d0+BDgCkJZwWmBPCsu1SH5hSbllumhQ0aafLxfWrykLCwiF",
+  "now": "2026-10-07T00:30:00.000Z",
+  "log_vkey": "trooth.co/witness-log/v1+342bc356+Af8XN9Nto7/M5+tALuYWyX4fAiHcHjyiX4vPGggzoaIK",
+  "log_key_thumbprint": "fHNl-BENt3I8_lHCT1zsDeriSxotI4wbMc4cfb3Ch4k",
+  "cosignatures": [
+    {
+      "name": "cosigned",
+      "note": "The witness cosigned this checkpoint.",
+      "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n— witness.vectors.example/w ASzk0AAAAABqxYuAjDA2LwWJY2+1q1NnACSZE7SHJGYVsV2e/FgNGTHRrxQQdARH00aISGJSrkpLCoijTUessfqVwk6u/AUZH3VQDQ==\n",
+      "expect": {
+        "valid": true,
+        "timestamp": 1791331200
+      }
+    },
+    {
+      "name": "other-tree",
+      "note": "A cosignature over another tree, appended to this checkpoint.",
+      "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n— witness.vectors.example/w ASzk0AAAAABqxYuAZwxmOd8PRQUHE0mI6JJrTsCQgZkndjMfNOhZ11Xnhg7OBRXWezpS8SbVdkaYZoGNxQ5Lpy2uKpRJZmaDi0UpAg==\n",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "impostor-key",
+      "note": "Signed by another key under the witness's name and key id.",
+      "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n— witness.vectors.example/w ASzk0AAAAABqxYuA+YPgxzFo8PD6YZEnzwWTqdD7Qg4eovVZDuYgKMlPyU3mXr+YXBebEL3bVarDF5w0Uyg49zfQMN/Bu4kTc82yBw==\n",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "other-name",
+      "note": "A valid cosignature by a witness that is not configured is ignored.",
+      "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n— witness.other.example/w 9BmnuQAAAABqxYuAjDA2LwWJY2+1q1NnACSZE7SHJGYVsV2e/FgNGTHRrxQQdARH00aISGJSrkpLCoijTUessfqVwk6u/AUZH3VQDQ==\n",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "future",
+      "note": "Dated two hours after the reader's clock.",
+      "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n— witness.vectors.example/w ASzk0AAAAABqxa6oSvwYuTz6MNpIP+pFBwfNpz8Ps4Yx9tqp5oVwSmU+NZdeojODSIVzHJKYM2eJoQ+3zJC6+MEIdK+oWK9ozSzPCg==\n",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "zero-time",
+      "note": "A cosignature must carry a time.",
+      "checkpoint": "trooth.co/witness-log/v1\n5\nAhJYPP8Fk4nxoEVu4W63RLV/VqE7jdwmZsO232/39eE=\n\n— trooth.co/witness-log/v1 NCvDVg0AOUepZrGbUID4/9GxCp5bLKhlL2LT8IHJddtBsjzqfHtqmE3Rsdb3lVYGQx3yqKgCIubI0qDmBIo/sA+mSAQ=\n— witness.vectors.example/w ASzk0AAAAAAAAAAAKJ+FQ84dds8GMeoWdEb51173oXB5UaRvATVj/oaK/vu50W+GjloROhRZom5zQ22J1z5Vn4MmbK0rduEehbtoCg==\n",
+      "expect": {
+        "valid": false
+      }
+    }
+  ],
+  "cose_receipts": [
+    {
+      "name": "entry-0",
+      "note": "The receipt for entry 0.",
+      "index": 0,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFAINYIO10Mh98WgOmfnyBGehqWZbu5QrjY7MNJh2V+R3q+ClYWCACQToD9VvoQ3CRt/1TqHEuEYeH+73lOlVjdKsULKblw1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEDYKWs4v7nR2DWKHF2wm3yxUBQbVg4CBPeoasLfJO3pgQozP2ZJ/mrVXSMuZyvx84MsUGpkmEPV/AI7FtVMGosP",
+      "expect": {
+        "valid": true,
+        "tree_size": 5
+      }
+    },
+    {
+      "name": "entry-1",
+      "note": "The receipt for entry 1.",
+      "index": 1,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFAYNYIP0ZuT4k4Lz0Tb5GOqx9WKQiOXSFjFn2+nSff3nRiB4TWCACQToD9VvoQ3CRt/1TqHEuEYeH+73lOlVjdKsULKblw1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEDYKWs4v7nR2DWKHF2wm3yxUBQbVg4CBPeoasLfJO3pgQozP2ZJ/mrVXSMuZyvx84MsUGpkmEPV/AI7FtVMGosP",
+      "expect": {
+        "valid": true,
+        "tree_size": 5
+      }
+    },
+    {
+      "name": "entry-2",
+      "note": "The receipt for entry 2.",
+      "index": 2,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFAoNYIDgkPF6HXGOxY7dWKyPuV7KPy9SJyPaJ5SoksqnpJ8fkWCCJ3Z6+nc9P3cclQcEiSPklnWBrgS5zK9nES0FIEH9nC1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEDYKWs4v7nR2DWKHF2wm3yxUBQbVg4CBPeoasLfJO3pgQozP2ZJ/mrVXSMuZyvx84MsUGpkmEPV/AI7FtVMGosP",
+      "expect": {
+        "valid": true,
+        "tree_size": 5
+      }
+    },
+    {
+      "name": "entry-3",
+      "note": "The receipt for entry 3.",
+      "index": 3,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFA4NYIIW2UsyvrLO5ZKaC756ct94QerKTohm/OXdeF8LFulJeWCCJ3Z6+nc9P3cclQcEiSPklnWBrgS5zK9nES0FIEH9nC1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEDYKWs4v7nR2DWKHF2wm3yxUBQbVg4CBPeoasLfJO3pgQozP2ZJ/mrVXSMuZyvx84MsUGpkmEPV/AI7FtVMGosP",
+      "expect": {
+        "valid": true,
+        "tree_size": 5
+      }
+    },
+    {
+      "name": "entry-4",
+      "note": "The receipt for entry 4.",
+      "index": 4,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYJoMFBIFYIDEr6lwqhDq1piX4BDGUZz0mxGzCglxaFe1/Wp/9Vlt09lhA2ClrOL+50dg1ihxdsJt8sVAUG1YOAgT3qGrC3yTt6YEKMz9mSf5q1V0jLmcr8fODLFBqZJhD1fwCOxbVTBqLDw==",
+      "expect": {
+        "valid": true,
+        "tree_size": 5
+      }
+    },
+    {
+      "name": "other-entry",
+      "note": "Entry 1's receipt checked against entry 2's bytes.",
+      "index": 2,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFAYNYIP0ZuT4k4Lz0Tb5GOqx9WKQiOXSFjFn2+nSff3nRiB4TWCACQToD9VvoQ3CRt/1TqHEuEYeH+73lOlVjdKsULKblw1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEDYKWs4v7nR2DWKHF2wm3yxUBQbVg4CBPeoasLfJO3pgQozP2ZJ/mrVXSMuZyvx84MsUGpkmEPV/AI7FtVMGosP",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "path-tampered",
+      "note": "One path hash changed.",
+      "index": 2,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFAoNYIDkkPF6HXGOxY7dWKyPuV7KPy9SJyPaJ5SoksqnpJ8fkWCCJ3Z6+nc9P3cclQcEiSPklnWBrgS5zK9nES0FIEH9nC1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEDYKWs4v7nR2DWKHF2wm3yxUBQbVg4CBPeoasLfJO3pgQozP2ZJ/mrVXSMuZyvx84MsUGpkmEPV/AI7FtVMGosP",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "impostor-key",
+      "note": "Signed by another key, naming the log key as kid.",
+      "index": 2,
+      "receipt": "0oRYKqMBJwRYIHxzZfgRDbdyPP5Rwk9c7A3q4ksaLSOMGzHOHH29woeJGQGLAaEZAYyhIIFYaoMFAoNYIDgkPF6HXGOxY7dWKyPuV7KPy9SJyPaJ5SoksqnpJ8fkWCCJ3Z6+nc9P3cclQcEiSPklnWBrgS5zK9nES0FIEH9nC1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEAwwkAKbKPPnbjx1hv03VHSrQUhodoRc3Vhvc2FaQEDb7YEJOLJ2cAQdeNWfSc6XV+VWJbJZA3i56ptHBpvyBYB",
+      "expect": {
+        "valid": false
+      }
+    },
+    {
+      "name": "kid-mismatch",
+      "note": "The log key's signature, but a kid naming another key.",
+      "index": 2,
+      "receipt": "0oRYKqMBJwRYIBpvFZcB2/op/XLg/0lHYIh298on1gBzrA5vv5z3UFa+GQGLAaEZAYyhIIFYaoMFAoNYIDgkPF6HXGOxY7dWKyPuV7KPy9SJyPaJ5SoksqnpJ8fkWCCJ3Z6+nc9P3cclQcEiSPklnWBrgS5zK9nES0FIEH9nC1ggsDkAlgjykUdMSdfnPAf5nZxanAMvFHy+Zto2F60/vAv2WEBBUAOHE9JpmKtggLNqOdyp/gYmYJP+jmdRaj3pblKmk5joB/M88Z2UlBuAdnPa8wS0N8AWzJt4hn2KuFX841ED",
+      "expect": {
+        "valid": false
+      }
+    }
+  ]
+}

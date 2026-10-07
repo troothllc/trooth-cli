@@ -2,7 +2,7 @@
   "format": "trooth.public-record.v1",
   "domain": "apple.com",
   "subject_id": "trooth:domain:apple.com",
-  "read_at": "2026-10-06T12:00:00.000Z",
+  "read_at": "2026-10-07T01:32:55.261Z",
   "site": {
     "legal_names": [
       {
@@ -11,7 +11,17 @@
       }
     ],
     "read": true,
-    "reason": null
+    "reason": null,
+    "links": [
+      {
+        "kind": "sustainability",
+        "url": "https://apple.com/environment/"
+      },
+      {
+        "kind": "investor_relations",
+        "url": "https://investor.apple.com/"
+      }
+    ]
   },
   "bindings": [
     {
@@ -407,7 +417,7 @@
         "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000120/aapl-20241031.htm"
       }
     ],
-    "events_cover_since": "2024-10-06",
+    "events_cover_since": "2024-10-07",
     "cybersecurity_incidents": [],
     "auditor_changes": [],
     "non_reliance": [],
@@ -584,37 +594,234 @@
     {
       "key": "dns.bimi",
       "label": "BIMI record",
-      "value": null,
+      "value": "v=BIMI1;l=https://www.apple.com/bimi/v2/apple.svg;a=https://www.apple.com/bimi/v2/apple.pem;",
       "source": "dns:default._bimi.apple.com TXT"
     },
     {
       "key": "dns.dmarc_policy",
       "label": "DMARC policy",
-      "value": null,
+      "value": "quarantine",
       "source": "dns:_dmarc.apple.com TXT"
+    }
+  ],
+  "entity": {
+    "id": "trooth:entity:lei:HWUPKR0MPOU8FGXBT394",
+    "name": "Apple Inc.",
+    "identifiers": [
+      "trooth:lei:HWUPKR0MPOU8FGXBT394",
+      "trooth:cik:0000320193"
+    ],
+    "basis": "the LEI binding is corroborated and so is the SEC filer binding"
+  },
+  "certificates": {
+    "source": "https://api.certspotter.com/v1/issuances?domain=apple.com&expand=issuer",
+    "unexpired": 5,
+    "issuers": [
+      "Apple"
+    ],
+    "newest_issued": "2026-09-30T15:28:37Z",
+    "soonest_expiry": "2026-10-20T19:10:47Z",
+    "page_full": false
+  },
+  "security_txt": {
+    "url": "https://apple.com/.well-known/security.txt",
+    "contacts": [
+      "https://security.apple.com"
+    ],
+    "expires": "2027-06-21T01:00:00.000Z",
+    "expired": false,
+    "policy": "https://security.apple.com/bounty/guidelines/",
+    "canonical": [],
+    "signed": false
+  },
+  "sanctions": {
+    "list": "OFAC Specially Designated Nationals and Blocked Persons List (entities, primary names)",
+    "source": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV",
+    "read_at": "2026-10-07T01:33:02.611Z",
+    "names_checked": [
+      "Apple Inc."
+    ],
+    "matches": []
+  },
+  "sources": [
+    {
+      "url": "https://apple.com/",
+      "status": 200,
+      "sha256": "4d2f4d0db40b5457fc19837d6ea430bb6b4aff990c45c5727661e2be7ec88347",
+      "bytes": 253633,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:55.262Z"
+    },
+    {
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "status": 200,
+      "sha256": "e89635068cd46772d1d3859ce2bc839fab781630787943a1874f258fa354e7a9",
+      "bytes": 163743,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:55.757Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+      "status": 200,
+      "sha256": "4495f7a16b4ade43dfa8041ac6477074122cbd5b88033e3e0f68b3f919e7ffbf",
+      "bytes": 18356,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:55.966Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/Revenues.json",
+      "status": 200,
+      "sha256": "ae228f6e452e9dd051b876be882802379f3a8a1569297ba4a8474ee437308c05",
+      "bytes": 2252,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.303Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/SalesRevenueNet.json",
+      "status": 200,
+      "sha256": "8b37365a7f187479d40d872ed51551ca40a3981268248b91ba2643cbfb152591",
+      "bytes": 31766,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.414Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/NetIncomeLoss.json",
+      "status": 200,
+      "sha256": "9b6ac23b024662c95dc7b4088a448bf60a31ff672e2f328161c5ceda6a8b9915",
+      "bytes": 50767,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.532Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/Assets.json",
+      "status": 200,
+      "sha256": "4378cc0249e20299870f7471471e05367f5c0faafdcc6addf739cd9f17648145",
+      "bytes": 19972,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.751Z"
+    },
+    {
+      "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+      "status": 200,
+      "sha256": "a79947744d64559989ba8bfc769c450961ee934c1ef670fc45631fe53da65643",
+      "bytes": 263131,
+      "complete": false,
+      "fetched_at": "2026-10-07T01:32:56.924Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Apple%20Inc.&page%5Bsize%5D=100",
+      "status": 200,
+      "sha256": "fb3dd8038f88a44ac95baa9b41404328fb84d3b399a318d3105413cd226ae15a",
+      "bytes": 58761,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.982Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394",
+      "status": 200,
+      "sha256": "ea400160e2d0957abbd41101c2a9f004f802c7c200866a65691d1e0a200151c3",
+      "bytes": 3109,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:58.276Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394/direct-parent",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T01:32:58.922Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394/ultimate-parent",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T01:32:59.826Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=apple.com&type=A&do=1",
+      "status": 200,
+      "sha256": "a6ad3cbab39d8d112a67a3826808305b58bb7e669fb71355e6223f178e5d9680",
+      "bytes": 182,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.699Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=apple.com&type=DS&do=1",
+      "status": 200,
+      "sha256": "0a2fdb9064bceb90582bd97cbd35e3812da06009b7ecd374ee2a754a1034c323",
+      "bytes": 1127,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_mta-sts.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "1956cb2115181c091900918fd28542628f8ac965486567d18cb4514d4f6cef73",
+      "bytes": 224,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_smtp._tls.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "5779e368e14d7b266f0fcb2ae69e59844c1434e10b4445c069c257e682c0cb3b",
+      "bytes": 269,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=default._bimi.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "a93850f2315307454af76ee1b8d2ef88c93979937361696ed3717bf77edbe86e",
+      "bytes": 301,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_dmarc.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "d8e0ea73a4c103a2f8b5098c15767e191e3f88f56755fea699bbcfd6f10a3b23",
+      "bytes": 280,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://apple.com/.well-known/security.txt",
+      "status": 200,
+      "sha256": "0df882de10a40e2c1d122ebdebf1e0ad2cc3486c1941950b4354e71d47df95ca",
+      "bytes": 337,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.763Z"
+    },
+    {
+      "url": "https://api.certspotter.com/v1/issuances?domain=apple.com&expand=issuer",
+      "status": 200,
+      "sha256": "1726499983cc1fec309798cdeaac761cec9338df8f805fbaf9cd8ec042ed5b40",
+      "bytes": 2968,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.938Z"
     }
   ],
   "not_read": [
     {
-      "source": "Certificate Transparency logs",
-      "reason": "not read in this version"
-    },
-    {
       "source": "Investor relations, sustainability and trust-center pages",
-      "reason": "not read in this version: they are often served behind bot protection, and a page that cannot be read is never guessed at"
+      "reason": "linked from the home page when found (site.links), not read: they are often served behind bot protection, and a page that cannot be read is never guessed at"
     },
     {
-      "source": "SAM.gov registrations and exclusions, sanctions lists",
-      "reason": "not read in this version"
+      "source": "SAM.gov registrations and exclusions",
+      "reason": "not read: the SAM.gov API needs a key Trooth does not yet hold"
     },
     {
       "source": "Patent and trademark offices",
-      "reason": "not read in this version"
+      "reason": "not read: the USPTO APIs need a key Trooth does not yet hold"
     },
     {
       "source": "State business registries",
-      "reason": "read only through the registry number the LEI record carries"
+      "reason": "read only through the registry number the LEI record carries; there is no common API across the states"
     }
   ],
-  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. Nothing here grades, rates or ranks the company. This reading is not signed."
+  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. A sanctions entry with the same name is not an identification. Nothing here grades, rates or ranks the company. Trooth signs a statement that names this reading by its SHA-256 and logs it; the signature says what Trooth read and when, not that what the sources say is true."
 }

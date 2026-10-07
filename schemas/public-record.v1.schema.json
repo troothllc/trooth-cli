@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://trooth.co/schemas/public-record.v1.schema.json",
   "title": "PublicRecordReading",
-  "description": "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.",
+  "description": "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.",
   "type": "object",
   "required": [
     "format",
@@ -76,6 +76,57 @@
         "$ref": "#/$defs/PublicFact"
       }
     },
+    "entity": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Entity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The legal entity the domain is tied to, when a binding is corroborated; null otherwise. Added in trooth 0.11.0."
+    },
+    "certificates": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Certificates"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Unexpired certificates for the exact domain name in Certificate Transparency logs, as a CT monitor returned them; null when it did not answer. Added in trooth 0.11.0."
+    },
+    "security_txt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SecurityTxt"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The site's /.well-known/security.txt (RFC 9116), or null when there is none or the site opted out of being read. Added in trooth 0.11.0."
+    },
+    "sanctions": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Sanctions"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0."
+    },
+    "sources": {
+      "type": "array",
+      "description": "Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.",
+      "items": {
+        "$ref": "#/$defs/Source"
+      }
+    },
     "not_read": {
       "type": "array",
       "description": "Each source that was not read, or did not answer, and why. A source not read is never guessed at.",
@@ -86,9 +137,328 @@
     "note": {
       "type": "string",
       "description": "What the reading is and is not, as a paragraph."
+    },
+    "signed": {
+      "$ref": "#/$defs/Signed",
+      "description": "The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0."
     }
   },
   "$defs": {
+    "Entity": {
+      "title": "Entity",
+      "type": "object",
+      "description": "A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md).",
+      "required": [
+        "id",
+        "name",
+        "identifiers",
+        "basis"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "trooth:entity:lei:<LEI> when the LEI binding is corroborated, otherwise trooth:entity:cik:<CIK>.",
+          "pattern": "^trooth:entity:(lei:[A-Z0-9]{18}[0-9]{2}|cik:[0-9]{10})$"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The legal name the registry holds."
+        },
+        "identifiers": {
+          "type": "array",
+          "description": "The corroborated identifiers (trooth:lei, trooth:cik).",
+          "items": {
+            "type": "string",
+            "description": "A Trooth id."
+          }
+        },
+        "basis": {
+          "type": "string",
+          "description": "Which bindings are corroborated."
+        }
+      }
+    },
+    "Certificates": {
+      "title": "Certificates",
+      "type": "object",
+      "description": "Certificates for the exact domain name in Certificate Transparency logs.",
+      "required": [
+        "source",
+        "unexpired",
+        "issuers",
+        "newest_issued",
+        "soonest_expiry",
+        "page_full"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "The CT monitor URL read."
+        },
+        "unexpired": {
+          "type": "integer",
+          "description": "How many unexpired certificates the monitor returned.",
+          "minimum": 0
+        },
+        "issuers": {
+          "type": "array",
+          "description": "The issuing authorities, at most 10.",
+          "items": {
+            "type": "string",
+            "description": "An issuer."
+          }
+        },
+        "newest_issued": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The latest not-before time."
+        },
+        "soonest_expiry": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The earliest not-after time."
+        },
+        "page_full": {
+          "type": "boolean",
+          "description": "True when the monitor's first page was full, so there may be more."
+        }
+      }
+    },
+    "SecurityTxt": {
+      "title": "SecurityTxt",
+      "type": "object",
+      "description": "A security.txt file (RFC 9116).",
+      "required": [
+        "url",
+        "contacts",
+        "expires",
+        "expired",
+        "policy",
+        "canonical",
+        "signed"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Where it was read."
+        },
+        "contacts": {
+          "type": "array",
+          "description": "Contact fields, at most 5.",
+          "items": {
+            "type": "string",
+            "description": "A contact URI."
+          }
+        },
+        "expires": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The Expires field."
+        },
+        "expired": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether Expires was in the past when read; null when it does not parse."
+        },
+        "policy": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The Policy field."
+        },
+        "canonical": {
+          "type": "array",
+          "description": "Canonical fields.",
+          "items": {
+            "type": "string",
+            "description": "A URI."
+          }
+        },
+        "signed": {
+          "type": "boolean",
+          "description": "Whether the file is OpenPGP clear-signed. The signature is not checked."
+        }
+      }
+    },
+    "Sanctions": {
+      "title": "Sanctions",
+      "type": "object",
+      "description": "An exact-name check against a sanctions list.",
+      "required": [
+        "list",
+        "source",
+        "read_at",
+        "names_checked",
+        "matches"
+      ],
+      "properties": {
+        "list": {
+          "type": "string",
+          "description": "The list and the part of it read."
+        },
+        "source": {
+          "type": "string",
+          "description": "The list URL."
+        },
+        "read_at": {
+          "type": "string",
+          "description": "When the list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "names_checked": {
+          "type": "array",
+          "description": "The legal names checked.",
+          "items": {
+            "type": "string",
+            "description": "A name."
+          }
+        },
+        "matches": {
+          "type": "array",
+          "description": "Entries with exactly one of those names (case, punctuation and suffix spellings folded). A name match is not an identification.",
+          "items": {
+            "$ref": "#/$defs/SanctionsEntry"
+          }
+        }
+      }
+    },
+    "SanctionsEntry": {
+      "title": "SanctionsEntry",
+      "type": "object",
+      "description": "A list entry.",
+      "required": [
+        "uid",
+        "name",
+        "programs"
+      ],
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The entry number on the list."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name as listed."
+        },
+        "programs": {
+          "type": "string",
+          "description": "The sanctions programs."
+        }
+      }
+    },
+    "Source": {
+      "title": "Source",
+      "type": "object",
+      "description": "One response read.",
+      "required": [
+        "url",
+        "status",
+        "sha256",
+        "bytes",
+        "complete",
+        "fetched_at"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The URL requested."
+        },
+        "status": {
+          "type": "integer",
+          "description": "The HTTP status."
+        },
+        "sha256": {
+          "type": "string",
+          "description": "SHA-256 of the bytes read, hex.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "description": "How many bytes were read.",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean",
+          "description": "False when only the start of the document was read (a filing's first 256 KB)."
+        },
+        "fetched_at": {
+          "type": "string",
+          "description": "When it was requested. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        }
+      }
+    },
+    "Signed": {
+      "title": "Signed",
+      "type": "object",
+      "description": "The statement naming the reading, and its log receipt.",
+      "required": [
+        "record_sha256",
+        "record_canonicalization",
+        "statement",
+        "statement_id",
+        "log",
+        "problem"
+      ],
+      "properties": {
+        "record_sha256": {
+          "type": "string",
+          "description": "SHA-256, hex, of the RFC 8785 bytes of the reading without `signed` (finite numbers in ECMAScript shortest form).",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "record_canonicalization": {
+          "type": "string",
+          "description": "How those bytes were made.",
+          "const": "RFC8785"
+        },
+        "statement": {
+          "oneOf": [
+            {
+              "$ref": "witness-statement.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The signed envelope; its payload is a public-record-statement.v1 document. Null when the reading could not be signed."
+        },
+        "statement_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "trooth:statement:<sha256 of the payload>."
+        },
+        "log": {
+          "oneOf": [
+            {
+              "$ref": "log-receipt.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The receipt of the statement as a public_record entry of the witness statement log, or null when it was not logged."
+        },
+        "problem": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What could not be done (not signed, or signed and not logged), or null."
+        }
+      }
+    },
     "PublicFact": {
       "title": "PublicFact",
       "type": "object",
@@ -371,6 +741,39 @@
             "null"
           ],
           "description": "Why no name was found, or why the site was not read (for example its robots.txt opts out)."
+        },
+        "links": {
+          "type": "array",
+          "description": "Pages the home page links to on the company's own domain: investor relations, trust center, security, status, sustainability. Linked, not read. Added in trooth 0.11.0.",
+          "items": {
+            "$ref": "#/$defs/SiteLink"
+          }
+        }
+      }
+    },
+    "SiteLink": {
+      "title": "SiteLink",
+      "type": "object",
+      "description": "A page the home page links to.",
+      "required": [
+        "kind",
+        "url"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "What the page is.",
+          "enum": [
+            "investor_relations",
+            "trust_center",
+            "security",
+            "status",
+            "sustainability"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "description": "The link, without query or fragment."
         }
       }
     },

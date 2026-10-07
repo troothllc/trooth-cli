@@ -1,13 +1,13 @@
 # Trooth signing keys: ceremony, custody, rotation and revocation
 
-Version 1.0, October 6, 2026.
+Version 1.1, October 7, 2026. Version 1.1 records the first key drills (section 6), the rule for changing the key of a witnessed log (section 4), and the hardware custody plan in detail (section 5).
 
 Trooth holds two kinds of signing key. This document says how each is made, where it is held, who can use it, and what happens when it is replaced or compromised. It describes what is in place now, and separately what is planned; nothing planned is described as done.
 
 | Key | Signs | Published at |
 |---|---|---|
 | Statement key (`trooth-master-2026-09`) | Witness statements, corrections, directory receipts | `https://api.trooth.co/public/keys` |
-| Log key (`trooth.co/witness-log/v1`) | Checkpoints of the witness statement log, and nothing else | `https://api.trooth.co/scan/log/v1/vkey`, and pinned in `trooth` 0.9.0 and later |
+| Log key (`trooth.co/witness-log/v1`) | Checkpoints of the witness statement log and its COSE receipts, and nothing else | `https://api.trooth.co/scan/log/v1/vkey`, as a COSE key at `https://api.trooth.co/.well-known/scitt-keys`, and pinned in `trooth` 0.9.0 and later |
 
 Keeping them apart means a compromised log key cannot sign a statement, and a compromised statement key cannot rewrite the log's history.
 
@@ -40,7 +40,7 @@ The log key is rotated at least every 24 months, and whenever custody changes.
 
 The statement key follows the lifecycle on the key list: a retired key's signatures stay trusted for statements that carry a time before its retirement.
 
-## 4. Compromise
+## 4. Compromise, and witnessed logs
 
 If the log key is, or may be, compromised:
 
@@ -49,11 +49,27 @@ If the log key is, or may be, compromised:
 3. Re-sign the current tree with the new key. The entries do not change, so every receipt's inclusion proof stays valid against the new checkpoint; only the checkpoint signature is new.
 4. Ask monitors to compare their saved checkpoints with the log. A checkpoint signed with the old key after the recorded stop time is evidence of misuse.
 
+**A witnessed log changes key by changing origin.** A witness keeps the key it was given for an origin and refuses a checkpoint signed by any other ([LOG.md](LOG.md) section 7); the witness network's lists cannot update a key once a witness has configured it. So once witnesses follow `trooth.co/witness-log/v1`, a rotation or a compromise is handled by starting `trooth.co/witness-log/v2` with the new key: it is announced to the witness network first, its first entry records the last v1 checkpoint, the v1 log stays readable, and a `trooth` release pins both. Drill 3 (section 6) showed a witness refusing a re-keyed checkpoint, which is what makes this rule necessary.
+
 If the statement key is compromised, it is marked compromised on the key list with the time, which makes every checker stop relying on its signatures ([VERIFY.md](VERIFY.md) section 3). Trooth re-signs current readings with a new key and logs them.
 
-## 5. Planned: hardware custody
+## 5. Planned: hardware custody and two-person control
 
-The next ceremony moves both keys into a hardware-backed key store that supports Ed25519 and does not release private keys, so that signing requires the device and the key cannot be copied out. That ceremony will be recorded here with: the device or service, the attestation it gives, who was present, the key's public half and fingerprint, and the backup arrangement. Until then the keys are software keys held as described in section 2.
+Two things are not in place, and this section says what each needs.
+
+**Hardware custody.** The next ceremony moves the log key into a key service that generates Ed25519 keys in hardware and never releases them. AWS Key Management Service has offered Ed25519 signing (key spec `ECC_NIST_EDWARDS25519`, algorithm `ED25519_SHA_512`) since November 2025, in its hardware security modules; the log's signer would call it to sign each checkpoint and receipt, and the key could not be copied out. Because a witnessed log changes key only by changing origin (section 4), the hardware key becomes the key of `trooth.co/witness-log/v2`. It needs an AWS account that is Trooth's, an IAM identity for the Worker limited to `kms:Sign` on that one key, and the ceremony recorded here with the key's ARN, its public half and fingerprint, and the account's access controls.
+
+**Two-person control.** Today one person, the founder, can use or change both keys. Two-person control needs a second named person with their own credentials: on the key service, a key policy under which changing or deleting the key needs a second approver; on Cloudflare, the Worker secrets and deploys of the log Worker require a second account's approval. Until a second person is named, the log's protection against its own operator is the witnesses and the monitors, not the operator's process.
+
+## 6. Drills
+
+The drills run on Trooth's own log code, in memory, with keys generated for the run and discarded, so production is never touched (`npm run drill:log-key` in trooth-scan-worker, `scripts/drill-log-key.mjs`). The founder's publisher runs them before each release that changes the log, and the result is recorded below.
+
+1. **Key loss.** With the key gone, the log refuses to append (nothing is written that it cannot sign). A new key signs the same tree with the same root; the old checkpoint still checks with the old public half; every receipt's inclusion proof reaches the new root; the log grows again.
+2. **Key compromise.** The tree is signed again with the new key at once. A checkpoint the stolen key signs still checks with the old public half, which is why the old key is unpinned at once; a monitor that kept a checkpoint sees two roots for one size signed by the old key, which is evidence of misuse; the new key does not open the forged checkpoint.
+3. **Witnesses after a key change.** A witness that cosigned under the old key refuses (403) a checkpoint signed by the new one. This is the reason for the rule in section 4.
+
+The runbook steps a drill does not exercise, because they need the real accounts, are sections 3 and 4: switching the Worker secret, publishing the release, and (for a witnessed log) announcing the new origin.
 
 ## Record
 
@@ -61,3 +77,5 @@ The next ceremony moves both keys into a hardware-backed key store that supports
 |---|---|---|
 | 2026-09-28 | Statement key `trooth-master-2026-09` | First listed on the key list |
 | 2026-10-06 | Log key `trooth.co/witness-log/v1` | Generated (ceremony v1); verifier key `trooth.co/witness-log/v1+06471ca9+AY9UdmLMbCX5Ib3ksDeoE8x3CburcWGJE9eJiPiYP5sZ` |
+| 2026-10-07 | Log key `trooth.co/witness-log/v1` | Drills 1 to 3 (section 6) run on the log code with throwaway keys: 12 of 12 steps held. Run again by the release publisher on the founder's computer before the release that added witnesses |
+| 2026-10-07 | Log key `trooth.co/witness-log/v1` | Published as a COSE key at `https://api.trooth.co/.well-known/scitt-keys`; RFC 9679 thumbprint is its kid |

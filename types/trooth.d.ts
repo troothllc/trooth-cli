@@ -118,7 +118,49 @@ export interface LogReceipt {
   checkpoint: string;
 }
 
-/** What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text. */
+/** The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true. */
+export interface PublicRecordStatement {
+  /** The payload type. */
+  statement: "trooth.public-record.v1";
+  /** trooth:domain:<domain>. */
+  subject_id: string;
+  /** The domain read. */
+  domain: string;
+  /** The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** SHA-256, hex, of the reading's RFC 8785 bytes without `signed`. */
+  record_sha256: string;
+  /** How those bytes were made. */
+  record_canonicalization: "RFC8785";
+  /** The reading's entity id, or null. */
+  entity_id: string | null;
+  /** Each binding's id and status. */
+  bindings: BindingStatus[];
+  /** How many responses the reading read. */
+  sources: number;
+  /** When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  issued_at: string;
+  /** The signing key, inside the signed bytes. */
+  signer: StatementSigner;
+}
+
+/** A binding as the statement names it. */
+export interface BindingStatus {
+  /** trooth:cik or trooth:lei id. */
+  id: string;
+  /** The binding status. */
+  status: string;
+}
+
+/** The signing key. */
+export interface StatementSigner {
+  /** The kid on https://api.trooth.co/public/keys. */
+  key_id: string;
+  /** Always trooth.co. */
+  issuer: "trooth.co";
+}
+
+/** What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text. */
 export interface PublicRecordReading {
   /** The format. */
   format: "trooth.public-record.v1";
@@ -138,10 +180,124 @@ export interface PublicRecordReading {
   lei: LeiRecord | null;
   /** Mail-authentication records beyond SPF and DMARC, and DNSSEC. */
   dns: PublicFact[];
+  /** The legal entity the domain is tied to, when a binding is corroborated; null otherwise. Added in trooth 0.11.0. */
+  entity?: Entity | null;
+  /** Unexpired certificates for the exact domain name in Certificate Transparency logs, as a CT monitor returned them; null when it did not answer. Added in trooth 0.11.0. */
+  certificates?: Certificates | null;
+  /** The site's /.well-known/security.txt (RFC 9116), or null when there is none or the site opted out of being read. Added in trooth 0.11.0. */
+  security_txt?: SecurityTxt | null;
+  /** Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0. */
+  sanctions?: Sanctions | null;
+  /** Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0. */
+  sources?: Source[];
   /** Each source that was not read, or did not answer, and why. A source not read is never guessed at. */
   not_read: NotRead[];
   /** What the reading is and is not, as a paragraph. */
   note: string;
+  /** The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0. */
+  signed?: Signed;
+}
+
+/** A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md). */
+export interface Entity {
+  /** trooth:entity:lei:<LEI> when the LEI binding is corroborated, otherwise trooth:entity:cik:<CIK>. */
+  id: string;
+  /** The legal name the registry holds. */
+  name: string | null;
+  /** The corroborated identifiers (trooth:lei, trooth:cik). */
+  identifiers: string[];
+  /** Which bindings are corroborated. */
+  basis: string;
+}
+
+/** Certificates for the exact domain name in Certificate Transparency logs. */
+export interface Certificates {
+  /** The CT monitor URL read. */
+  source: string;
+  /** How many unexpired certificates the monitor returned. */
+  unexpired: number;
+  /** The issuing authorities, at most 10. */
+  issuers: string[];
+  /** The latest not-before time. */
+  newest_issued: string | null;
+  /** The earliest not-after time. */
+  soonest_expiry: string | null;
+  /** True when the monitor's first page was full, so there may be more. */
+  page_full: boolean;
+}
+
+/** A security.txt file (RFC 9116). */
+export interface SecurityTxt {
+  /** Where it was read. */
+  url: string;
+  /** Contact fields, at most 5. */
+  contacts: string[];
+  /** The Expires field. */
+  expires: string | null;
+  /** Whether Expires was in the past when read; null when it does not parse. */
+  expired: boolean | null;
+  /** The Policy field. */
+  policy: string | null;
+  /** Canonical fields. */
+  canonical: string[];
+  /** Whether the file is OpenPGP clear-signed. The signature is not checked. */
+  signed: boolean;
+}
+
+/** An exact-name check against a sanctions list. */
+export interface Sanctions {
+  /** The list and the part of it read. */
+  list: string;
+  /** The list URL. */
+  source: string;
+  /** When the list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** The legal names checked. */
+  names_checked: string[];
+  /** Entries with exactly one of those names (case, punctuation and suffix spellings folded). A name match is not an identification. */
+  matches: SanctionsEntry[];
+}
+
+/** A list entry. */
+export interface SanctionsEntry {
+  /** The entry number on the list. */
+  uid: string;
+  /** The name as listed. */
+  name: string;
+  /** The sanctions programs. */
+  programs: string;
+}
+
+/** One response read. */
+export interface Source {
+  /** The URL requested. */
+  url: string;
+  /** The HTTP status. */
+  status: number;
+  /** SHA-256 of the bytes read, hex. */
+  sha256: string;
+  /** How many bytes were read. */
+  bytes: number;
+  /** False when only the start of the document was read (a filing's first 256 KB). */
+  complete: boolean;
+  /** When it was requested. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  fetched_at: string;
+}
+
+/** The statement naming the reading, and its log receipt. */
+export interface Signed {
+  /** SHA-256, hex, of the RFC 8785 bytes of the reading without `signed` (finite numbers in ECMAScript shortest form). */
+  record_sha256: string;
+  /** How those bytes were made. */
+  record_canonicalization: "RFC8785";
+  /** The signed envelope; its payload is a public-record-statement.v1 document. Null when the reading could not be signed. */
+  statement: WitnessStatement | null;
+  /** trooth:statement:<sha256 of the payload>. */
+  statement_id: string | null;
+  /** The receipt of the statement as a public_record entry of the witness statement log, or null when it was not logged. */
+  log: LogReceipt | null;
+  /** What could not be done (not signed, or signed and not logged), or null. */
+  problem: string | null;
 }
 
 /** One fact as its source published it, with the URL it was read from. */
@@ -232,6 +388,16 @@ export interface SiteRead {
   read: boolean;
   /** Why no name was found, or why the site was not read (for example its robots.txt opts out). */
   reason: string | null;
+  /** Pages the home page links to on the company's own domain: investor relations, trust center, security, status, sustainability. Linked, not read. Added in trooth 0.11.0. */
+  links?: SiteLink[];
+}
+
+/** A page the home page links to. */
+export interface SiteLink {
+  /** What the page is. */
+  kind: "investor_relations" | "trust_center" | "security" | "status" | "sustainability";
+  /** The link, without query or fragment. */
+  url: string;
 }
 
 /** A legal name a page states. */

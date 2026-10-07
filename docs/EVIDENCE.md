@@ -1,6 +1,6 @@
 # What a company publishes, and what Trooth reads
 
-Version 1.0, October 7, 2026. Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
+Version 1.1, October 7, 2026. Version 1.1 adds certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
 
 A company publishes about itself in three places: its own website and DNS, the regulators and registries it must file with, and outside parties that describe it. This document lists what is published in each, says for every item whether Trooth reads it today, and sets the rules for reading it. Nothing here grades, rates or ranks a company.
 
@@ -32,7 +32,7 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Data-subject contact, retention, transfers, children's data, governing law, breach notification | Read: L5, L10, L12, L15, L16, L17, L18 |
 | Sub-processor list, DPA availability | Read: L13, L14 |
 | Export-control statement, employee AI-use policy, COPPA disclosure | Read: L6, L7, L8 |
-| security.txt (RFC 9116), its Contact and Expires | Read: S1, I14, I15 |
+| security.txt (RFC 9116), its Contact and Expires | Read: S1, I14, I15; and public record `security_txt` (contacts, expiry, policy, canonical, whether clear-signed) |
 | TLS and HSTS, security headers, exposed `.env` or `.git`, server banner | Read: S2, S11 to S19 |
 | Vulnerability disclosure, bug bounty, incident contact | Read: S7, S9, S5 |
 | CAA, MX, SPF, DMARC | Read: S20, B16, B17, B18 |
@@ -42,9 +42,9 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Copyright and trademark notices, DMCA contact, open-source notices, SBOM | Read: I5, I11, I12, I13, I16, I3 |
 | Model card, training-data statements, AI disclosures, llms.txt, AI crawler rules | Read: A1, A2, A4, A5, A9, A11 to A16 |
 | Accessibility statement, modern slavery statement | Not read |
-| Investor-relations site: earnings releases, call transcripts, guidance, presentations | Not read (often behind bot protection; never guessed at) |
-| Sustainability, ESG and climate reports | Not read |
-| Trust center: SOC 2, ISO 27001, PCI attestations it lists | Declared |
+| Investor-relations site: earnings releases, call transcripts, guidance, presentations | Linked: public record `site.links` names the page when the home page links to it on the company's domain; its content is not read (often behind bot protection; never guessed at) |
+| Sustainability, ESG and climate reports | Linked, not read (`site.links`) |
+| Trust center: SOC 2, ISO 27001, PCI attestations it lists | Declared; the trust-center page is linked, not read (`site.links`) |
 | Security advisories it publishes as a vendor | Not read |
 | Careers pages, press releases, blog | Not read |
 | Developer surfaces: OpenAPI documents, `.well-known` files | Read where the Standard asks (A14, I14); otherwise not read |
@@ -67,10 +67,10 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Legal Entity Identifier record: legal name, other names, jurisdiction, legal form, business registry and number, status, addresses, registration dates, corroboration level | GLEIF | Read: public record `lei.facts` |
 | Direct and ultimate parent | GLEIF | Read: `lei.direct_parent`, `lei.ultimate_parent` |
 | State or country business registry entry | The registry | Read only as the registry number the LEI record carries; B1 is declared |
-| Federal contractor registration and exclusions | SAM.gov | Not read |
-| Sanctions lists | OFAC and others | Not read |
-| Patents and trademarks | USPTO, EUIPO | Declared (I4, I7) |
-| Certificates issued for the domain | Certificate Transparency logs | Not read |
+| Federal contractor registration and exclusions | SAM.gov | Not read: the SAM.gov API needs a key Trooth does not yet hold |
+| Sanctions lists | OFAC Specially Designated Nationals list | Read: public record `sanctions`, entities' primary names, exact name after folding; a name match is not an identification. Other lists are not read |
+| Patents and trademarks | USPTO, EUIPO | Declared (I4, I7); the offices' APIs need a key Trooth does not yet hold |
+| Certificates issued for the domain | Certificate Transparency logs, through the Cert Spotter monitor | Read: public record `certificates` (unexpired certificates for the exact name, issuers, newest and soonest-expiring) |
 | Code and packages | GitHub, npm, PyPI | Not read |
 
 ### 2.3 Said by others
@@ -104,15 +104,28 @@ Status: `corroborated` when evidence that ties it is present; otherwise `contrad
 
 ## 4. How it is read
 
-- **Sources.** data.sec.gov and www.sec.gov with a named agent and contact address, as the SEC's fair-access rules ask; api.gleif.org; DNS over HTTPS; the company's home page and its terms, legal and privacy pages, until a legal name is found.
+- **Sources.** data.sec.gov and www.sec.gov with a named agent and contact address, as the SEC's fair-access rules ask; api.gleif.org; DNS over HTTPS; api.certspotter.com; the OFAC SDN list (read at most once a day); the company's home page and its terms, legal and privacy pages, until a legal name is found, and its `/.well-known/security.txt`.
 - **Safety.** Every request goes through the same guarded fetch as the witness reading: public addresses only, at most five redirects, bodies capped at 2 MB, of a filing only its first 256 KB. Pages are read as text with patterns; nothing in them runs. A site whose robots.txt names Trooth-Witness with `Disallow: /` is not read; the registries still are, because they are not the company's servers.
-- **Limits.** An answer is cached for a day. Uncached readings: 3 a minute from one address, 6 an hour of one domain.
+- **Limits.** An answer is cached for a day; `?cached=only` answers from the cache or 404 and never starts a reading. Uncached readings: 3 a minute from one address, 6 an hour of one domain. Once an hour Trooth also reads up to three Network companies whose cached reading is missing, so their Trust Profiles can show one.
+- **Replay.** Every response read is listed in `sources` with its URL, status, the SHA-256 of the bytes read and whether the whole document was read. Trooth keeps those bytes under that hash, so a disputed fact can be replayed from what Trooth actually received.
 - **Absence.** Every source that was not read, or did not answer, is listed in `not_read` with the reason. A source not read is never filled in.
-- **Not signed.** The reading is not signed and not logged in this version; each fact carries the URL to read it again from its source.
+## 5. The signed statement
 
-## 5. Limits of this version
+Each reading carries `signed`, which is not part of what it names:
+
+1. `record_sha256` is SHA-256, hex, of the RFC 8785 bytes of the reading without `signed`. Numbers are written in ECMAScript's shortest form, as RFC 8785 specifies (a reading can carry a value that is not an integer); everything else follows the profile in [VERIFY.md](VERIFY.md) section 2.1.
+2. `statement` is an envelope like a v3 witness statement: Ed25519 over RFC 8785 payload bytes, signed with Trooth's statement key, whose payload is a `trooth.public-record.v1` statement ([schema](../schemas/public-record-statement.v1.schema.json)) naming the domain, `read_at`, `record_sha256`, the entity id, each binding's id and status, how many sources were read, when it was issued, and the signer inside the signed bytes.
+3. `log` is the receipt of that statement as a `public_record` entry of the witness statement log ([LOG.md](LOG.md) section 4), or null with the reason in `problem`.
+
+A checker recomputes the hash from the reading, checks the payload names it (and the same domain, `read_at` and subject), checks the signature with a key on the published key list that was trusted at `issued_at`, and checks the receipt. `trooth public-record` does all four: it exits 8 when the signature or key does not hold and 9 when the reading is not the one named or the receipt does not check.
+
+What the signature establishes: Trooth read these sources and got these answers at this time, and published that reading in this order. It does not establish that what the sources say is true, that a filing is accurate, or that a name match on a sanctions list is the same entity.
+
+## 6. Limits of this version
 
 - Foreign issuers reporting in IFRS: filings are listed, financial values are not read.
 - Filing text (Items 1A, 1C, 3; exhibits) is linked, not read.
-- The public record is served by the API and the command-line tool; it is not yet shown on the company's Trust Profile.
-- Certificate Transparency, SAM.gov, sanctions lists, patent offices, code registries, investor-relations, sustainability and trust-center pages are not read.
+- The Trust Profile shows a reading when one was taken in the last day; otherwise the reader can ask for one there.
+- SAM.gov and patent and trademark offices are not read (each needs an API key); state registries are read only through the LEI record's registry number; code registries are not read; investor-relations, sustainability and trust-center pages are linked, not read.
+- Certificates are counted for the exact domain name only, from one CT monitor's first page.
+- Only the OFAC SDN list's primary entity names are checked; aliases and other lists are not.

@@ -32,14 +32,15 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 |---|---|
 | `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
 | `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all; `--save-bundle` keeps every input in one file and `--bundle` checks it later with no network. Statements v1, v2 and v3 (RFC 8785 bytes) are checked. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 27 cases plus 7 bundles any other implementation must agree on. New in 0.7.0; bundles and v3 new in 0.8.0; the witness statement log and corrections new in 0.9.0. |
-| `trooth public-record <domain>` | What the company has published outside its own site, read by Trooth from the authorities that hold it: its SEC filer record and filings (10-K, 10-Q, 8-K with item numbers, including material cybersecurity incidents and auditor changes), annual revenue, net income and assets as filed in XBRL, its LEI record and parents, DNS mail authentication beyond SPF and DMARC, and the evidence tying each identifier to the domain (its own 10-K's XBRL namespace, or the registry naming the domain). A look-alike site that copies a company's name is reported as a claim, never tied. `--cik`, `--lei` and `--ticker` name the identifier when the site does not. Rules in [docs/EVIDENCE.md](docs/EVIDENCE.md). New in 0.10.0. |
+| `trooth public-record <domain>` | What the company has published outside its own site, read by Trooth from the authorities that hold it: its SEC filer record and filings (10-K, 10-Q, 8-K with item numbers, including material cybersecurity incidents and auditor changes), annual revenue, net income and assets as filed in XBRL, its LEI record and parents, DNS mail authentication beyond SPF and DMARC, certificates for the domain in Certificate Transparency logs, its security.txt, the pages its home page links to, an exact-name check against the OFAC list, and the evidence tying each identifier to the domain (its own 10-K's XBRL namespace, or the registry naming the domain). A look-alike site that copies a company's name is reported as a claim, never tied. Each reading is named by its SHA-256 in a statement Trooth signs and logs, and the command checks that statement, its key and its log entry. `--cik`, `--lei` and `--ticker` name the identifier when the site does not. Rules in [docs/EVIDENCE.md](docs/EVIDENCE.md). New in 0.10.0; signed, with the new sources, in 0.11.0. |
+| `trooth log checkpoint` · `log monitor --state <file>` · `log receipt <index>` | Reads and checks the witness statement log ([docs/LOG.md](docs/LOG.md)): its signed checkpoint and which independent witnesses cosigned it, that it only grew since the checkpoint you saved, and the RFC 9942 COSE receipt for one entry. `--witnesses <n>` requires n cosignatures. New in 0.9.0; witnesses and receipts new in 0.11.0. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
 | `trooth --help` | Help. Also `-h` and `help`. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
 ## Flags
 
-`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, `log monitor` takes `--state`, and `public-record` takes `--cik`, `--lei` and `--ticker`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, `log monitor` takes `--state`, `log checkpoint` and `log monitor` take `--witnesses`, `log receipt` takes `--out`, every `log` command takes `--log-vkey`, and `public-record` takes `--cik`, `--lei`, `--ticker` and `--log-vkey`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 Any other flag is a usage error. The message names the flag, and for a `--` flag given to `check` or `lint` it also lists the ones that exist.
 
@@ -54,8 +55,8 @@ Any other flag is a usage error. The message names the flag, and for a `--` flag
 | 4 | `verify`: everything checked held, but the mapping or the manifest was not supplied, so the binding is only partially checked. `lint`: the read was incomplete. A selected file was over the size limit, did not parse or could not be read, or the walk stopped at its file limit. `--allow-incomplete` reports the same and exits 0 (or 1 when nothing was read). New in 0.5.0. |
 | 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. `verify`: the record carries no signed statement to check. New in 0.5.0. |
 | 6 | `check`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
-| 8 | `verify`: the statement is malformed, its signature does not check, or its key is not trusted (compromised, revoked, retired before the statement's time, or not on the list). New in 0.7.0. |
-| 9 | `verify`: the signature checks and the key is trusted, but the domain, the check mapping, the evidence manifest or the signed counts do not match what was signed, or the log's receipt does not check. `log monitor`: the log is not an extension of the checkpoint you saved. New in 0.7.0. |
+| 8 | `verify`: the statement is malformed, its signature does not check, or its key is not trusted (compromised, revoked, retired before the statement's time, or not on the list). `public-record`: the same, for the statement naming the reading. New in 0.7.0. |
+| 9 | `verify`: the signature checks and the key is trusted, but the domain, the check mapping, the evidence manifest or the signed counts do not match what was signed, or the log's receipt does not check. `log monitor`: the log is not an extension of the checkpoint you saved. `log checkpoint` and `log monitor`: fewer pinned witnesses cosigned than `--witnesses` asks. `log receipt`: the COSE receipt does not check. `public-record`: the reading is not the one its statement names, or its log receipt does not check. New in 0.7.0. |
 | 10 | `verify`: everything held, and a correction Trooth signed and entered in the log withdraws or replaces the statement. New in 0.9.0. |
 | 7 | Output not delivered: stdout or stderr failed or was closed before everything was written, for example a reader that stopped early (EPIPE) or a full disk. The command's own result was not delivered, whatever it would have been, so this code replaces it. Nothing is retried. New in 0.6.1. |
 
@@ -321,6 +322,14 @@ trooth log monitor --state trooth-log-state.json
 
 This repository runs that check every hour (`.github/workflows/log-monitor.yml`).
 
+The log asks independent witnesses of the [witness network](https://witness-network.org) to cosign each checkpoint ([docs/LOG.md](docs/LOG.md) section 7): a witness cosigns only after checking the new tree extends the last one it saw, so a cosigned checkpoint cannot have been shown to you while a different history was shown to someone else. `trooth log checkpoint` says which of the witnesses pinned in this release cosigned, and `--witnesses 2` makes it exit 9 unless at least two did. Cosignatures begin when the witness network follows the log.
+
+For SCITT tooling each entry also has an RFC 9942 COSE receipt, checked against the log key published at `https://api.trooth.co/.well-known/scitt-keys`:
+
+```
+trooth log receipt 0 --out entry-0.cose
+```
+
 ### In your own code
 
 The same checks, passing the same test vectors, in three languages:
@@ -341,15 +350,24 @@ A checked statement means Trooth's key signed that reading for that domain. It d
 $ trooth public-record apple.com
 apple.com  public record, read 2026-10-07
   site names   Apple Inc. (https://apple.com/)
+  entity       trooth:entity:lei:HWUPKR0MPOU8FGXBT394 Apple Inc. (the LEI binding is corroborated and so is the SEC filer binding)
   SEC filer    CIK 0000320193  corroborated the 10-K filed 2025-10-31 declares its extension taxonomy under www.apple.com
-               Apple Inc. · AAPL (Nasdaq) · Large accelerated filer · incorporated CA
   LEI          HWUPKR0MPOU8FGXBT394  corroborated the LEI record and the SEC filer 0000320193 name the same entity, and the filer's own filing ties it to apple.com
   filings      10-K 2025-10-31 · 10-Q 2026-07-31 · 8-K 2026-07-30 · DEF 14A 2026-01-08
-  8-K events   18 since 2024-10-07 · cybersecurity incidents (1.05): 0 · auditor changes (4.01): 0 · non-reliance (4.02): 0
-  Revenue      416,161,000,000 USD (year ending 2025-09-27, 10-K filed 2025-10-31)
+  revenue      416,161,000,000 USD (year ending 2025-09-27, 10-K filed 2025-10-31)
+  certificates 5 unexpired for apple.com in CT logs · issuers Apple · soonest expiry 2026-10-20
+  security.txt https://security.apple.com (expires 2027-07-10)
+  sanctions    no OFAC SDN entity with the name Apple Inc.
+  signature    signed by trooth-master-2026-09, and entry 12 of the log
 ```
 
-Every fact carries the URL of the regulator or registry it came from (`--json`). A filing is the company's own statement to its regulator, not Trooth's finding. The reading is not signed; it is cached for a day. Exit 0 when an identifier was found, 1 when none was (a private company files nothing with the SEC).
+Every fact carries the URL of the regulator or registry it came from (`--json`), and every response read is listed with its SHA-256. A filing is the company's own statement to its regulator, not Trooth's finding; a sanctions entry with the same name is not an identification. The statement naming the reading is checked here: the reading's RFC 8785 SHA-256, the signature and its key on `api.trooth.co/public/keys`, and its entry in the log ([docs/EVIDENCE.md](docs/EVIDENCE.md) section 5). The signature says what Trooth read and when, not that the sources are right. A reading is cached for a day. Exit 0 when an identifier was found, 1 when none was (a private company files nothing with the SEC), 8 or 9 when the signature or the log entry does not hold.
+
+## Changed in 0.11.0
+
+- `trooth log checkpoint` and `trooth log monitor` report which of the witnesses pinned in this release cosigned the checkpoint (c2sp.org/tlog-cosignature), and `--witnesses <n>` requires n of them. New `trooth log receipt <index>` fetches and checks an entry's RFC 9942 COSE receipt and confirms the key set at `/.well-known/scitt-keys` lists the log key ([docs/LOG.md](docs/LOG.md) 1.1).
+- `trooth public-record` checks the signed statement each reading now carries, shows the legal entity's id (`trooth:entity:lei:` or `trooth:entity:cik:`, [docs/IDS.md](docs/IDS.md) 1.2), certificates in CT logs, security.txt, the pages the home page links to, and an exact-name OFAC check ([docs/EVIDENCE.md](docs/EVIDENCE.md) 1.1).
+- [docs/KEY-CEREMONY.md](docs/KEY-CEREMONY.md) 1.1 records the first key drills and the rule that a witnessed log changes key by changing origin. Vectors in `tests/vectors/witness-cose.json`.
 
 ## Changed in 0.10.0
 

@@ -120,7 +120,49 @@ type LogReceipt struct {
 	Checkpoint string `json:"checkpoint"`
 }
 
-// PublicRecordReading: What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.
+// PublicRecordStatement: The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true.
+type PublicRecordStatement struct {
+	// The payload type. One of: trooth.public-record.v1.
+	Statement string `json:"statement"`
+	// trooth:domain:<domain>.
+	SubjectID string `json:"subject_id"`
+	// The domain read.
+	Domain string `json:"domain"`
+	// The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// SHA-256, hex, of the reading's RFC 8785 bytes without `signed`.
+	RecordSha256 string `json:"record_sha256"`
+	// How those bytes were made. One of: RFC8785.
+	RecordCanonicalization string `json:"record_canonicalization"`
+	// The reading's entity id, or null.
+	EntityID *string `json:"entity_id"`
+	// Each binding's id and status.
+	Bindings []BindingStatus `json:"bindings"`
+	// How many responses the reading read.
+	Sources int64 `json:"sources"`
+	// When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	IssuedAt string `json:"issued_at"`
+	// The signing key, inside the signed bytes.
+	Signer StatementSigner `json:"signer"`
+}
+
+// BindingStatus: A binding as the statement names it.
+type BindingStatus struct {
+	// trooth:cik or trooth:lei id.
+	ID string `json:"id"`
+	// The binding status.
+	Status string `json:"status"`
+}
+
+// StatementSigner: The signing key.
+type StatementSigner struct {
+	// The kid on https://api.trooth.co/public/keys.
+	KeyID string `json:"key_id"`
+	// Always trooth.co. One of: trooth.co.
+	Issuer string `json:"issuer"`
+}
+
+// PublicRecordReading: What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.
 type PublicRecordReading struct {
 	// The format. One of: trooth.public-record.v1.
 	Format string `json:"format"`
@@ -140,10 +182,124 @@ type PublicRecordReading struct {
 	Lei *LeiRecord `json:"lei"`
 	// Mail-authentication records beyond SPF and DMARC, and DNSSEC.
 	Dns []PublicFact `json:"dns"`
+	// The legal entity the domain is tied to, when a binding is corroborated; null otherwise. Added in trooth 0.11.0.
+	Entity *Entity `json:"entity,omitempty"`
+	// Unexpired certificates for the exact domain name in Certificate Transparency logs, as a CT monitor returned them; null when it did not answer. Added in trooth 0.11.0.
+	Certificates *Certificates `json:"certificates,omitempty"`
+	// The site's /.well-known/security.txt (RFC 9116), or null when there is none or the site opted out of being read. Added in trooth 0.11.0.
+	SecurityTxt *SecurityTxt `json:"security_txt,omitempty"`
+	// Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0.
+	Sanctions *Sanctions `json:"sanctions,omitempty"`
+	// Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.
+	Sources []Source `json:"sources,omitempty"`
 	// Each source that was not read, or did not answer, and why. A source not read is never guessed at.
 	NotRead []NotRead `json:"not_read"`
 	// What the reading is and is not, as a paragraph.
 	Note string `json:"note"`
+	// The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.
+	Signed *Signed `json:"signed,omitempty"`
+}
+
+// Entity: A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md).
+type Entity struct {
+	// trooth:entity:lei:<LEI> when the LEI binding is corroborated, otherwise trooth:entity:cik:<CIK>.
+	ID string `json:"id"`
+	// The legal name the registry holds.
+	Name *string `json:"name"`
+	// The corroborated identifiers (trooth:lei, trooth:cik).
+	Identifiers []string `json:"identifiers"`
+	// Which bindings are corroborated.
+	Basis string `json:"basis"`
+}
+
+// Certificates: Certificates for the exact domain name in Certificate Transparency logs.
+type Certificates struct {
+	// The CT monitor URL read.
+	Source string `json:"source"`
+	// How many unexpired certificates the monitor returned.
+	Unexpired int64 `json:"unexpired"`
+	// The issuing authorities, at most 10.
+	Issuers []string `json:"issuers"`
+	// The latest not-before time.
+	NewestIssued *string `json:"newest_issued"`
+	// The earliest not-after time.
+	SoonestExpiry *string `json:"soonest_expiry"`
+	// True when the monitor's first page was full, so there may be more.
+	PageFull bool `json:"page_full"`
+}
+
+// SecurityTxt: A security.txt file (RFC 9116).
+type SecurityTxt struct {
+	// Where it was read.
+	URL string `json:"url"`
+	// Contact fields, at most 5.
+	Contacts []string `json:"contacts"`
+	// The Expires field.
+	Expires *string `json:"expires"`
+	// Whether Expires was in the past when read; null when it does not parse.
+	Expired *bool `json:"expired"`
+	// The Policy field.
+	Policy *string `json:"policy"`
+	// Canonical fields.
+	Canonical []string `json:"canonical"`
+	// Whether the file is OpenPGP clear-signed. The signature is not checked.
+	Signed bool `json:"signed"`
+}
+
+// Sanctions: An exact-name check against a sanctions list.
+type Sanctions struct {
+	// The list and the part of it read.
+	List string `json:"list"`
+	// The list URL.
+	Source string `json:"source"`
+	// When the list was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// The legal names checked.
+	NamesChecked []string `json:"names_checked"`
+	// Entries with exactly one of those names (case, punctuation and suffix spellings folded). A name match is not an identification.
+	Matches []SanctionsEntry `json:"matches"`
+}
+
+// SanctionsEntry: A list entry.
+type SanctionsEntry struct {
+	// The entry number on the list.
+	Uid string `json:"uid"`
+	// The name as listed.
+	Name string `json:"name"`
+	// The sanctions programs.
+	Programs string `json:"programs"`
+}
+
+// Source: One response read.
+type Source struct {
+	// The URL requested.
+	URL string `json:"url"`
+	// The HTTP status.
+	Status int64 `json:"status"`
+	// SHA-256 of the bytes read, hex.
+	Sha256 string `json:"sha256"`
+	// How many bytes were read.
+	Bytes int64 `json:"bytes"`
+	// False when only the start of the document was read (a filing's first 256 KB).
+	Complete bool `json:"complete"`
+	// When it was requested. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	FetchedAt string `json:"fetched_at"`
+}
+
+// Signed: The statement naming the reading, and its log receipt.
+type Signed struct {
+	// SHA-256, hex, of the RFC 8785 bytes of the reading without `signed` (finite numbers in ECMAScript shortest form).
+	RecordSha256 string `json:"record_sha256"`
+	// How those bytes were made. One of: RFC8785.
+	RecordCanonicalization string `json:"record_canonicalization"`
+	// The signed envelope; its payload is a public-record-statement.v1 document. Null when the reading could not be signed.
+	Statement *WitnessStatement `json:"statement"`
+	// trooth:statement:<sha256 of the payload>.
+	StatementID *string `json:"statement_id"`
+	// The receipt of the statement as a public_record entry of the witness statement log, or null when it was not logged.
+	Log *LogReceipt `json:"log"`
+	// What could not be done (not signed, or signed and not logged), or null.
+	Problem *string `json:"problem"`
 }
 
 // PublicFact: One fact as its source published it, with the URL it was read from.
@@ -234,6 +390,16 @@ type SiteRead struct {
 	Read bool `json:"read"`
 	// Why no name was found, or why the site was not read (for example its robots.txt opts out).
 	Reason *string `json:"reason"`
+	// Pages the home page links to on the company's own domain: investor relations, trust center, security, status, sustainability. Linked, not read. Added in trooth 0.11.0.
+	Links []SiteLink `json:"links,omitempty"`
+}
+
+// SiteLink: A page the home page links to.
+type SiteLink struct {
+	// What the page is. One of: investor_relations, trust_center, security, status, sustainability.
+	Kind string `json:"kind"`
+	// The link, without query or fragment.
+	URL string `json:"url"`
 }
 
 // SiteName: A legal name a page states.
