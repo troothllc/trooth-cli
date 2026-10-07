@@ -118,6 +118,182 @@ export interface LogReceipt {
   checkpoint: string;
 }
 
+/** What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text. */
+export interface PublicRecordReading {
+  /** The format. */
+  format: "trooth.public-record.v1";
+  /** The domain read. */
+  domain: string;
+  /** trooth:domain:<domain>. */
+  subject_id: string;
+  /** When Trooth read the sources. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** What the company's own pages say about which legal entity it is. */
+  site: SiteRead;
+  /** Each identifier found and the evidence for and against tying it to the domain. */
+  bindings: EntityBinding[];
+  /** The SEC filer's record, or null when no filer was identified. */
+  sec: SecRecord | null;
+  /** The LEI record, or null when none was identified. */
+  lei: LeiRecord | null;
+  /** Mail-authentication records beyond SPF and DMARC, and DNSSEC. */
+  dns: PublicFact[];
+  /** Each source that was not read, or did not answer, and why. A source not read is never guessed at. */
+  not_read: NotRead[];
+  /** What the reading is and is not, as a paragraph. */
+  note: string;
+}
+
+/** One fact as its source published it, with the URL it was read from. */
+export interface PublicFact {
+  /** A stable key, source.field (for example sec.tickers, lei.jurisdiction, dns.mta_sts). */
+  key: string;
+  /** The fact as words. */
+  label: string;
+  /** The value as published: text, a number, true or false, a list of text, or null when the source states nothing. */
+  value: string | number | boolean | null | string[];
+  /** Where it was read: a URL, or dns:<name> <type> for a DNS record. */
+  source: string;
+}
+
+/** One piece of evidence for or against a binding. */
+export interface BindingEvidence {
+  /** For: filing_namespace_names_domain, registry_lists_domain, through_corroborated_filer (these tie the identifier to the domain), site_names_registry_name (a claim by the site), registries_agree, edgar_names_lei. Against: registry_lists_other_domain, registries_disagree, edgar_names_other_lei. */
+  kind: string;
+  /** What was seen, as a sentence. */
+  detail: string;
+  /** Where it was seen, or null when it follows from other evidence. */
+  source: string | null;
+}
+
+/** A link between the domain and a legal-entity identifier, with the evidence for and against it. Nothing is asserted beyond the evidence. */
+export interface EntityBinding {
+  /** cik (SEC Central Index Key) or lei (Legal Entity Identifier). */
+  identifier: "cik" | "lei";
+  /** The identifier: 10 digits for a CIK, 20 characters for an LEI. */
+  value: string;
+  /** The stable id: trooth:cik:<10 digits> or trooth:lei:<LEI> (docs/IDS.md). */
+  id: string;
+  /** How the identifier was found: asked (given by the requester), ticker, site_legal_name (the legal name the site states matched exactly one listed SEC filer), edgar_lei_field, registry_name_match (exact legal name and, when the SEC gives one, the jurisdiction). */
+  found_by: "asked" | "ticker" | "site_legal_name" | "edgar_lei_field" | "registry_name_match";
+  /** corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier. */
+  status: "corroborated" | "claimed_by_site" | "registries_only" | "uncorroborated" | "contradicted" | "not_found";
+  /** Evidence for the binding. */
+  for: BindingEvidence[];
+  /** Evidence against it. */
+  against: BindingEvidence[];
+}
+
+/** One SEC filing, as EDGAR lists it. */
+export interface Filing {
+  /** The form type (10-K, 10-Q, 8-K, DEF 14A, 20-F ...). */
+  form: string;
+  /** The filing date, YYYY-MM-DD. */
+  filed: string;
+  /** The period or event date, when EDGAR gives one. */
+  report_date: string | null;
+  /** For an 8-K, the item numbers it reports (for example 1.05, 4.01). */
+  items: string[];
+  /** EDGAR's description of the primary document. */
+  description: string | null;
+  /** The primary document on www.sec.gov. */
+  url: string;
+}
+
+/** A value the company filed in XBRL, as it filed it: the latest annual (10-K, full fiscal year) value of the concept. */
+export interface FinancialFact {
+  /** The XBRL concept, taxonomy:Name. */
+  tag: string;
+  /** The concept as words. */
+  label: string;
+  /** The value as filed. */
+  value: number;
+  /** The unit (USD). */
+  unit: string;
+  /** The period start for a flow such as revenue; null for a balance such as assets. */
+  period_start: string | null;
+  /** The period end. */
+  period_end: string;
+  /** The form the value was filed in. */
+  form: string;
+  /** The filing date. */
+  filed: string;
+  /** The accession number of that filing. */
+  accession: string;
+  /** The data.sec.gov URL the value was read from. */
+  source: string;
+}
+
+/** The legal names the company's pages state in copyright notices. */
+export interface SiteRead {
+  /** Each legal name stated, with the page. */
+  legal_names: SiteName[];
+  /** Whether any page of the site could be read. */
+  read: boolean;
+  /** Why no name was found, or why the site was not read (for example its robots.txt opts out). */
+  reason: string | null;
+}
+
+/** A legal name a page states. */
+export interface SiteName {
+  /** The name as written. */
+  name: string;
+  /** The page. */
+  source: string;
+}
+
+/** The SEC filer's registration facts, filings and annual XBRL values. */
+export interface SecRecord {
+  /** The Central Index Key, 10 digits. */
+  cik: string;
+  /** Registration facts on file with the SEC. */
+  facts: PublicFact[];
+  /** The latest filing of each key form type, keyed by form. */
+  latest: Record<string, Filing>;
+  /** 8-K filings of the last two years, newest first, at most 50. */
+  events: Filing[];
+  /** The earliest date the events cover. */
+  events_cover_since: string | null;
+  /** 8-K filings reporting Item 1.05, a material cybersecurity incident. */
+  cybersecurity_incidents: Filing[];
+  /** 8-K filings reporting Item 4.01, a change of certifying accountant. */
+  auditor_changes: Filing[];
+  /** 8-K filings reporting Item 4.02, non-reliance on financial statements issued before. */
+  non_reliance: Filing[];
+  /** Forms 3, 4 and 5 filed in the last 90 days. */
+  insider_forms_last_90_days: number;
+  /** Annual values as filed. */
+  financials: FinancialFact[];
+}
+
+/** The Legal Entity Identifier record. */
+export interface LeiRecord {
+  /** The LEI. */
+  lei: string;
+  /** The record's facts. */
+  facts: PublicFact[];
+  /** The direct parent the record reports, or null. */
+  direct_parent: Parent | null;
+  /** The ultimate parent the record reports, or null. */
+  ultimate_parent: Parent | null;
+}
+
+/** A parent entity. */
+export interface Parent {
+  /** The parent's LEI. */
+  lei: string;
+  /** Its legal name. */
+  name: string | null;
+}
+
+/** A source not read. */
+export interface NotRead {
+  /** The source. */
+  source: string;
+  /** Why. */
+  reason: string;
+}
+
 /** Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list. */
 export interface VerificationBundle {
   /** The bundle format. */

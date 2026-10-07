@@ -20,7 +20,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 10);
+  assert.equal(Object.keys(schemas).length, 11);
   for (const [f, s] of Object.entries(schemas)) {
     assert.equal(s.$id, `https://trooth.co/schemas/${f}`);
     assert.equal(s.$schema, 'https://json-schema.org/draft/2020-12/schema');
@@ -116,12 +116,21 @@ test('trooth verify --json with a log answer validates against verify-result', a
   }
 });
 
+test('public-record readings built by the scan worker validate (docs/EVIDENCE.md)', () => {
+  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com']) {
+    ok('public-record.v1.schema.json', JSON.parse(readFileSync(new URL(`./fixtures/public-record/${n}.json`, import.meta.url), 'utf8')), n);
+  }
+});
+
 test('stable ids: format, parse and refuse', () => {
   assert.equal(formatId('domain', 'Trooth.CO.'), 'trooth:domain:trooth.co');
   assert.deepEqual(parseId('trooth:mapping:1.0.1'), { type: 'mapping', value: '1.0.1' });
   assert.equal(parseId('trooth:domain:not a domain'), null);
   assert.equal(parseId('trooth:planet:earth'), null);
   assert.throws(() => formatId('statement', 'abc'));
+  assert.equal(formatId('cik', '320193'), 'trooth:cik:0000320193');
+  assert.equal(formatId('lei', 'hwupkr0mpou8fgxbt394'), 'trooth:lei:HWUPKR0MPOU8FGXBT394');
+  assert.equal(parseId('trooth:cik:320193'), null);
   assert.match(statementId('{}'), /^trooth:statement:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a$/);
 });
 

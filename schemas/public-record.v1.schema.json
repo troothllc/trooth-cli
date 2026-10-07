@@ -1,0 +1,570 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/public-record.v1.schema.json",
+  "title": "PublicRecordReading",
+  "description": "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.",
+  "type": "object",
+  "required": [
+    "format",
+    "domain",
+    "subject_id",
+    "read_at",
+    "site",
+    "bindings",
+    "sec",
+    "lei",
+    "dns",
+    "not_read",
+    "note"
+  ],
+  "properties": {
+    "format": {
+      "type": "string",
+      "description": "The format.",
+      "const": "trooth.public-record.v1"
+    },
+    "domain": {
+      "type": "string",
+      "description": "The domain read."
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "trooth:domain:<domain>.",
+      "pattern": "^trooth:domain:[a-z0-9.-]+$"
+    },
+    "read_at": {
+      "type": "string",
+      "description": "When Trooth read the sources. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "site": {
+      "$ref": "#/$defs/SiteRead",
+      "description": "What the company's own pages say about which legal entity it is."
+    },
+    "bindings": {
+      "type": "array",
+      "description": "Each identifier found and the evidence for and against tying it to the domain.",
+      "items": {
+        "$ref": "#/$defs/EntityBinding"
+      }
+    },
+    "sec": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SecRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The SEC filer's record, or null when no filer was identified."
+    },
+    "lei": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LeiRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The LEI record, or null when none was identified."
+    },
+    "dns": {
+      "type": "array",
+      "description": "Mail-authentication records beyond SPF and DMARC, and DNSSEC.",
+      "items": {
+        "$ref": "#/$defs/PublicFact"
+      }
+    },
+    "not_read": {
+      "type": "array",
+      "description": "Each source that was not read, or did not answer, and why. A source not read is never guessed at.",
+      "items": {
+        "$ref": "#/$defs/NotRead"
+      }
+    },
+    "note": {
+      "type": "string",
+      "description": "What the reading is and is not, as a paragraph."
+    }
+  },
+  "$defs": {
+    "PublicFact": {
+      "title": "PublicFact",
+      "type": "object",
+      "description": "One fact as its source published it, with the URL it was read from.",
+      "required": [
+        "key",
+        "label",
+        "value",
+        "source"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "A stable key, source.field (for example sec.tickers, lei.jurisdiction, dns.mta_sts)."
+        },
+        "label": {
+          "type": "string",
+          "description": "The fact as words."
+        },
+        "value": {
+          "description": "The value as published: text, a number, true or false, a list of text, or null when the source states nothing.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "source": {
+          "type": "string",
+          "description": "Where it was read: a URL, or dns:<name> <type> for a DNS record."
+        }
+      }
+    },
+    "BindingEvidence": {
+      "title": "BindingEvidence",
+      "type": "object",
+      "description": "One piece of evidence for or against a binding.",
+      "required": [
+        "kind",
+        "detail",
+        "source"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "For: filing_namespace_names_domain, registry_lists_domain, through_corroborated_filer (these tie the identifier to the domain), site_names_registry_name (a claim by the site), registries_agree, edgar_names_lei. Against: registry_lists_other_domain, registries_disagree, edgar_names_other_lei."
+        },
+        "detail": {
+          "type": "string",
+          "description": "What was seen, as a sentence."
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where it was seen, or null when it follows from other evidence."
+        }
+      }
+    },
+    "EntityBinding": {
+      "title": "EntityBinding",
+      "type": "object",
+      "description": "A link between the domain and a legal-entity identifier, with the evidence for and against it. Nothing is asserted beyond the evidence.",
+      "required": [
+        "identifier",
+        "value",
+        "id",
+        "found_by",
+        "status",
+        "for",
+        "against"
+      ],
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "description": "cik (SEC Central Index Key) or lei (Legal Entity Identifier).",
+          "enum": [
+            "cik",
+            "lei"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "description": "The identifier: 10 digits for a CIK, 20 characters for an LEI."
+        },
+        "id": {
+          "type": "string",
+          "description": "The stable id: trooth:cik:<10 digits> or trooth:lei:<LEI> (docs/IDS.md).",
+          "pattern": "^trooth:(cik:[0-9]{10}|lei:[A-Z0-9]{20})$"
+        },
+        "found_by": {
+          "type": "string",
+          "description": "How the identifier was found: asked (given by the requester), ticker, site_legal_name (the legal name the site states matched exactly one listed SEC filer), edgar_lei_field, registry_name_match (exact legal name and, when the SEC gives one, the jurisdiction).",
+          "enum": [
+            "asked",
+            "ticker",
+            "site_legal_name",
+            "edgar_lei_field",
+            "registry_name_match"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "description": "corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier.",
+          "enum": [
+            "corroborated",
+            "claimed_by_site",
+            "registries_only",
+            "uncorroborated",
+            "contradicted",
+            "not_found"
+          ]
+        },
+        "for": {
+          "type": "array",
+          "description": "Evidence for the binding.",
+          "items": {
+            "$ref": "#/$defs/BindingEvidence"
+          }
+        },
+        "against": {
+          "type": "array",
+          "description": "Evidence against it.",
+          "items": {
+            "$ref": "#/$defs/BindingEvidence"
+          }
+        }
+      }
+    },
+    "Filing": {
+      "title": "Filing",
+      "type": "object",
+      "description": "One SEC filing, as EDGAR lists it.",
+      "required": [
+        "form",
+        "filed",
+        "report_date",
+        "items",
+        "description",
+        "url"
+      ],
+      "properties": {
+        "form": {
+          "type": "string",
+          "description": "The form type (10-K, 10-Q, 8-K, DEF 14A, 20-F ...)."
+        },
+        "filed": {
+          "type": "string",
+          "description": "The filing date, YYYY-MM-DD."
+        },
+        "report_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The period or event date, when EDGAR gives one."
+        },
+        "items": {
+          "type": "array",
+          "description": "For an 8-K, the item numbers it reports (for example 1.05, 4.01).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "EDGAR's description of the primary document."
+        },
+        "url": {
+          "type": "string",
+          "description": "The primary document on www.sec.gov."
+        }
+      }
+    },
+    "FinancialFact": {
+      "title": "FinancialFact",
+      "type": "object",
+      "description": "A value the company filed in XBRL, as it filed it: the latest annual (10-K, full fiscal year) value of the concept.",
+      "required": [
+        "tag",
+        "label",
+        "value",
+        "unit",
+        "period_start",
+        "period_end",
+        "form",
+        "filed",
+        "accession",
+        "source"
+      ],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "The XBRL concept, taxonomy:Name."
+        },
+        "label": {
+          "type": "string",
+          "description": "The concept as words."
+        },
+        "value": {
+          "type": "number",
+          "description": "The value as filed."
+        },
+        "unit": {
+          "type": "string",
+          "description": "The unit (USD)."
+        },
+        "period_start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The period start for a flow such as revenue; null for a balance such as assets."
+        },
+        "period_end": {
+          "type": "string",
+          "description": "The period end."
+        },
+        "form": {
+          "type": "string",
+          "description": "The form the value was filed in."
+        },
+        "filed": {
+          "type": "string",
+          "description": "The filing date."
+        },
+        "accession": {
+          "type": "string",
+          "description": "The accession number of that filing."
+        },
+        "source": {
+          "type": "string",
+          "description": "The data.sec.gov URL the value was read from."
+        }
+      }
+    },
+    "SiteRead": {
+      "title": "SiteRead",
+      "type": "object",
+      "description": "The legal names the company's pages state in copyright notices.",
+      "required": [
+        "legal_names",
+        "read",
+        "reason"
+      ],
+      "properties": {
+        "legal_names": {
+          "type": "array",
+          "description": "Each legal name stated, with the page.",
+          "items": {
+            "$ref": "#/$defs/SiteName"
+          }
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether any page of the site could be read."
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why no name was found, or why the site was not read (for example its robots.txt opts out)."
+        }
+      }
+    },
+    "SiteName": {
+      "title": "SiteName",
+      "type": "object",
+      "description": "A legal name a page states.",
+      "required": [
+        "name",
+        "source"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name as written."
+        },
+        "source": {
+          "type": "string",
+          "description": "The page."
+        }
+      }
+    },
+    "SecRecord": {
+      "title": "SecRecord",
+      "type": "object",
+      "description": "The SEC filer's registration facts, filings and annual XBRL values.",
+      "required": [
+        "cik",
+        "facts",
+        "latest",
+        "events",
+        "events_cover_since",
+        "cybersecurity_incidents",
+        "auditor_changes",
+        "non_reliance",
+        "insider_forms_last_90_days",
+        "financials"
+      ],
+      "properties": {
+        "cik": {
+          "type": "string",
+          "description": "The Central Index Key, 10 digits.",
+          "pattern": "^[0-9]{10}$"
+        },
+        "facts": {
+          "type": "array",
+          "description": "Registration facts on file with the SEC.",
+          "items": {
+            "$ref": "#/$defs/PublicFact"
+          }
+        },
+        "latest": {
+          "type": "object",
+          "description": "The latest filing of each key form type, keyed by form.",
+          "additionalProperties": {
+            "$ref": "#/$defs/Filing"
+          }
+        },
+        "events": {
+          "type": "array",
+          "description": "8-K filings of the last two years, newest first, at most 50.",
+          "items": {
+            "$ref": "#/$defs/Filing"
+          }
+        },
+        "events_cover_since": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The earliest date the events cover."
+        },
+        "cybersecurity_incidents": {
+          "type": "array",
+          "description": "8-K filings reporting Item 1.05, a material cybersecurity incident.",
+          "items": {
+            "$ref": "#/$defs/Filing"
+          }
+        },
+        "auditor_changes": {
+          "type": "array",
+          "description": "8-K filings reporting Item 4.01, a change of certifying accountant.",
+          "items": {
+            "$ref": "#/$defs/Filing"
+          }
+        },
+        "non_reliance": {
+          "type": "array",
+          "description": "8-K filings reporting Item 4.02, non-reliance on financial statements issued before.",
+          "items": {
+            "$ref": "#/$defs/Filing"
+          }
+        },
+        "insider_forms_last_90_days": {
+          "type": "integer",
+          "description": "Forms 3, 4 and 5 filed in the last 90 days.",
+          "minimum": 0
+        },
+        "financials": {
+          "type": "array",
+          "description": "Annual values as filed.",
+          "items": {
+            "$ref": "#/$defs/FinancialFact"
+          }
+        }
+      }
+    },
+    "LeiRecord": {
+      "title": "LeiRecord",
+      "type": "object",
+      "description": "The Legal Entity Identifier record.",
+      "required": [
+        "lei",
+        "facts",
+        "direct_parent",
+        "ultimate_parent"
+      ],
+      "properties": {
+        "lei": {
+          "type": "string",
+          "description": "The LEI.",
+          "pattern": "^[A-Z0-9]{20}$"
+        },
+        "facts": {
+          "type": "array",
+          "description": "The record's facts.",
+          "items": {
+            "$ref": "#/$defs/PublicFact"
+          }
+        },
+        "direct_parent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Parent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The direct parent the record reports, or null."
+        },
+        "ultimate_parent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Parent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The ultimate parent the record reports, or null."
+        }
+      }
+    },
+    "Parent": {
+      "title": "Parent",
+      "type": "object",
+      "description": "A parent entity.",
+      "required": [
+        "lei",
+        "name"
+      ],
+      "properties": {
+        "lei": {
+          "type": "string",
+          "description": "The parent's LEI."
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Its legal name."
+        }
+      }
+    },
+    "NotRead": {
+      "title": "NotRead",
+      "type": "object",
+      "description": "A source not read.",
+      "required": [
+        "source",
+        "reason"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "The source."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why."
+        }
+      }
+    }
+  }
+}

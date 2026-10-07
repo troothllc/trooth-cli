@@ -120,6 +120,182 @@ type LogReceipt struct {
 	Checkpoint string `json:"checkpoint"`
 }
 
+// PublicRecordReading: What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS), beside the legal name its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Not signed: every fact carries the URL to read it again. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.
+type PublicRecordReading struct {
+	// The format. One of: trooth.public-record.v1.
+	Format string `json:"format"`
+	// The domain read.
+	Domain string `json:"domain"`
+	// trooth:domain:<domain>.
+	SubjectID string `json:"subject_id"`
+	// When Trooth read the sources. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// What the company's own pages say about which legal entity it is.
+	Site SiteRead `json:"site"`
+	// Each identifier found and the evidence for and against tying it to the domain.
+	Bindings []EntityBinding `json:"bindings"`
+	// The SEC filer's record, or null when no filer was identified.
+	Sec *SecRecord `json:"sec"`
+	// The LEI record, or null when none was identified.
+	Lei *LeiRecord `json:"lei"`
+	// Mail-authentication records beyond SPF and DMARC, and DNSSEC.
+	Dns []PublicFact `json:"dns"`
+	// Each source that was not read, or did not answer, and why. A source not read is never guessed at.
+	NotRead []NotRead `json:"not_read"`
+	// What the reading is and is not, as a paragraph.
+	Note string `json:"note"`
+}
+
+// PublicFact: One fact as its source published it, with the URL it was read from.
+type PublicFact struct {
+	// A stable key, source.field (for example sec.tickers, lei.jurisdiction, dns.mta_sts).
+	Key string `json:"key"`
+	// The fact as words.
+	Label string `json:"label"`
+	// The value as published: text, a number, true or false, a list of text, or null when the source states nothing.
+	Value any `json:"value"`
+	// Where it was read: a URL, or dns:<name> <type> for a DNS record.
+	Source string `json:"source"`
+}
+
+// BindingEvidence: One piece of evidence for or against a binding.
+type BindingEvidence struct {
+	// For: filing_namespace_names_domain, registry_lists_domain, through_corroborated_filer (these tie the identifier to the domain), site_names_registry_name (a claim by the site), registries_agree, edgar_names_lei. Against: registry_lists_other_domain, registries_disagree, edgar_names_other_lei.
+	Kind string `json:"kind"`
+	// What was seen, as a sentence.
+	Detail string `json:"detail"`
+	// Where it was seen, or null when it follows from other evidence.
+	Source *string `json:"source"`
+}
+
+// EntityBinding: A link between the domain and a legal-entity identifier, with the evidence for and against it. Nothing is asserted beyond the evidence.
+type EntityBinding struct {
+	// cik (SEC Central Index Key) or lei (Legal Entity Identifier). One of: cik, lei.
+	Identifier string `json:"identifier"`
+	// The identifier: 10 digits for a CIK, 20 characters for an LEI.
+	Value string `json:"value"`
+	// The stable id: trooth:cik:<10 digits> or trooth:lei:<LEI> (docs/IDS.md).
+	ID string `json:"id"`
+	// How the identifier was found: asked (given by the requester), ticker, site_legal_name (the legal name the site states matched exactly one listed SEC filer), edgar_lei_field, registry_name_match (exact legal name and, when the SEC gives one, the jurisdiction). One of: asked, ticker, site_legal_name, edgar_lei_field, registry_name_match.
+	FoundBy string `json:"found_by"`
+	// corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier. One of: corroborated, claimed_by_site, registries_only, uncorroborated, contradicted, not_found.
+	Status string `json:"status"`
+	// Evidence for the binding.
+	For []BindingEvidence `json:"for"`
+	// Evidence against it.
+	Against []BindingEvidence `json:"against"`
+}
+
+// Filing: One SEC filing, as EDGAR lists it.
+type Filing struct {
+	// The form type (10-K, 10-Q, 8-K, DEF 14A, 20-F ...).
+	Form string `json:"form"`
+	// The filing date, YYYY-MM-DD.
+	Filed string `json:"filed"`
+	// The period or event date, when EDGAR gives one.
+	ReportDate *string `json:"report_date"`
+	// For an 8-K, the item numbers it reports (for example 1.05, 4.01).
+	Items []string `json:"items"`
+	// EDGAR's description of the primary document.
+	Description *string `json:"description"`
+	// The primary document on www.sec.gov.
+	URL string `json:"url"`
+}
+
+// FinancialFact: A value the company filed in XBRL, as it filed it: the latest annual (10-K, full fiscal year) value of the concept.
+type FinancialFact struct {
+	// The XBRL concept, taxonomy:Name.
+	Tag string `json:"tag"`
+	// The concept as words.
+	Label string `json:"label"`
+	// The value as filed.
+	Value float64 `json:"value"`
+	// The unit (USD).
+	Unit string `json:"unit"`
+	// The period start for a flow such as revenue; null for a balance such as assets.
+	PeriodStart *string `json:"period_start"`
+	// The period end.
+	PeriodEnd string `json:"period_end"`
+	// The form the value was filed in.
+	Form string `json:"form"`
+	// The filing date.
+	Filed string `json:"filed"`
+	// The accession number of that filing.
+	Accession string `json:"accession"`
+	// The data.sec.gov URL the value was read from.
+	Source string `json:"source"`
+}
+
+// SiteRead: The legal names the company's pages state in copyright notices.
+type SiteRead struct {
+	// Each legal name stated, with the page.
+	LegalNames []SiteName `json:"legal_names"`
+	// Whether any page of the site could be read.
+	Read bool `json:"read"`
+	// Why no name was found, or why the site was not read (for example its robots.txt opts out).
+	Reason *string `json:"reason"`
+}
+
+// SiteName: A legal name a page states.
+type SiteName struct {
+	// The name as written.
+	Name string `json:"name"`
+	// The page.
+	Source string `json:"source"`
+}
+
+// SecRecord: The SEC filer's registration facts, filings and annual XBRL values.
+type SecRecord struct {
+	// The Central Index Key, 10 digits.
+	Cik string `json:"cik"`
+	// Registration facts on file with the SEC.
+	Facts []PublicFact `json:"facts"`
+	// The latest filing of each key form type, keyed by form.
+	Latest map[string]Filing `json:"latest"`
+	// 8-K filings of the last two years, newest first, at most 50.
+	Events []Filing `json:"events"`
+	// The earliest date the events cover.
+	EventsCoverSince *string `json:"events_cover_since"`
+	// 8-K filings reporting Item 1.05, a material cybersecurity incident.
+	CybersecurityIncidents []Filing `json:"cybersecurity_incidents"`
+	// 8-K filings reporting Item 4.01, a change of certifying accountant.
+	AuditorChanges []Filing `json:"auditor_changes"`
+	// 8-K filings reporting Item 4.02, non-reliance on financial statements issued before.
+	NonReliance []Filing `json:"non_reliance"`
+	// Forms 3, 4 and 5 filed in the last 90 days.
+	InsiderFormsLast90Days int64 `json:"insider_forms_last_90_days"`
+	// Annual values as filed.
+	Financials []FinancialFact `json:"financials"`
+}
+
+// LeiRecord: The Legal Entity Identifier record.
+type LeiRecord struct {
+	// The LEI.
+	Lei string `json:"lei"`
+	// The record's facts.
+	Facts []PublicFact `json:"facts"`
+	// The direct parent the record reports, or null.
+	DirectParent *Parent `json:"direct_parent"`
+	// The ultimate parent the record reports, or null.
+	UltimateParent *Parent `json:"ultimate_parent"`
+}
+
+// Parent: A parent entity.
+type Parent struct {
+	// The parent's LEI.
+	Lei string `json:"lei"`
+	// Its legal name.
+	Name *string `json:"name"`
+}
+
+// NotRead: A source not read.
+type NotRead struct {
+	// The source.
+	Source string `json:"source"`
+	// Why.
+	Reason string `json:"reason"`
+}
+
 // VerificationBundle: Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list.
 type VerificationBundle struct {
 	// The bundle format. One of: trooth.verification-bundle.v1.

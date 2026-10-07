@@ -2,6 +2,16 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.10.0 (2026-10-07)
+
+### The public record: what a company publishes outside its own site
+
+- New command `trooth public-record <domain> [--cik N] [--lei X] [--ticker T] [--json]`, reading `https://api.trooth.co/scan/public-record/<domain>`. It shows the SEC filer record (name, CIK, tickers, exchanges, filer category, SIC, state of incorporation, fiscal year end, address, website on file, former names), the latest 10-K, 10-Q, 8-K, DEF 14A, 20-F and others with links, two years of 8-K filings with their item numbers, material cybersecurity incidents (Item 1.05), auditor changes (4.01) and non-reliance (4.02), the count of insider forms in 90 days, and annual revenue, net income and total assets as filed in XBRL; the GLEIF LEI record and its parents; and DMARC policy, MTA-STS and its mode, SMTP TLS reporting, BIMI and DNSSEC.
+- Each identifier is a binding with evidence for and against. It is `corroborated` only when the company's own annual filing declares its XBRL extension taxonomy under the domain, the SEC record lists the domain, or (for an LEI) the LEI record agrees with a corroborated filer. A site that states a company's legal name is `claimed_by_site`: any site can copy a copyright line.
+- `docs/EVIDENCE.md`: who-said-it classes (company declaration, Trooth observation, regulator filing, registry record, DNS record, public source), the full inventory of what a company publishes on its site, with regulators and registries, and through others, with what Trooth reads of each today, and the binding rules.
+- Schema `public-record.v1.schema.json`, generated TypeScript, Pydantic and Go types; `trooth:cik:` and `trooth:lei:` ids (`docs/IDS.md` 1.1). The type generator now handles unions, numbers and Python keyword field names.
+- Exit 0 when an identifier was found, 1 when none was, 2 for usage, 3 when the reading could not be had (including its rate limits).
+
 ## 0.9.0 (2026-10-06)
 
 ### The witness statement log, corrections and monitoring
