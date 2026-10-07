@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/mcp-tools-statement.v1.schema.json",
+  "title": "McpToolsStatement",
+  "description": "The payload Trooth signs for an MCP tool reading, carried as the payload of a witness-statement envelope (RFC 8785, Ed25519) and logged as an mcp_tools entry. It names every tool's description and definition hash, so the log alone tells when a server changed what it tells agents.",
+  "type": "object",
+  "required": [
+    "statement",
+    "subject_id",
+    "endpoint",
+    "read_at",
+    "manifest_sha256",
+    "tools",
+    "previous_manifest_sha256",
+    "reading_sha256",
+    "reading_canonicalization",
+    "issued_at",
+    "signer"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "statement": {
+      "type": "string",
+      "description": "The payload type.",
+      "const": "trooth.mcp-tools.v1"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "trooth:mcp:<host and path>.",
+      "pattern": "^trooth:mcp:.+$"
+    },
+    "endpoint": {
+      "type": "string",
+      "description": "The endpoint read."
+    },
+    "read_at": {
+      "type": "string",
+      "description": "The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "description": "The manifest hash.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tools": {
+      "type": "array",
+      "description": "Each tool's hashes, sorted by name.",
+      "items": {
+        "$ref": "#/$defs/StatementTool"
+      }
+    },
+    "previous_manifest_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The previous manifest hash, or null for the first reading."
+    },
+    "reading_sha256": {
+      "type": "string",
+      "description": "SHA-256, hex, of the reading's RFC 8785 bytes.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reading_canonicalization": {
+      "type": "string",
+      "description": "How those bytes were made.",
+      "const": "RFC8785"
+    },
+    "issued_at": {
+      "type": "string",
+      "description": "When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "signer": {
+      "$ref": "#/$defs/McpStatementSigner",
+      "description": "The signing key, inside the signed bytes."
+    }
+  },
+  "$defs": {
+    "StatementTool": {
+      "title": "StatementTool",
+      "type": "object",
+      "description": "A tool as the statement names it.",
+      "required": [
+        "name",
+        "description_sha256",
+        "definition_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The tool name."
+        },
+        "description_sha256": {
+          "type": "string",
+          "description": "The description hash.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "definition_sha256": {
+          "type": "string",
+          "description": "The definition hash.",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "McpStatementSigner": {
+      "title": "McpStatementSigner",
+      "type": "object",
+      "description": "The signing key.",
+      "required": [
+        "key_id",
+        "issuer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "type": "string",
+          "description": "The kid on https://api.trooth.co/public/keys."
+        },
+        "issuer": {
+          "type": "string",
+          "description": "Always trooth.co.",
+          "const": "trooth.co"
+        }
+      }
+    }
+  }
+}

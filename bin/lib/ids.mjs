@@ -17,6 +17,12 @@ export const ID_TYPES = {
   entity: /^(?:lei:[A-Z0-9]{18}[0-9]{2}|cik:[0-9]{10})$/,
   cik: /^[0-9]{10}$/,
   lei: /^[A-Z0-9]{18}[0-9]{2}$/,
+  jurisdiction: /^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/,
+  registry: /^[A-Z]{2}-[A-Z0-9]{1,3}:[A-Za-z0-9-]{1,40}$/,
+  uei: /^[A-Z0-9]{12}$/,
+  repo: /^(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)\/[a-z0-9_.-]{1,100}$/,
+  api: /^(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?$/,
+  mcp: /^(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?$/,
 };
 
 /** Build an id; throws when the value is not in its type's form. */

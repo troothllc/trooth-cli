@@ -94,6 +94,107 @@ class LogReceipt(BaseModel):
     inclusion_proof: List[str] = Field(..., description="The RFC 9162 audit path, leaf to root, each a 32-byte hash in standard base64.")
     checkpoint: str = Field(..., description="A C2SP checkpoint (origin, size, base64 root, each on its own line) followed by a blank line and C2SP signed-note signature lines; the log key's line is an em dash, the key name and base64 of the 4-byte key hash and the 64-byte Ed25519 signature.")
 
+class McpToolsStatement(BaseModel):
+    "The payload Trooth signs for an MCP tool reading, carried as the payload of a witness-statement envelope (RFC 8785, Ed25519) and logged as an mcp_tools entry. It names every tool's description and definition hash, so the log alone tells when a server changed what it tells agents."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    statement: Literal["trooth.mcp-tools.v1"] = Field(..., description="The payload type.")
+    subject_id: str = Field(..., description="trooth:mcp:<host and path>.")
+    endpoint: str = Field(..., description="The endpoint read.")
+    read_at: str = Field(..., description="The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    manifest_sha256: str = Field(..., description="The manifest hash.")
+    tools: List[StatementTool] = Field(..., description="Each tool's hashes, sorted by name.")
+    previous_manifest_sha256: Optional[str] = Field(..., description="The previous manifest hash, or null for the first reading.")
+    reading_sha256: str = Field(..., description="SHA-256, hex, of the reading's RFC 8785 bytes.")
+    reading_canonicalization: Literal["RFC8785"] = Field(..., description="How those bytes were made.")
+    issued_at: str = Field(..., description="When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    signer: McpStatementSigner = Field(..., description="The signing key, inside the signed bytes.")
+
+class StatementTool(BaseModel):
+    "A tool as the statement names it."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str = Field(..., description="The tool name.")
+    description_sha256: str = Field(..., description="The description hash.")
+    definition_sha256: str = Field(..., description="The definition hash.")
+
+class McpStatementSigner(BaseModel):
+    "The signing key."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    key_id: str = Field(..., description="The kid on https://api.trooth.co/public/keys.")
+    issuer: Literal["trooth.co"] = Field(..., description="Always trooth.co.")
+
+class McpToolsReading(BaseModel):
+    "The tool list of an MCP server as Trooth read it with no credentials, each tool's description and definition hashed. Served at https://api.trooth.co/scan/mcp-tools/reading?endpoint=<url>. A statement naming the reading is signed and logged as an mcp_tools entry when the manifest changed. docs/EVIDENCE.md section 9 in trooth-cli is the normative text. A hash says what was listed, not that a tool does what its description says."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    format: Literal["trooth.mcp-tools.v1"] = Field(..., description="The format.")
+    endpoint: str = Field(..., description="The MCP endpoint read (streamable HTTP).")
+    subject_id: str = Field(..., description="trooth:mcp:<host and path>.")
+    read_at: str = Field(..., description="When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    server: McpServer = Field(..., description="What the server said about itself in initialize.")
+    tools: List[ToolHash] = Field(..., description="Every tool listed, sorted by name, at most 500.")
+    manifest_sha256: str = Field(..., description="SHA-256, hex, of the RFC 8785 bytes of [{name, definition_sha256}] sorted by name.")
+    previous: Optional[PreviousManifest] = Field(..., description="The manifest of the reading before this one, or null for the first.")
+    changed: Optional[ManifestDiff] = Field(..., description="Tools added, removed or changed since the previous reading, or null for the first.")
+    note: str = Field(..., description="What the reading is and is not.")
+    last_checked: Optional[str] = Field(None, description="When Trooth last read the server and found this manifest. Served beside the reading; not part of the bytes it names.")
+    signed: Optional[McpToolsSigned] = Field(None, description="The statement naming the reading, and its log receipt. Not part of the bytes it names.")
+
+class McpServer(BaseModel):
+    "The server's own description."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: Optional[str] = Field(..., description="serverInfo.name.")
+    version: Optional[str] = Field(..., description="serverInfo.version.")
+    protocol_version: Optional[str] = Field(..., description="The protocol version agreed.")
+
+class ToolHash(BaseModel):
+    "One tool as listed."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str = Field(..., description="The tool name.")
+    title: Optional[str] = Field(..., description="The title, from the tool or its annotations.")
+    description: str = Field(..., description="The description as listed (empty when there is none).")
+    description_sha256: str = Field(..., description="SHA-256, hex, of the description's UTF-8 bytes.")
+    definition_sha256: str = Field(..., description="SHA-256, hex, of the RFC 8785 bytes of the whole tool object as listed.")
+
+class PreviousManifest(BaseModel):
+    "The reading before."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    manifest_sha256: str = Field(..., description="Its manifest hash.")
+    read_at: str = Field(..., description="When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+
+class ManifestDiff(BaseModel):
+    "Tool names by what happened to them."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    added: List[str] = Field(..., description="Tools new in this reading.")
+    removed: List[str] = Field(..., description="Tools no longer listed.")
+    changed: List[str] = Field(..., description="Tools whose definition hash changed.")
+
+class McpToolsSigned(BaseModel):
+    "The statement naming the reading."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    reading_sha256: str = Field(..., description="SHA-256, hex, of the RFC 8785 bytes of the reading without last_checked and signed.")
+    statement: Optional[WitnessStatement] = Field(..., description="The signed envelope; its payload is an mcp-tools-statement.v1 document. Null when it could not be signed.")
+    statement_id: Optional[str] = Field(..., description="trooth:statement:<sha256 of the payload>.")
+    log: Optional[LogReceipt] = Field(..., description="The receipt of the statement as an mcp_tools entry, or null when it was not logged.")
+    problem: Optional[str] = Field(..., description="What could not be done, or null.")
+    logged_at_read: Optional[str] = Field(..., description="The read_at of the reading that was logged.")
+
 class PublicRecordStatement(BaseModel):
     "The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true."
 
@@ -128,7 +229,7 @@ class StatementSigner(BaseModel):
     issuer: Literal["trooth.co"] = Field(..., description="Always trooth.co.")
 
 class PublicRecordReading(BaseModel):
-    "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text."
+    "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list, and since trooth 0.12.0 SAM.gov, the USPTO, four state registries, the FTC and RDAP), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text."
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -148,7 +249,147 @@ class PublicRecordReading(BaseModel):
     sources: Optional[List[Source]] = Field(None, description="Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.")
     not_read: List[NotRead] = Field(..., description="Each source that was not read, or did not answer, and why. A source not read is never guessed at.")
     note: str = Field(..., description="What the reading is and is not, as a paragraph.")
+    sam: Optional[SamReading] = Field(None, description="SAM.gov registrations and exclusions under the legal name, or null when SAM.gov was not read (not_read says why). A name match is not an identification. Added in trooth 0.12.0.")
+    patents: Optional[PatentReading] = Field(None, description="Patent applications whose first applicant is the legal name, from the USPTO Open Data Portal, or null when it was not read. Added in trooth 0.12.0.")
+    registries: Optional[List[RegistryEntry]] = Field(None, description="Exact-name entries in the state business registries that publish open data (New York, Colorado, Connecticut, Oregon). A name match is not an identification. Added in trooth 0.12.0.")
+    merger_review: Optional[MergerReview] = Field(None, description="Hart-Scott-Rodino early termination notices the FTC published naming the legal name as a party, or null when they were not read. Added in trooth 0.12.0.")
+    domain_registration: Optional[DomainRegistration] = Field(None, description="The domain's registration, from RDAP, or null when no RDAP service answered. Added in trooth 0.12.0.")
+    changes: Optional[List[Change]] = Field(None, description="What the sources in this reading record as having changed (renames, acquisitions and dispositions, changes in control, previous legal names, parents, merger review, domain registration), newest first. Added in trooth 0.12.0.")
+    subjects: Optional[List[NamedSubject]] = Field(None, description="Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0.")
     signed: Optional[Signed] = Field(None, description="The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.")
+
+class SamReading(BaseModel):
+    "SAM.gov, read under one legal name with Trooth's key (the key is never in the record). Cached for 30 days per name, so read_at can be earlier than the reading's."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The SAM.gov API read.")
+    read_at: str = Field(..., description="When SAM.gov was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    names_checked: List[str] = Field(..., description="The legal names searched.")
+    registrations: List[SamRegistration] = Field(..., description="Entity registrations with exactly that legal name, at most 10.")
+    exclusions: List[SamExclusion] = Field(..., description="Exclusion records with exactly that name, at most 20. A name match is not an identification.")
+
+class SamRegistration(BaseModel):
+    "A SAM.gov entity registration."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    uei: Optional[str] = Field(..., description="The Unique Entity ID.")
+    cage: Optional[str] = Field(..., description="The CAGE code.")
+    legal_name: str = Field(..., description="The legal business name registered.")
+    status: Optional[str] = Field(..., description="The registration status.")
+    expires: Optional[str] = Field(..., description="The registration expiration date.")
+    purpose: Optional[str] = Field(..., description="The purpose of registration.")
+
+class SamExclusion(BaseModel):
+    "A SAM.gov exclusion record."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str = Field(..., description="The name excluded.")
+    uei: Optional[str] = Field(..., description="The UEI on the record.")
+    cage: Optional[str] = Field(..., description="The CAGE code on the record.")
+    classification: Optional[str] = Field(..., description="Firm, Individual, Vessel or Special Entity Designation.")
+    type: Optional[str] = Field(..., description="The exclusion type.")
+    program: Optional[str] = Field(..., description="The exclusion program.")
+    agency: Optional[str] = Field(..., description="The excluding agency.")
+    active: Optional[str] = Field(..., description="The activation date.")
+    terminates: Optional[str] = Field(..., description="The termination date, or Indefinite.")
+    record_status: Optional[str] = Field(..., description="The record status.")
+
+class PatentReading(BaseModel):
+    "Patent applications from the USPTO Open Data Portal. Cached for 7 days per name."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The search API read.")
+    read_at: str = Field(..., description="When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    applicant_names: List[str] = Field(..., description="The first-applicant names searched.")
+    applications: int = Field(..., description="How many applications the search counted.")
+    recent: List[PatentApplication] = Field(..., description="The newest applications, at most 5.")
+
+class PatentApplication(BaseModel):
+    "A patent application."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    application: str = Field(..., description="The application number.")
+    title: Optional[str] = Field(..., description="The title of the invention.")
+    filed: Optional[str] = Field(..., description="The filing date.")
+    status: Optional[str] = Field(..., description="The application status.")
+    patent: Optional[str] = Field(..., description="The patent number, once granted.")
+    granted: Optional[str] = Field(..., description="The grant date.")
+
+class RegistryEntry(BaseModel):
+    "An entry in a state business registry with exactly the legal name."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    jurisdiction: str = Field(..., description="The registry's jurisdiction, ISO 3166-2.")
+    registry: str = Field(..., description="The registry and dataset.")
+    id: str = Field(..., description="The entity's number in that registry.")
+    name: str = Field(..., description="The name as registered.")
+    status: Optional[str] = Field(..., description="The status the registry gives (Active for the datasets of active entities only).")
+    entity_type: Optional[str] = Field(..., description="The entity type.")
+    formed: Optional[str] = Field(..., description="The formation or registration date in that state.")
+    formation_jurisdiction: Optional[str] = Field(..., description="Where the entity was formed, as the registry writes it.")
+    source: str = Field(..., description="The open-data URL for this entry.")
+
+class MergerReview(BaseModel):
+    "FTC early termination notices under the HSR Act, searched by words of the legal name and kept when a party has exactly that name. Cached for 7 days per name."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The FTC API read.")
+    read_at: str = Field(..., description="When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
+    names_checked: List[str] = Field(..., description="The legal names searched.")
+    notices: List[MergerNotice] = Field(..., description="Notices naming the company as a party, at most 20.")
+    matched_in_search: int = Field(..., description="How many notices the word search returned before names were compared.")
+
+class MergerNotice(BaseModel):
+    "An early termination notice."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    transaction: str = Field(..., description="The HSR transaction number.")
+    date: Optional[str] = Field(..., description="The date early termination was granted.")
+    acquiring: Optional[str] = Field(..., description="The acquiring person.")
+    acquired: Optional[str] = Field(..., description="The acquired person.")
+    acquired_entities: List[str] = Field(..., description="The acquired entities named.")
+    role: Literal["acquiring", "acquired"] = Field(..., description="The company's role in the notice.")
+    url: str = Field(..., description="The notice on ftc.gov.")
+
+class DomainRegistration(BaseModel):
+    "A domain's registration from RDAP (RFC 9083)."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The RDAP URL read.")
+    registrar: Optional[str] = Field(..., description="The registrar.")
+    registered: Optional[str] = Field(..., description="The registration date.")
+    changed: Optional[str] = Field(..., description="The last-changed date.")
+    expires: Optional[str] = Field(..., description="The expiration date.")
+    transferred: Optional[str] = Field(..., description="The last transfer date.")
+    status: List[str] = Field(..., description="EPP status values.")
+
+class Change(BaseModel):
+    "A change a source records."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kind: Literal["renamed", "previous_legal_name", "acquisition_or_disposition", "change_in_control", "merger_review", "parent", "domain_registered", "domain_transferred"] = Field(..., description="What changed.")
+    date: Optional[str] = Field(..., description="When, as the source dates it; null when it gives no date.")
+    detail: str = Field(..., description="The change in words.")
+    source: str = Field(..., description="Where to read it.")
+
+class NamedSubject(BaseModel):
+    "A subject the reading names (docs/IDS.md)."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="The Trooth id.")
+    kind: Literal["domain", "entity", "sec_filer", "lei", "jurisdiction", "state_registry", "sam_uei", "code_repository", "api", "mcp_server"] = Field(..., description="What it names.")
+    basis: str = Field(..., description="Why the reading names it.")
 
 class Entity(BaseModel):
     "A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md)."
@@ -652,10 +893,30 @@ KeyList.model_rebuild()
 PublicKey.model_rebuild()
 KeyEvent.model_rebuild()
 LogReceipt.model_rebuild()
+McpToolsStatement.model_rebuild()
+StatementTool.model_rebuild()
+McpStatementSigner.model_rebuild()
+McpToolsReading.model_rebuild()
+McpServer.model_rebuild()
+ToolHash.model_rebuild()
+PreviousManifest.model_rebuild()
+ManifestDiff.model_rebuild()
+McpToolsSigned.model_rebuild()
 PublicRecordStatement.model_rebuild()
 BindingStatus.model_rebuild()
 StatementSigner.model_rebuild()
 PublicRecordReading.model_rebuild()
+SamReading.model_rebuild()
+SamRegistration.model_rebuild()
+SamExclusion.model_rebuild()
+PatentReading.model_rebuild()
+PatentApplication.model_rebuild()
+RegistryEntry.model_rebuild()
+MergerReview.model_rebuild()
+MergerNotice.model_rebuild()
+DomainRegistration.model_rebuild()
+Change.model_rebuild()
+NamedSubject.model_rebuild()
 Entity.model_rebuild()
 Certificates.model_rebuild()
 SecurityTxt.model_rebuild()

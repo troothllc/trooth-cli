@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { verifyStatement, verifyBundle } from '../bin/lib/verify.mjs';
 import { verifyConsistency, fromB64, parseVkey, LOG_ORIGIN, inclusionPath, consistencyPath, toB64, rootOf } from '../bin/lib/tlog.mjs';
-import { PINNED_LOG_VKEYS } from '../bin/lib/log-trust.mjs';
+import { PINNED_LOG_VKEYS, HARDWARE_LOG_VKEY } from '../bin/lib/log-trust.mjs';
 
 const dir = new URL('./vectors/', import.meta.url);
 const L = JSON.parse(readFileSync(new URL('log.json', dir), 'utf8'));
@@ -163,4 +163,8 @@ test('a pinned log key is recorded in docs/KEY-CEREMONY.md, with no placeholder 
   if (!PINNED_LOG_VKEYS.length) return;
   for (const k of PINNED_LOG_VKEYS) assert.ok(doc.includes(k), `the ceremony record names ${k}`);
   assert.doesNotMatch(doc, /CEREMONY_DATE|LOG_VKEY/);
+  if (HARDWARE_LOG_VKEY) {
+    assert.ok(doc.includes(HARDWARE_LOG_VKEY), 'the ceremony record names the hardware key');
+    assert.doesNotMatch(doc, /@@HARDWARE_/);
+  }
 });

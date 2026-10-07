@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://trooth.co/schemas/public-record.v1.schema.json",
   "title": "PublicRecordReading",
-  "description": "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.",
+  "description": "What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list, and since trooth 0.12.0 SAM.gov, the USPTO, four state registries, the FTC and RDAP), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.",
   "type": "object",
   "required": [
     "format",
@@ -138,12 +138,669 @@
       "type": "string",
       "description": "What the reading is and is not, as a paragraph."
     },
+    "sam": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Sam"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "SAM.gov registrations and exclusions under the legal name, or null when SAM.gov was not read (not_read says why). A name match is not an identification. Added in trooth 0.12.0."
+    },
+    "patents": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Patents"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Patent applications whose first applicant is the legal name, from the USPTO Open Data Portal, or null when it was not read. Added in trooth 0.12.0."
+    },
+    "registries": {
+      "type": "array",
+      "description": "Exact-name entries in the state business registries that publish open data (New York, Colorado, Connecticut, Oregon). A name match is not an identification. Added in trooth 0.12.0.",
+      "items": {
+        "$ref": "#/$defs/RegistryEntry"
+      }
+    },
+    "merger_review": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MergerReview"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hart-Scott-Rodino early termination notices the FTC published naming the legal name as a party, or null when they were not read. Added in trooth 0.12.0."
+    },
+    "domain_registration": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DomainRegistration"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The domain's registration, from RDAP, or null when no RDAP service answered. Added in trooth 0.12.0."
+    },
+    "changes": {
+      "type": "array",
+      "description": "What the sources in this reading record as having changed (renames, acquisitions and dispositions, changes in control, previous legal names, parents, merger review, domain registration), newest first. Added in trooth 0.12.0.",
+      "items": {
+        "$ref": "#/$defs/Change"
+      }
+    },
+    "subjects": {
+      "type": "array",
+      "description": "Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0.",
+      "items": {
+        "$ref": "#/$defs/Subject"
+      }
+    },
     "signed": {
       "$ref": "#/$defs/Signed",
       "description": "The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0."
     }
   },
   "$defs": {
+    "Sam": {
+      "title": "SamReading",
+      "type": "object",
+      "description": "SAM.gov, read under one legal name with Trooth's key (the key is never in the record). Cached for 30 days per name, so read_at can be earlier than the reading's.",
+      "required": [
+        "source",
+        "read_at",
+        "names_checked",
+        "registrations",
+        "exclusions"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "The SAM.gov API read."
+        },
+        "read_at": {
+          "type": "string",
+          "description": "When SAM.gov was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "names_checked": {
+          "type": "array",
+          "description": "The legal names searched.",
+          "items": {
+            "type": "string",
+            "description": "A name."
+          }
+        },
+        "registrations": {
+          "type": "array",
+          "description": "Entity registrations with exactly that legal name, at most 10.",
+          "items": {
+            "$ref": "#/$defs/SamRegistration"
+          }
+        },
+        "exclusions": {
+          "type": "array",
+          "description": "Exclusion records with exactly that name, at most 20. A name match is not an identification.",
+          "items": {
+            "$ref": "#/$defs/SamExclusion"
+          }
+        }
+      }
+    },
+    "SamRegistration": {
+      "title": "SamRegistration",
+      "type": "object",
+      "description": "A SAM.gov entity registration.",
+      "required": [
+        "uei",
+        "cage",
+        "legal_name",
+        "status",
+        "expires",
+        "purpose"
+      ],
+      "properties": {
+        "uei": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The Unique Entity ID."
+        },
+        "cage": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The CAGE code."
+        },
+        "legal_name": {
+          "type": "string",
+          "description": "The legal business name registered."
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The registration status."
+        },
+        "expires": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The registration expiration date."
+        },
+        "purpose": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The purpose of registration."
+        }
+      }
+    },
+    "SamExclusion": {
+      "title": "SamExclusion",
+      "type": "object",
+      "description": "A SAM.gov exclusion record.",
+      "required": [
+        "name",
+        "uei",
+        "cage",
+        "classification",
+        "type",
+        "program",
+        "agency",
+        "active",
+        "terminates",
+        "record_status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name excluded."
+        },
+        "uei": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The UEI on the record."
+        },
+        "cage": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The CAGE code on the record."
+        },
+        "classification": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Firm, Individual, Vessel or Special Entity Designation."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The exclusion type."
+        },
+        "program": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The exclusion program."
+        },
+        "agency": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The excluding agency."
+        },
+        "active": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The activation date."
+        },
+        "terminates": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The termination date, or Indefinite."
+        },
+        "record_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The record status."
+        }
+      }
+    },
+    "Patents": {
+      "title": "PatentReading",
+      "type": "object",
+      "description": "Patent applications from the USPTO Open Data Portal. Cached for 7 days per name.",
+      "required": [
+        "source",
+        "read_at",
+        "applicant_names",
+        "applications",
+        "recent"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "The search API read."
+        },
+        "read_at": {
+          "type": "string",
+          "description": "When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "applicant_names": {
+          "type": "array",
+          "description": "The first-applicant names searched.",
+          "items": {
+            "type": "string",
+            "description": "A name."
+          }
+        },
+        "applications": {
+          "type": "integer",
+          "description": "How many applications the search counted.",
+          "minimum": 0
+        },
+        "recent": {
+          "type": "array",
+          "description": "The newest applications, at most 5.",
+          "items": {
+            "$ref": "#/$defs/PatentApplication"
+          }
+        }
+      }
+    },
+    "PatentApplication": {
+      "title": "PatentApplication",
+      "type": "object",
+      "description": "A patent application.",
+      "required": [
+        "application",
+        "title",
+        "filed",
+        "status",
+        "patent",
+        "granted"
+      ],
+      "properties": {
+        "application": {
+          "type": "string",
+          "description": "The application number."
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The title of the invention."
+        },
+        "filed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The filing date."
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The application status."
+        },
+        "patent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The patent number, once granted."
+        },
+        "granted": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The grant date."
+        }
+      }
+    },
+    "RegistryEntry": {
+      "title": "RegistryEntry",
+      "type": "object",
+      "description": "An entry in a state business registry with exactly the legal name.",
+      "required": [
+        "jurisdiction",
+        "registry",
+        "id",
+        "name",
+        "status",
+        "entity_type",
+        "formed",
+        "formation_jurisdiction",
+        "source"
+      ],
+      "properties": {
+        "jurisdiction": {
+          "type": "string",
+          "description": "The registry's jurisdiction, ISO 3166-2.",
+          "pattern": "^US-[A-Z]{2}$"
+        },
+        "registry": {
+          "type": "string",
+          "description": "The registry and dataset."
+        },
+        "id": {
+          "type": "string",
+          "description": "The entity's number in that registry."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name as registered."
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The status the registry gives (Active for the datasets of active entities only)."
+        },
+        "entity_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The entity type."
+        },
+        "formed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The formation or registration date in that state."
+        },
+        "formation_jurisdiction": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the entity was formed, as the registry writes it."
+        },
+        "source": {
+          "type": "string",
+          "description": "The open-data URL for this entry."
+        }
+      }
+    },
+    "MergerReview": {
+      "title": "MergerReview",
+      "type": "object",
+      "description": "FTC early termination notices under the HSR Act, searched by words of the legal name and kept when a party has exactly that name. Cached for 7 days per name.",
+      "required": [
+        "source",
+        "read_at",
+        "names_checked",
+        "notices",
+        "matched_in_search"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "The FTC API read."
+        },
+        "read_at": {
+          "type": "string",
+          "description": "When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        },
+        "names_checked": {
+          "type": "array",
+          "description": "The legal names searched.",
+          "items": {
+            "type": "string",
+            "description": "A name."
+          }
+        },
+        "notices": {
+          "type": "array",
+          "description": "Notices naming the company as a party, at most 20.",
+          "items": {
+            "$ref": "#/$defs/MergerNotice"
+          }
+        },
+        "matched_in_search": {
+          "type": "integer",
+          "description": "How many notices the word search returned before names were compared.",
+          "minimum": 0
+        }
+      }
+    },
+    "MergerNotice": {
+      "title": "MergerNotice",
+      "type": "object",
+      "description": "An early termination notice.",
+      "required": [
+        "transaction",
+        "date",
+        "acquiring",
+        "acquired",
+        "acquired_entities",
+        "role",
+        "url"
+      ],
+      "properties": {
+        "transaction": {
+          "type": "string",
+          "description": "The HSR transaction number."
+        },
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The date early termination was granted."
+        },
+        "acquiring": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The acquiring person."
+        },
+        "acquired": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The acquired person."
+        },
+        "acquired_entities": {
+          "type": "array",
+          "description": "The acquired entities named.",
+          "items": {
+            "type": "string",
+            "description": "An entity."
+          }
+        },
+        "role": {
+          "type": "string",
+          "description": "The company's role in the notice.",
+          "enum": [
+            "acquiring",
+            "acquired"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "description": "The notice on ftc.gov."
+        }
+      }
+    },
+    "DomainRegistration": {
+      "title": "DomainRegistration",
+      "type": "object",
+      "description": "A domain's registration from RDAP (RFC 9083).",
+      "required": [
+        "source",
+        "registrar",
+        "registered",
+        "changed",
+        "expires",
+        "transferred",
+        "status"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "The RDAP URL read."
+        },
+        "registrar": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The registrar."
+        },
+        "registered": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The registration date."
+        },
+        "changed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The last-changed date."
+        },
+        "expires": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The expiration date."
+        },
+        "transferred": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The last transfer date."
+        },
+        "status": {
+          "type": "array",
+          "description": "EPP status values.",
+          "items": {
+            "type": "string",
+            "description": "A status."
+          }
+        }
+      }
+    },
+    "Change": {
+      "title": "Change",
+      "type": "object",
+      "description": "A change a source records.",
+      "required": [
+        "kind",
+        "date",
+        "detail",
+        "source"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "What changed.",
+          "enum": [
+            "renamed",
+            "previous_legal_name",
+            "acquisition_or_disposition",
+            "change_in_control",
+            "merger_review",
+            "parent",
+            "domain_registered",
+            "domain_transferred"
+          ]
+        },
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When, as the source dates it; null when it gives no date."
+        },
+        "detail": {
+          "type": "string",
+          "description": "The change in words."
+        },
+        "source": {
+          "type": "string",
+          "description": "Where to read it."
+        }
+      }
+    },
+    "Subject": {
+      "title": "NamedSubject",
+      "type": "object",
+      "description": "A subject the reading names (docs/IDS.md).",
+      "required": [
+        "id",
+        "kind",
+        "basis"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The Trooth id.",
+          "pattern": "^trooth:[a-z_]+:.+$"
+        },
+        "kind": {
+          "type": "string",
+          "description": "What it names.",
+          "enum": [
+            "domain",
+            "entity",
+            "sec_filer",
+            "lei",
+            "jurisdiction",
+            "state_registry",
+            "sam_uei",
+            "code_repository",
+            "api",
+            "mcp_server"
+          ]
+        },
+        "basis": {
+          "type": "string",
+          "description": "Why the reading names it."
+        }
+      }
+    },
     "Entity": {
       "title": "Entity",
       "type": "object",

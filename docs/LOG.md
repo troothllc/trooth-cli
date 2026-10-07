@@ -1,6 +1,6 @@
 # Trooth's witness statement log
 
-Version 1.1, October 7, 2026. Version 1.1 adds the `public_record` entry kind, witness cosignatures (section 7), COSE receipts and the COSE key set (section 8). Normative for Trooth's log, for `trooth verify`, `trooth log`, `trooth public-record`, the SDKs in `sdk/`, and any other implementation. The cases any implementation must agree on are in [`tests/vectors/log.json`](../tests/vectors/log.json) and [`tests/vectors/witness-cose.json`](../tests/vectors/witness-cose.json); Go's `golang.org/x/mod/sumdb` packages also check its notes, roots and proofs, litewitness (filippo.io/torchwood) has cosigned its checkpoints in a test, and pycose has checked its receipts.
+Version 1.2, October 7, 2026. Version 1.2 adds the `mcp_tools` entry kind and the hardware key's second signature line on every checkpoint (section 3). Version 1.1 added the `public_record` entry kind, witness cosignatures (section 7), COSE receipts and the COSE key set (section 8). Normative for Trooth's log, for `trooth verify`, `trooth log`, `trooth public-record`, the SDKs in `sdk/`, and any other implementation. The cases any implementation must agree on are in [`tests/vectors/log.json`](../tests/vectors/log.json) and [`tests/vectors/witness-cose.json`](../tests/vectors/witness-cose.json); Go's `golang.org/x/mod/sumdb` packages also check its notes, roots and proofs, litewitness (filippo.io/torchwood) has cosigned its checkpoints in a test, and pycose has checked its receipts.
 
 Every witness statement Trooth publishes, every public record reading it serves, and every correction it issues, is entered in one public, append-only log. A receipt from the log shows that a statement was published in a particular order, and that Trooth cannot later show different readers different histories without that being detectable by anyone who keeps a checkpoint.
 
@@ -10,6 +10,7 @@ The key words MUST, MUST NOT and SHOULD are used as in RFC 2119.
 
 - A **witness statement** is entered when its reading is published to the Trooth Network: at first publication, and each time the reading is taken again for a published listing. A reading that was never published is never logged, so the log cannot reveal that a domain was read privately.
 - A **public record statement** is entered when a public record reading is served ([EVIDENCE.md](EVIDENCE.md) section 5). That reading is public from the moment it exists, so logging it reveals nothing private. At most 200 are entered an hour across all domains; a reading beyond that is signed and says it was not logged.
+- An **MCP tool statement** is entered when Trooth reads the tool list of an MCP server and finds a manifest it has not logged before ([EVIDENCE.md](EVIDENCE.md) section 9): the first reading of a server, and each reading after its tools changed. A reading that finds the same manifest adds nothing.
 - A **correction** (section 6) is entered when Trooth issues one.
 - Entries are never edited or removed. A statement that was wrong stays in the log; a later correction says so.
 - Appending is idempotent: the same envelope is entered once.
@@ -19,7 +20,7 @@ The key words MUST, MUST NOT and SHOULD are used as in RFC 2119.
 An entry is the UTF-8 bytes of the RFC 8785 (JCS) form of:
 
 ```json
-{"kind": "witness_statement" | "public_record" | "correction", "statement": {"alg": …, "canonicalization": …, "key_id": …, "payload": …, "signature": …}}
+{"kind": "witness_statement" | "public_record" | "mcp_tools" | "correction", "statement": {"alg": …, "canonicalization": …, "key_id": …, "payload": …, "signature": …}}
 ```
 
 `statement` holds exactly the five envelope fields as published, so anyone holding the envelope rebuilds the same bytes. An entry MUST be at most 65,535 bytes.
@@ -37,6 +38,8 @@ trooth.co/witness-log/v1
 ```
 
 signed as a C2SP signed note ([c2sp.org/signed-note](https://c2sp.org/signed-note)) with an Ed25519 key named `trooth.co/witness-log/v1`, followed by any witness cosignatures (section 7). The signature line is an em dash (U+2014), a space, the key name, a space, and standard base64 of the 4-byte key hash followed by the 64-byte signature. The key hash is the first 4 bytes of `SHA-256(name || 0x0A || 0x01 || public key)`. The verifier key is written `<name>+<key hash, hex>+<base64(0x01 || public key)>`.
+
+From ceremony v2 ([KEY-CEREMONY.md](KEY-CEREMONY.md) section 5) each checkpoint carries a second signature line under the same name, by the log's hardware key in AWS KMS: the software key's line first, the hardware key's second, then any cosignatures. A checker that knows only the software key ignores the second line, as the signed-note format requires; `trooth` 0.12.0 and later pin the hardware key as `HARDWARE_LOG_VKEY` and `trooth log checkpoint` reports whether it signed. The software key's signature is the one that makes a checkpoint check. When the hardware key could not be reached, a checkpoint carries the software line alone and is signed again by both once it answers. `/vkeys` serves both verifier keys, software first.
 
 A checker MUST verify the signature with a log key it already holds before reading the size or root, and MUST refuse a checkpoint whose origin line is not `trooth.co/witness-log/v1`. `trooth` 0.9.0 and later carry the production log key in `bin/lib/log-trust.mjs`; the log also serves it at `/vkey`, which a checker SHOULD NOT rely on alone.
 
@@ -146,7 +149,8 @@ All under `https://api.trooth.co/scan/log/v1`:
 | `/witnesses` | Each witness the log asks, its key, and what it last did (JSON) |
 | `/receipt/<i>[?tree_size=<n>]` | An RFC 9942 COSE receipt for entry i (`application/cose`), against the newest checkpoint or size n |
 | `/vkey` | The log's verifier key (text) |
-| `/lookup?statement_id=trooth:statement:<hex>[&kind=correction\|public_record]` | The entry and a receipt against the newest checkpoint, or 404 |
+| `/vkeys` | Every key that signs checkpoints, one per line, software first (text) |
+| `/lookup?statement_id=trooth:statement:<hex>[&kind=correction\|public_record\|mcp_tools]` | The entry and a receipt against the newest checkpoint, or 404 |
 | `/corrections?statement_id=…` | Every logged correction naming the statement, each with its receipt |
 | `/proof/inclusion?index=<i>&tree_size=<n>` | An RFC 9162 inclusion proof |
 | `/proof/consistency?first=<m>&second=<n>` | An RFC 9162 consistency proof |
@@ -164,4 +168,4 @@ The log follows Certificate Transparency's tree (RFC 9162) and the C2SP formats 
 - One operator. The log runs on Trooth's infrastructure; witnesses and monitors detect or refuse a rewritten history, they do not run the log.
 - Witness cosignatures begin when the witness network accepts the log onto its staging list; the witnesses are staging services, and the network has no production list yet.
 - The time a checkpoint is signed is not in the checkpoint; the log keeps it, and it is Trooth's own clock. A cosignature's time is the witness's clock.
-- The log key is held in software as an encrypted Worker secret, not yet in a hardware module, and is used by one person ([KEY-CEREMONY.md](KEY-CEREMONY.md)).
+- The log key that witnesses follow is held in software as an encrypted Worker secret; from ceremony v2 every checkpoint is also signed by a key that never leaves AWS KMS hardware, and the next origin (`trooth.co/witness-log/v2`) will use that key alone. One person administers both ([KEY-CEREMONY.md](KEY-CEREMONY.md) section 6).

@@ -1,6 +1,6 @@
 # What a company publishes, and what Trooth reads
 
-Version 1.1, October 7, 2026. Version 1.1 adds certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
+Version 1.2, October 7, 2026. Version 1.2 adds SAM.gov registrations and exclusions, patent applications, four state business registries, FTC merger review, the domain's registration (RDAP), the changes those sources record, the subjects a reading names (section 7), and MCP tool description hashes (section 9). Version 1.1 added certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
 
 A company publishes about itself in three places: its own website and DNS, the regulators and registries it must file with, and outside parties that describe it. This document lists what is published in each, says for every item whether Trooth reads it today, and sets the rules for reading it. Nothing here grades, rates or ranks a company.
 
@@ -66,12 +66,17 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Subsidiaries (Exhibit 21) | 10-K exhibits | Not read |
 | Legal Entity Identifier record: legal name, other names, jurisdiction, legal form, business registry and number, status, addresses, registration dates, corroboration level | GLEIF | Read: public record `lei.facts` |
 | Direct and ultimate parent | GLEIF | Read: `lei.direct_parent`, `lei.ultimate_parent` |
-| State or country business registry entry | The registry | Read only as the registry number the LEI record carries; B1 is declared |
-| Federal contractor registration and exclusions | SAM.gov | Not read: the SAM.gov API needs a key Trooth does not yet hold |
+| State or country business registry entry | New York, Colorado, Connecticut and Oregon open-data registries; the registry number the LEI record carries | Read: public record `registries`, exact legal name; a name match is not an identification. Other states publish no open-data registry with a common query interface; B1 is declared |
+| Federal contractor registration and exclusions | SAM.gov Entity and Exclusions APIs | Read when Trooth holds a SAM.gov key: public record `sam`, exact legal name, cached 30 days per name, at most 8 requests a day; a name match is not an identification |
+| Merger review | FTC early termination notices under the Hart-Scott-Rodino Act | Read: public record `merger_review`, notices with a party of exactly the legal name, cached 7 days per name |
+| Renames, acquisitions and dispositions (8-K Item 2.01), changes in control (Item 5.01), previous legal names, parents | EDGAR, GLEIF | Read: public record `changes`, with merger review and domain events, newest first |
+| The domain's registration: registrar, registration, expiry, transfer | RDAP (RFC 9083) through rdap.org | Read: public record `domain_registration` |
 | Sanctions lists | OFAC Specially Designated Nationals list | Read: public record `sanctions`, entities' primary names, exact name after folding; a name match is not an identification. Other lists are not read |
-| Patents and trademarks | USPTO, EUIPO | Declared (I4, I7); the offices' APIs need a key Trooth does not yet hold |
+| Patents | USPTO Open Data Portal | Read when Trooth holds a USPTO key: public record `patents`, applications whose first applicant is the legal name, cached 7 days per name |
+| Trademarks | USPTO, EUIPO | Declared (I4, I7); not read in this version |
 | Certificates issued for the domain | Certificate Transparency logs, through the Cert Spotter monitor | Read: public record `certificates` (unexpired certificates for the exact name, issuers, newest and soonest-expiring) |
-| Code and packages | GitHub, npm, PyPI | Not read |
+| Code repositories, APIs and MCP servers | The company's home page | Linked, not read: public record `subjects` (`repo`, `api`, `mcp` ids). An MCP server's tool list is read separately (section 9) |
+| Packages | npm, PyPI | Not read |
 
 ### 2.3 Said by others
 
@@ -104,11 +109,13 @@ Status: `corroborated` when evidence that ties it is present; otherwise `contrad
 
 ## 4. How it is read
 
-- **Sources.** data.sec.gov and www.sec.gov with a named agent and contact address, as the SEC's fair-access rules ask; api.gleif.org; DNS over HTTPS; api.certspotter.com; the OFAC SDN list (read at most once a day); the company's home page and its terms, legal and privacy pages, until a legal name is found, and its `/.well-known/security.txt`.
+- **Sources.** data.sec.gov and www.sec.gov with a named agent and contact address, as the SEC's fair-access rules ask; api.gleif.org; DNS over HTTPS; api.certspotter.com; the OFAC SDN list (read at most once a day); api.sam.gov, api.uspto.gov and api.ftc.gov with Trooth's keys; data.ny.gov, data.colorado.gov, data.ct.gov and data.oregon.gov; rdap.org; the company's home page and its terms, legal and privacy pages, until a legal name is found, and its `/.well-known/security.txt`.
 - **Safety.** Every request goes through the same guarded fetch as the witness reading: public addresses only, at most five redirects, bodies capped at 2 MB, of a filing only its first 256 KB. Pages are read as text with patterns; nothing in them runs. A site whose robots.txt names Trooth-Witness with `Disallow: /` is not read; the registries still are, because they are not the company's servers.
 - **Limits.** An answer is cached for a day; `?cached=only` answers from the cache or 404 and never starts a reading. Uncached readings: 3 a minute from one address, 6 an hour of one domain. Once an hour Trooth also reads up to three Network companies whose cached reading is missing, so their Trust Profiles can show one.
 - **Replay.** Every response read is listed in `sources` with its URL, status, the SHA-256 of the bytes read and whether the whole document was read. Trooth keeps those bytes under that hash, so a disputed fact can be replayed from what Trooth actually received.
 - **Absence.** Every source that was not read, or did not answer, is listed in `not_read` with the reason. A source not read is never filled in.
+- **Names.** SAM.gov, the USPTO, the state registries and the FTC are searched by the legal names the SEC and the LEI record hold (the site's own copyright name only when no registry names the company). A match is reported as a name match beside its source; it is not an identification.
+- **Keys.** A key goes only in the request. Every URL in `sources` has any `api_key` value replaced with `REDACTED`, and no key appears in the reading, the statement or the log. A keyed source's answer is cached per name, so its `read_at` can be earlier than the reading's.
 ## 5. The signed statement
 
 Each reading carries `signed`, which is not part of what it names:
@@ -126,6 +133,32 @@ What the signature establishes: Trooth read these sources and got these answers 
 - Foreign issuers reporting in IFRS: filings are listed, financial values are not read.
 - Filing text (Items 1A, 1C, 3; exhibits) is linked, not read.
 - The Trust Profile shows a reading when one was taken in the last day; otherwise the reader can ask for one there.
-- SAM.gov and patent and trademark offices are not read (each needs an API key); state registries are read only through the LEI record's registry number; code registries are not read; investor-relations, sustainability and trust-center pages are linked, not read.
+- SAM.gov is read for at most four names a day (its allowance for a key without a federal role is 10 requests); the others are listed under `not_read` and read on a later day. Trademarks are not read. State registries other than New York, Colorado, Connecticut and Oregon are not read. Code registries are not read; investor-relations, sustainability and trust-center pages are linked, not read.
+- RDAP answers only for top-level domains whose registry publishes an RDAP service; some country-code registries do not.
+- The FTC publishes early termination notices only for filings granted early termination; a merger reviewed to the end of its waiting period has no notice.
 - Certificates are counted for the exact domain name only, from one CT monitor's first page.
 - Only the OFAC SDN list's primary entity names are checked; aliases and other lists are not.
+
+## 7. Changes and subjects
+
+`changes` lists what the sources in a reading record as having changed, newest first, each with its date as the source gives it and where to read it: a former name on file with the SEC (`renamed`), a previous legal name in the LEI record, an 8-K reporting Item 2.01 (completion of an acquisition or disposition) or Item 5.01 (a change in control), a parent the LEI record names, an FTC early termination notice naming the company, and the domain's registration and last transfer. A change is the source's statement, not Trooth's finding.
+
+`subjects` lists every subject the reading names, each with why ([IDS.md](IDS.md) 1.3): the domain; the entity, filer and LEI ids with their binding status; the jurisdictions the LEI record and the SEC record give; each state registry entry and SAM.gov UEI found by name (marked as name matches); and the code repositories, APIs and MCP servers the home page links to.
+
+## 8. Reading the public record in the terminal
+
+`trooth public-record <domain>` prints every section above and checks the signed statement (section 5). `--json` prints the reading with `cli_check`.
+
+## 9. MCP tool description hashes
+
+An agent decides what an MCP tool does from the description and schema the server lists. A server that changes a description after it was reviewed changes what agents do without anyone being told. Trooth reads the tool list of MCP servers with no credentials, over the streamable HTTP transport (`initialize`, `notifications/initialized`, `tools/list`, paged), and publishes ([schema](../schemas/mcp-tools.v1.schema.json)):
+
+- for each tool, `description_sha256`, SHA-256 of the description's UTF-8 bytes, and `definition_sha256`, SHA-256 of the RFC 8785 bytes of the whole tool object as listed (name, title, description, input and output schemas, annotations, and anything else the server put there);
+- `manifest_sha256`, SHA-256 of the RFC 8785 bytes of the list of `{name, definition_sha256}` sorted by name;
+- the previous manifest and the tools added, removed or changed since.
+
+A statement naming the reading ([statement schema](../schemas/mcp-tools-statement.v1.schema.json)) carries every tool's two hashes, the manifest and the reading's own RFC 8785 SHA-256; it is signed with Trooth's statement key and logged as an `mcp_tools` entry ([LOG.md](LOG.md) section 1) when the manifest is one Trooth has not logged before. A reading that finds the same manifest only moves `last_checked`. So the log is each server's history of tool changes, each with a receipt.
+
+Trooth reads each server at most once a day. The servers read are listed at `https://api.trooth.co/scan/mcp-tools`; one server's newest reading is at `https://api.trooth.co/scan/mcp-tools/reading?endpoint=<url>`. `trooth mcp-tools <endpoint>` recomputes every description hash and the manifest, checks the statement and its log receipt, and with `--live` reads the server's tool list from the user's own machine and says whether it is the same, tool by tool (exit 9 when it is not).
+
+What a hash establishes: the server listed exactly these bytes to a client with no credentials when Trooth read it. It does not establish what a tool does, that its description is accurate, or that the server lists the same tools to every client.

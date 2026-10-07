@@ -12,7 +12,7 @@ import { createHash, createPublicKey, verify as edVerify } from 'node:crypto';
 import { canonicalize } from './jcs.mjs';
 
 export const LOG_ORIGIN = 'trooth.co/witness-log/v1';
-export const ENTRY_KINDS = ['witness_statement', 'correction', 'public_record'];
+export const ENTRY_KINDS = ['witness_statement', 'correction', 'public_record', 'mcp_tools'];
 
 const sha256 = (...parts) => { const h = createHash('sha256'); for (const p of parts) h.update(p); return h.digest(); };
 const ZERO = Buffer.from([0]);

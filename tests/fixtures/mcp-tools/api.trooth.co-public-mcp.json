@@ -1,0 +1,95 @@
+{
+  "format": "trooth.mcp-tools.v1",
+  "endpoint": "https://api.trooth.co/public/mcp",
+  "subject_id": "trooth:mcp:api.trooth.co/public/mcp",
+  "read_at": "2026-10-07T04:00:17.667Z",
+  "server": {
+    "name": "trooth-mcp",
+    "version": "1.4.1",
+    "protocol_version": "2025-06-18"
+  },
+  "tools": [
+    {
+      "name": "trooth_ai_data_use_disclosures",
+      "title": "Read a company's published AI and data-use declarations",
+      "description": "Read what one company on the Trooth Network has declared about AI and customer data: whether it trains models on customer data, whether AI is in the product, and which approaches. The company is named by its domain or its Trooth slug, matched exactly. Each row is the company's own declaration and is labeled so. Also says whether Trooth observed a supporting policy clause; not observed means Trooth has not read one, never that the company does not train on customer data. Read only.",
+      "description_sha256": "cb3c8b09e65c3f8e43dc15f2cd7234daf502a584fe5bc841c5b1d4cb99e1c3d9",
+      "definition_sha256": "7f364d5464568638c86939c2c5a3a6d169b075e16db385fb3548864942c89304"
+    },
+    {
+      "name": "trooth_ask",
+      "title": "Ask about Trooth (the Trooth Network, what a record carries, pricing, methodology)",
+      "description": "Answer a question about Trooth itself (what the Trooth Network is, what one company record carries, pricing, how witnessing works) from Trooth's fixed, curated knowledge base. Makes no outside request. A question the knowledge base does not cover returns out_of_scope; for a company's record use trooth_public_trust_profile.",
+      "description_sha256": "c4fd0e4105e1f54572b5dff18d7434ff6f40692cc8a10dbc80fa6c08deb8aff0",
+      "definition_sha256": "aa35823cf04d4f5a8fe45338c7dfcfeb99861d1f3fda394bf7b4104453daa771"
+    },
+    {
+      "name": "trooth_compare_companies",
+      "title": "Compare companies' Trust Profiles side by side",
+      "description": "Compare two to 4 companies on the Trooth Network section by section, named by their domains or Trooth slugs separated by commas: each section's state for each company and the rows it published, side by side, with who said them. sections narrows it, e.g. security,privacy,ai. A section a company left empty is shown as not published, never filled in from another. Nothing is weighed or ordered; each cell is the company's own record. Read only.",
+      "description_sha256": "10ff8264f5c7e79d4bfdad2e7bec75c45e564d545f723cb3a2cdde3ee15f1330",
+      "definition_sha256": "b23180b143dfd7869a8200b3ecfd0d147b30eefa19041d45e142632b198e8a71"
+    },
+    {
+      "name": "trooth_my_company_record",
+      "title": "Read your own workspace's company record (sign-in required)",
+      "description": "Needs an OAuth access token for this server from the authorization server its protected-resource metadata names, for a person who has signed in to trooth.co; no scope is required, and every other tool here needs no token. Reads the company record of the Trooth workspace the signed-in person belongs to: its name, its slug and the address of its public page. The workspace comes from the token's subject and never from an argument, so this tool takes no arguments. Read only.",
+      "description_sha256": "0dea985c0fbfcc774320893adaf47fd4f455e8bb9e4a8d4706d0014ea0f57093",
+      "definition_sha256": "4d924df9c7b1c99bdc1e8b7f193674949974fbdb84bcb8d644bf839e11e981f1"
+    },
+    {
+      "name": "trooth_outside_in_read",
+      "title": "Live read of a domain's public security surface",
+      "description": "Fetch https://<domain>/ and /.well-known/security.txt once, when called, from Trooth's server and report whether HTTPS answered, which of five response headers (HSTS, CSP, nosniff, frame protection, referrer policy) are present, and whether security.txt is published, absent or unread. IP literals and names resolving to private, loopback or link-local addresses are refused; redirects are reported, not followed; each request stops after 4 seconds. Observations, not witnessed evidence, not a grade.",
+      "description_sha256": "d81674610809f415d32b4ab4a8372939ffd8f6f178040dabb52cc6c777c453c3",
+      "definition_sha256": "9972ac1062caf8cd0551c2997614adf5d16ff03876430991507920a977b08d4b"
+    },
+    {
+      "name": "trooth_public_trust_profile",
+      "title": "Read a company's complete Trust Profile",
+      "description": "Read one company's published record on the Trooth Network, given its domain or Trooth slug, matched exactly (a URL is reduced to its host), never by a similar name; a name several companies share returns their candidates, not a pick. Returns its complete Trust Profile: every section with its state and who said it. A record is keyed by its domain and does not by itself say which legal entity, subsidiary or product the domain belongs to. Returns a status and a provenance label. Read only.",
+      "description_sha256": "4b252029491449f89657f6f632d8a3a69c81d687f3c76076a17470f829d39406",
+      "definition_sha256": "f1ce203595044115da2f2b539dcc44297bd0a8d43ac88bb0848137ab8aca9d4b"
+    },
+    {
+      "name": "trooth_search_companies",
+      "title": "Search the Trooth Network for companies",
+      "description": "Search the companies published on the Trooth Network by name, domain, tagline or category, optionally within one industry. Returns up to 10 entries, each with its name and tagline in the company's own words, whether Trooth witnessed it, and the identifier that reads its record with trooth_public_trust_profile. No match is an honest absence on the Network, never a judgment about a company. Read only.",
+      "description_sha256": "039784819ddaf68512f054fb001abe4c30a2c631a627dd85eb2af27499b391eb",
+      "definition_sha256": "9507521c20898223e75151ff2c27afe04e7eac3e15e28796a51fb33e0f7becac"
+    },
+    {
+      "name": "trooth_verify",
+      "title": "Check the signatures on a Trust Ledger Token",
+      "description": "Check the two signatures on a Trust Ledger Token (tlt2. or tlt. form, or its JTI) against Trooth's own token ledger. Returns valid, invalid (a signature does not check out), expired or revoked, or unclaimed when no token matches. Trooth's signature covers the signing event, not the claim bytes and not the truth of the claims; the issuing company's signature covers the payload.",
+      "description_sha256": "fed8b6c1a6f65dd17eeb893f2d028c5991415377ce055b33ab154672bcf81ef0",
+      "definition_sha256": "8e9db7a203d833f79c633666dc1b512835e3bc246599548babb76a6503574103"
+    }
+  ],
+  "manifest_sha256": "fedd1d2372462de065ba6046e45eac33c97ad628d13c910d3bcc2f8b8054e058",
+  "previous": null,
+  "changed": null,
+  "note": "Each hash is of the tool as the server listed it to a client with no credentials, when Trooth read it. A hash says what was listed, not that the tool does what its description says. Trooth signs a statement naming this manifest and logs it when the manifest changed.",
+  "last_checked": "2026-10-07T04:00:17.667Z",
+  "signed": {
+    "reading_sha256": "509dee9953d1eb2c0891caec2731d5286a8816dd465390d919f89f82326eb75e",
+    "statement": {
+      "payload": "{\"endpoint\":\"https://api.trooth.co/public/mcp\",\"issued_at\":\"2026-10-07T04:00:17.667Z\",\"manifest_sha256\":\"fedd1d2372462de065ba6046e45eac33c97ad628d13c910d3bcc2f8b8054e058\",\"previous_manifest_sha256\":null,\"read_at\":\"2026-10-07T04:00:17.667Z\",\"reading_canonicalization\":\"RFC8785\",\"reading_sha256\":\"509dee9953d1eb2c0891caec2731d5286a8816dd465390d919f89f82326eb75e\",\"signer\":{\"issuer\":\"trooth.co\",\"key_id\":\"trooth-master-2026-09\"},\"statement\":\"trooth.mcp-tools.v1\",\"subject_id\":\"trooth:mcp:api.trooth.co/public/mcp\",\"tools\":[{\"definition_sha256\":\"7f364d5464568638c86939c2c5a3a6d169b075e16db385fb3548864942c89304\",\"description_sha256\":\"cb3c8b09e65c3f8e43dc15f2cd7234daf502a584fe5bc841c5b1d4cb99e1c3d9\",\"name\":\"trooth_ai_data_use_disclosures\"},{\"definition_sha256\":\"aa35823cf04d4f5a8fe45338c7dfcfeb99861d1f3fda394bf7b4104453daa771\",\"description_sha256\":\"c4fd0e4105e1f54572b5dff18d7434ff6f40692cc8a10dbc80fa6c08deb8aff0\",\"name\":\"trooth_ask\"},{\"definition_sha256\":\"b23180b143dfd7869a8200b3ecfd0d147b30eefa19041d45e142632b198e8a71\",\"description_sha256\":\"10ff8264f5c7e79d4bfdad2e7bec75c45e564d545f723cb3a2cdde3ee15f1330\",\"name\":\"trooth_compare_companies\"},{\"definition_sha256\":\"4d924df9c7b1c99bdc1e8b7f193674949974fbdb84bcb8d644bf839e11e981f1\",\"description_sha256\":\"0dea985c0fbfcc774320893adaf47fd4f455e8bb9e4a8d4706d0014ea0f57093\",\"name\":\"trooth_my_company_record\"},{\"definition_sha256\":\"9972ac1062caf8cd0551c2997614adf5d16ff03876430991507920a977b08d4b\",\"description_sha256\":\"d81674610809f415d32b4ab4a8372939ffd8f6f178040dabb52cc6c777c453c3\",\"name\":\"trooth_outside_in_read\"},{\"definition_sha256\":\"f1ce203595044115da2f2b539dcc44297bd0a8d43ac88bb0848137ab8aca9d4b\",\"description_sha256\":\"4b252029491449f89657f6f632d8a3a69c81d687f3c76076a17470f829d39406\",\"name\":\"trooth_public_trust_profile\"},{\"definition_sha256\":\"9507521c20898223e75151ff2c27afe04e7eac3e15e28796a51fb33e0f7becac\",\"description_sha256\":\"039784819ddaf68512f054fb001abe4c30a2c631a627dd85eb2af27499b391eb\",\"name\":\"trooth_search_companies\"},{\"definition_sha256\":\"8e9db7a203d833f79c633666dc1b512835e3bc246599548babb76a6503574103\",\"description_sha256\":\"fed8b6c1a6f65dd17eeb893f2d028c5991415377ce055b33ab154672bcf81ef0\",\"name\":\"trooth_verify\"}]}",
+      "signature": "ed25519:MHYelYhL7fszOGr+yd1rIg6MRWGLoPeW+eYNyQNsOJdmg28DrUdhDrPd5noMpoVdWm9looa9w/CNjhxAHMEeAA==",
+      "key_id": "trooth-master-2026-09",
+      "alg": "Ed25519",
+      "canonicalization": "RFC8785"
+    },
+    "statement_id": "trooth:statement:22292024e2d327e7eb01bdb8cfb3758309063fef80e157a3c486f57068b6e5dc",
+    "log": {
+      "log": "trooth.co/witness-log/v1",
+      "index": 0,
+      "tree_size": 1,
+      "root_hash": "6s1hpQ3Wag+AJSMDc18ZBkBzGDoNi1acOuPV+8wiobc=",
+      "inclusion_proof": [],
+      "checkpoint": "trooth.co/witness-log/v1\n1\n6s1hpQ3Wag+AJSMDc18ZBkBzGDoNi1acOuPV+8wiobc=\n\n— trooth.co/witness-log/v1 NCvDVttprNmnFH+1a9+hQuKLf2+8RF5ggxOMIP6Dl9rf0GMqxuDy8YEYebOGc3eh0j5hmNd/P8jUw1yfB6/Oti8yLQI=\n"
+    },
+    "problem": null,
+    "logged_at_read": "2026-10-07T04:00:17.667Z"
+  }
+}

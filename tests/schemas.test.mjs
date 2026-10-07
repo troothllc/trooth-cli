@@ -20,7 +20,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 12);
+  assert.equal(Object.keys(schemas).length, 14);
   for (const [f, s] of Object.entries(schemas)) {
     assert.equal(s.$id, `https://trooth.co/schemas/${f}`);
     assert.equal(s.$schema, 'https://json-schema.org/draft/2020-12/schema');
@@ -117,7 +117,7 @@ test('trooth verify --json with a log answer validates against verify-result', a
 });
 
 test('public-record readings built by the scan worker validate (docs/EVIDENCE.md)', () => {
-  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com']) {
+  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com', 'nvidia.com']) {
     ok('public-record.v1.schema.json', JSON.parse(readFileSync(new URL(`./fixtures/public-record/${n}.json`, import.meta.url), 'utf8')), n);
   }
   // A signed answer, as a local run of the scan worker served it on 2026-10-07
@@ -156,4 +156,24 @@ test('RFC 8785 profile: sorting by UTF-16 code units, ECMAScript escaping, integ
 
 test('generated types are current', () => {
   execFileSync(process.execPath, [new URL('../scripts/gen-types.mjs', import.meta.url).pathname, '--check'], { stdio: 'pipe' });
+});
+
+// The fixture was read from the live server and signed by the scan worker's own code with a test key
+// under the production key id; only its shape is checked here.
+test('an MCP tool reading built and signed by the scan worker validates, and so does its statement (docs/EVIDENCE.md section 9)', () => {
+  const r = JSON.parse(readFileSync(new URL('./fixtures/mcp-tools/api.trooth.co-public-mcp.json', import.meta.url), 'utf8'));
+  ok('mcp-tools.v1.schema.json', r, 'the reading');
+  ok('mcp-tools-statement.v1.schema.json', JSON.parse(r.signed.statement.payload), 'its statement payload');
+  assert.notDeepEqual(validate('mcp-tools-statement.v1.schema.json', { ...JSON.parse(r.signed.statement.payload), extra: 1 }), [], 'no field outside the schema is signed');
+  ok('log-receipt.schema.json', r.signed.log, 'its log receipt');
+});
+
+test('the subjects a reading names are Trooth ids (docs/IDS.md 1.3)', () => {
+  const r = JSON.parse(readFileSync(new URL('./fixtures/public-record/nvidia.com.json', import.meta.url), 'utf8'));
+  assert.ok(r.subjects.length >= 5);
+  for (const s of r.subjects) assert.ok(parseId(s.id), s.id);
+  const m = JSON.parse(readFileSync(new URL('./fixtures/mcp-tools/api.trooth.co-public-mcp.json', import.meta.url), 'utf8'));
+  assert.deepEqual(parseId(m.subject_id), { type: 'mcp', value: 'api.trooth.co/public/mcp' });
+  assert.equal(formatId('registry', 'US-NY:4986044'), 'trooth:registry:US-NY:4986044');
+  assert.equal(parseId('trooth:repo:github.com/Troothllc'), null);
 });

@@ -1,6 +1,6 @@
 # Trooth stable identifiers
 
-Version 1.2, October 7, 2026. Version 1.2 defines `entity`. Version 1.1 added `cik` and `lei`.
+Version 1.3, October 7, 2026. Version 1.3 adds `jurisdiction`, `registry`, `uei`, `repo`, `api` and `mcp`, the subjects a public record reading or an MCP tool reading names. Version 1.2 defined `entity`. Version 1.1 added `cik` and `lei`.
 
 One grammar names everything Trooth publishes about a reading, so a reference means the same thing in a statement, a bundle, an SDK, a log entry and a citation, and never depends on a URL that could move:
 
@@ -18,11 +18,18 @@ trooth:<type>:<value>
 | `cik` | The SEC Central Index Key, 10 digits with leading zeros | `trooth:cik:0000320193` | An SEC filer (EDGAR) |
 | `lei` | An ISO 17442 Legal Entity Identifier: 20 characters, upper case (a checker also tests its ISO 7064 check digits) | `trooth:lei:HWUPKR0MPOU8FGXBT394` | A legal entity in the GLEIF register |
 | `entity` | `lei:` and an LEI, or `cik:` and a 10-digit CIK | `trooth:entity:lei:HWUPKR0MPOU8FGXBT394` | A legal entity, named by its own registry identifier: the LEI when a public record reading corroborates the LEI binding, otherwise the SEC CIK when that is corroborated. Trooth mints no number of its own for an entity, so anyone holding the LEI or CIK derives the same id. The UUID form reserved in version 1.0 was never issued |
+| `jurisdiction` | An ISO 3166-1 alpha-2 country code, or an ISO 3166-2 subdivision code | `trooth:jurisdiction:US-DE` | A jurisdiction, as a registry records where an entity was formed |
+| `registry` | An ISO 3166-2 code, a colon, and the entity's number in that state's business registry | `trooth:registry:US-NY:4986044` | One entry in a state business registry ([EVIDENCE.md](EVIDENCE.md) section 2.2) |
+| `uei` | A SAM.gov Unique Entity ID, 12 characters, upper case | `trooth:uei:ABCDEFG12345` | One SAM.gov entity registration |
+| `repo` | A code host and an owner, lower case | `trooth:repo:github.com/troothllc` | An organization or user on a code host |
+| `api` | A host and an optional path, lower case, without scheme, query or fragment | `trooth:api:developer.nvidia.com` | A company's API or its documentation |
+| `mcp` | A host and a path, lower case, without scheme, query or fragment | `trooth:mcp:api.trooth.co/public/mcp` | An MCP server endpoint ([EVIDENCE.md](EVIDENCE.md) section 9) |
 
 Rules:
 
 - An id is compared as an exact string. `formatId` lowercases a domain and drops a trailing dot before it builds one; `parseId` accepts only the canonical form.
 - A `statement` id is derived, not assigned: anyone holding the payload bytes computes the same id, and different bytes always give a different id.
+- A `registry` or `uei` id that a reading found by searching a legal name is a name match; the reading says so beside it, and it is not an identification.
 - A `cik` or `lei` id names a registry entry. Whether it belongs to a domain is a separate question, answered with evidence in a public-record reading ([EVIDENCE.md](EVIDENCE.md)).
 - An id names something; it asserts nothing about it. `trooth:domain:example.com` does not say the record exists, who controls the domain, or that anything in the record is true.
 - A type not in this table is not a Trooth id. New types are added here first.

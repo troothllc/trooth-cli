@@ -2,6 +2,18 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.12.0 (2026-10-07)
+
+### MCP tool description hashes, the rest of the public record, and the hardware key
+
+- New command `trooth mcp-tools [endpoint] [--live] [--json]`. Without an endpoint it lists the MCP servers whose tool lists Trooth reads (`https://api.trooth.co/scan/mcp-tools`). With one it reads Trooth's newest reading, recomputes each tool's `description_sha256` and the `manifest_sha256` from the definition hashes, checks the reading's RFC 8785 SHA-256, the `trooth.mcp-tools.v1` statement and its key, and the log receipt. `--live` reads the server's tool list from this machine (streamable HTTP, no credentials) and reports tools added, removed or changed since Trooth logged them. Exit 9 on any difference, 8 when the signature or key does not hold, 4 when the server could not be read. `bin/lib/mcp-tools.mjs` holds the hashes and a small MCP client.
+- Log entries gain the kind `mcp_tools`. The Python and Go packages accept it.
+- `trooth public-record` prints the reading's new sections: `sam` (SAM.gov registrations and exclusions, exact legal name), `patents` (USPTO Open Data Portal applications by first applicant), `registries` (New York, Colorado, Connecticut and Oregon open-data registries, exact legal name), `merger_review` (FTC early termination notices), `domain_registration` (RDAP), `changes` (renames, Items 2.01 and 5.01, previous legal names, parents, merger notices, domain events) and `subjects`.
+- `trooth log checkpoint` reports the hardware key's signature line (`hardware_key` in `--json`), checked against `HARDWARE_LOG_VKEY` in `bin/lib/log-trust.mjs`.
+- Ids (`docs/IDS.md` 1.3): `jurisdiction`, `registry`, `uei`, `repo`, `api`, `mcp`.
+- Schemas: `public-record.v1` gains the new sections (all optional for older readings); new `mcp-tools.v1` and `mcp-tools-statement.v1`. Fixtures: a reading of nvidia.com built by the scan worker's reader, and a signed reading of Trooth's own MCP server built by the scan worker's code.
+- `docs/KEY-CEREMONY.md` 1.2 (ceremony v2: the hardware key in AWS KMS, which co-signs every checkpoint; what two-person control still needs; drill 4), `docs/LOG.md` 1.2, `docs/EVIDENCE.md` 1.2 (sections 7 to 9).
+
 ## 0.11.0 (2026-10-07)
 
 ### Witnesses, COSE receipts and a signed public record

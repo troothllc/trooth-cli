@@ -120,6 +120,136 @@ type LogReceipt struct {
 	Checkpoint string `json:"checkpoint"`
 }
 
+// McpToolsStatement: The payload Trooth signs for an MCP tool reading, carried as the payload of a witness-statement envelope (RFC 8785, Ed25519) and logged as an mcp_tools entry. It names every tool's description and definition hash, so the log alone tells when a server changed what it tells agents.
+type McpToolsStatement struct {
+	// The payload type. One of: trooth.mcp-tools.v1.
+	Statement string `json:"statement"`
+	// trooth:mcp:<host and path>.
+	SubjectID string `json:"subject_id"`
+	// The endpoint read.
+	Endpoint string `json:"endpoint"`
+	// The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// The manifest hash.
+	ManifestSha256 string `json:"manifest_sha256"`
+	// Each tool's hashes, sorted by name.
+	Tools []StatementTool `json:"tools"`
+	// The previous manifest hash, or null for the first reading.
+	PreviousManifestSha256 *string `json:"previous_manifest_sha256"`
+	// SHA-256, hex, of the reading's RFC 8785 bytes.
+	ReadingSha256 string `json:"reading_sha256"`
+	// How those bytes were made. One of: RFC8785.
+	ReadingCanonicalization string `json:"reading_canonicalization"`
+	// When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	IssuedAt string `json:"issued_at"`
+	// The signing key, inside the signed bytes.
+	Signer McpStatementSigner `json:"signer"`
+}
+
+// StatementTool: A tool as the statement names it.
+type StatementTool struct {
+	// The tool name.
+	Name string `json:"name"`
+	// The description hash.
+	DescriptionSha256 string `json:"description_sha256"`
+	// The definition hash.
+	DefinitionSha256 string `json:"definition_sha256"`
+}
+
+// McpStatementSigner: The signing key.
+type McpStatementSigner struct {
+	// The kid on https://api.trooth.co/public/keys.
+	KeyID string `json:"key_id"`
+	// Always trooth.co. One of: trooth.co.
+	Issuer string `json:"issuer"`
+}
+
+// McpToolsReading: The tool list of an MCP server as Trooth read it with no credentials, each tool's description and definition hashed. Served at https://api.trooth.co/scan/mcp-tools/reading?endpoint=<url>. A statement naming the reading is signed and logged as an mcp_tools entry when the manifest changed. docs/EVIDENCE.md section 9 in trooth-cli is the normative text. A hash says what was listed, not that a tool does what its description says.
+type McpToolsReading struct {
+	// The format. One of: trooth.mcp-tools.v1.
+	Format string `json:"format"`
+	// The MCP endpoint read (streamable HTTP).
+	Endpoint string `json:"endpoint"`
+	// trooth:mcp:<host and path>.
+	SubjectID string `json:"subject_id"`
+	// When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// What the server said about itself in initialize.
+	Server McpServer `json:"server"`
+	// Every tool listed, sorted by name, at most 500.
+	Tools []ToolHash `json:"tools"`
+	// SHA-256, hex, of the RFC 8785 bytes of [{name, definition_sha256}] sorted by name.
+	ManifestSha256 string `json:"manifest_sha256"`
+	// The manifest of the reading before this one, or null for the first.
+	Previous *PreviousManifest `json:"previous"`
+	// Tools added, removed or changed since the previous reading, or null for the first.
+	Changed *ManifestDiff `json:"changed"`
+	// What the reading is and is not.
+	Note string `json:"note"`
+	// When Trooth last read the server and found this manifest. Served beside the reading; not part of the bytes it names.
+	LastChecked *string `json:"last_checked,omitempty"`
+	// The statement naming the reading, and its log receipt. Not part of the bytes it names.
+	Signed *McpToolsSigned `json:"signed,omitempty"`
+}
+
+// McpServer: The server's own description.
+type McpServer struct {
+	// serverInfo.name.
+	Name *string `json:"name"`
+	// serverInfo.version.
+	Version *string `json:"version"`
+	// The protocol version agreed.
+	ProtocolVersion *string `json:"protocol_version"`
+}
+
+// ToolHash: One tool as listed.
+type ToolHash struct {
+	// The tool name.
+	Name string `json:"name"`
+	// The title, from the tool or its annotations.
+	Title *string `json:"title"`
+	// The description as listed (empty when there is none).
+	Description string `json:"description"`
+	// SHA-256, hex, of the description's UTF-8 bytes.
+	DescriptionSha256 string `json:"description_sha256"`
+	// SHA-256, hex, of the RFC 8785 bytes of the whole tool object as listed.
+	DefinitionSha256 string `json:"definition_sha256"`
+}
+
+// PreviousManifest: The reading before.
+type PreviousManifest struct {
+	// Its manifest hash.
+	ManifestSha256 string `json:"manifest_sha256"`
+	// When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+}
+
+// ManifestDiff: Tool names by what happened to them.
+type ManifestDiff struct {
+	// Tools new in this reading.
+	Added []string `json:"added"`
+	// Tools no longer listed.
+	Removed []string `json:"removed"`
+	// Tools whose definition hash changed.
+	Changed []string `json:"changed"`
+}
+
+// McpToolsSigned: The statement naming the reading.
+type McpToolsSigned struct {
+	// SHA-256, hex, of the RFC 8785 bytes of the reading without last_checked and signed.
+	ReadingSha256 string `json:"reading_sha256"`
+	// The signed envelope; its payload is an mcp-tools-statement.v1 document. Null when it could not be signed.
+	Statement *WitnessStatement `json:"statement"`
+	// trooth:statement:<sha256 of the payload>.
+	StatementID *string `json:"statement_id"`
+	// The receipt of the statement as an mcp_tools entry, or null when it was not logged.
+	Log *LogReceipt `json:"log"`
+	// What could not be done, or null.
+	Problem *string `json:"problem"`
+	// The read_at of the reading that was logged.
+	LoggedAtRead *string `json:"logged_at_read"`
+}
+
 // PublicRecordStatement: The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true.
 type PublicRecordStatement struct {
 	// The payload type. One of: trooth.public-record.v1.
@@ -162,7 +292,7 @@ type StatementSigner struct {
 	Issuer string `json:"issuer"`
 }
 
-// PublicRecordReading: What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.
+// PublicRecordReading: What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list, and since trooth 0.12.0 SAM.gov, the USPTO, four state registries, the FTC and RDAP), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text.
 type PublicRecordReading struct {
 	// The format. One of: trooth.public-record.v1.
 	Format string `json:"format"`
@@ -196,8 +326,200 @@ type PublicRecordReading struct {
 	NotRead []NotRead `json:"not_read"`
 	// What the reading is and is not, as a paragraph.
 	Note string `json:"note"`
+	// SAM.gov registrations and exclusions under the legal name, or null when SAM.gov was not read (not_read says why). A name match is not an identification. Added in trooth 0.12.0.
+	Sam *SamReading `json:"sam,omitempty"`
+	// Patent applications whose first applicant is the legal name, from the USPTO Open Data Portal, or null when it was not read. Added in trooth 0.12.0.
+	Patents *PatentReading `json:"patents,omitempty"`
+	// Exact-name entries in the state business registries that publish open data (New York, Colorado, Connecticut, Oregon). A name match is not an identification. Added in trooth 0.12.0.
+	Registries []RegistryEntry `json:"registries,omitempty"`
+	// Hart-Scott-Rodino early termination notices the FTC published naming the legal name as a party, or null when they were not read. Added in trooth 0.12.0.
+	MergerReview *MergerReview `json:"merger_review,omitempty"`
+	// The domain's registration, from RDAP, or null when no RDAP service answered. Added in trooth 0.12.0.
+	DomainRegistration *DomainRegistration `json:"domain_registration,omitempty"`
+	// What the sources in this reading record as having changed (renames, acquisitions and dispositions, changes in control, previous legal names, parents, merger review, domain registration), newest first. Added in trooth 0.12.0.
+	Changes []Change `json:"changes,omitempty"`
+	// Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0.
+	Subjects []NamedSubject `json:"subjects,omitempty"`
 	// The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.
 	Signed *Signed `json:"signed,omitempty"`
+}
+
+// SamReading: SAM.gov, read under one legal name with Trooth's key (the key is never in the record). Cached for 30 days per name, so read_at can be earlier than the reading's.
+type SamReading struct {
+	// The SAM.gov API read.
+	Source string `json:"source"`
+	// When SAM.gov was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// The legal names searched.
+	NamesChecked []string `json:"names_checked"`
+	// Entity registrations with exactly that legal name, at most 10.
+	Registrations []SamRegistration `json:"registrations"`
+	// Exclusion records with exactly that name, at most 20. A name match is not an identification.
+	Exclusions []SamExclusion `json:"exclusions"`
+}
+
+// SamRegistration: A SAM.gov entity registration.
+type SamRegistration struct {
+	// The Unique Entity ID.
+	Uei *string `json:"uei"`
+	// The CAGE code.
+	Cage *string `json:"cage"`
+	// The legal business name registered.
+	LegalName string `json:"legal_name"`
+	// The registration status.
+	Status *string `json:"status"`
+	// The registration expiration date.
+	Expires *string `json:"expires"`
+	// The purpose of registration.
+	Purpose *string `json:"purpose"`
+}
+
+// SamExclusion: A SAM.gov exclusion record.
+type SamExclusion struct {
+	// The name excluded.
+	Name string `json:"name"`
+	// The UEI on the record.
+	Uei *string `json:"uei"`
+	// The CAGE code on the record.
+	Cage *string `json:"cage"`
+	// Firm, Individual, Vessel or Special Entity Designation.
+	Classification *string `json:"classification"`
+	// The exclusion type.
+	Type *string `json:"type"`
+	// The exclusion program.
+	Program *string `json:"program"`
+	// The excluding agency.
+	Agency *string `json:"agency"`
+	// The activation date.
+	Active *string `json:"active"`
+	// The termination date, or Indefinite.
+	Terminates *string `json:"terminates"`
+	// The record status.
+	RecordStatus *string `json:"record_status"`
+}
+
+// PatentReading: Patent applications from the USPTO Open Data Portal. Cached for 7 days per name.
+type PatentReading struct {
+	// The search API read.
+	Source string `json:"source"`
+	// When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// The first-applicant names searched.
+	ApplicantNames []string `json:"applicant_names"`
+	// How many applications the search counted.
+	Applications int64 `json:"applications"`
+	// The newest applications, at most 5.
+	Recent []PatentApplication `json:"recent"`
+}
+
+// PatentApplication: A patent application.
+type PatentApplication struct {
+	// The application number.
+	Application string `json:"application"`
+	// The title of the invention.
+	Title *string `json:"title"`
+	// The filing date.
+	Filed *string `json:"filed"`
+	// The application status.
+	Status *string `json:"status"`
+	// The patent number, once granted.
+	Patent *string `json:"patent"`
+	// The grant date.
+	Granted *string `json:"granted"`
+}
+
+// RegistryEntry: An entry in a state business registry with exactly the legal name.
+type RegistryEntry struct {
+	// The registry's jurisdiction, ISO 3166-2.
+	Jurisdiction string `json:"jurisdiction"`
+	// The registry and dataset.
+	Registry string `json:"registry"`
+	// The entity's number in that registry.
+	ID string `json:"id"`
+	// The name as registered.
+	Name string `json:"name"`
+	// The status the registry gives (Active for the datasets of active entities only).
+	Status *string `json:"status"`
+	// The entity type.
+	EntityType *string `json:"entity_type"`
+	// The formation or registration date in that state.
+	Formed *string `json:"formed"`
+	// Where the entity was formed, as the registry writes it.
+	FormationJurisdiction *string `json:"formation_jurisdiction"`
+	// The open-data URL for this entry.
+	Source string `json:"source"`
+}
+
+// MergerReview: FTC early termination notices under the HSR Act, searched by words of the legal name and kept when a party has exactly that name. Cached for 7 days per name.
+type MergerReview struct {
+	// The FTC API read.
+	Source string `json:"source"`
+	// When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).
+	ReadAt string `json:"read_at"`
+	// The legal names searched.
+	NamesChecked []string `json:"names_checked"`
+	// Notices naming the company as a party, at most 20.
+	Notices []MergerNotice `json:"notices"`
+	// How many notices the word search returned before names were compared.
+	MatchedInSearch int64 `json:"matched_in_search"`
+}
+
+// MergerNotice: An early termination notice.
+type MergerNotice struct {
+	// The HSR transaction number.
+	Transaction string `json:"transaction"`
+	// The date early termination was granted.
+	Date *string `json:"date"`
+	// The acquiring person.
+	Acquiring *string `json:"acquiring"`
+	// The acquired person.
+	Acquired *string `json:"acquired"`
+	// The acquired entities named.
+	AcquiredEntities []string `json:"acquired_entities"`
+	// The company's role in the notice. One of: acquiring, acquired.
+	Role string `json:"role"`
+	// The notice on ftc.gov.
+	URL string `json:"url"`
+}
+
+// DomainRegistration: A domain's registration from RDAP (RFC 9083).
+type DomainRegistration struct {
+	// The RDAP URL read.
+	Source string `json:"source"`
+	// The registrar.
+	Registrar *string `json:"registrar"`
+	// The registration date.
+	Registered *string `json:"registered"`
+	// The last-changed date.
+	Changed *string `json:"changed"`
+	// The expiration date.
+	Expires *string `json:"expires"`
+	// The last transfer date.
+	Transferred *string `json:"transferred"`
+	// EPP status values.
+	Status []string `json:"status"`
+}
+
+// Change: A change a source records.
+type Change struct {
+	// What changed. One of: renamed, previous_legal_name, acquisition_or_disposition, change_in_control, merger_review, parent, domain_registered, domain_transferred.
+	Kind string `json:"kind"`
+	// When, as the source dates it; null when it gives no date.
+	Date *string `json:"date"`
+	// The change in words.
+	Detail string `json:"detail"`
+	// Where to read it.
+	Source string `json:"source"`
+}
+
+// NamedSubject: A subject the reading names (docs/IDS.md).
+type NamedSubject struct {
+	// The Trooth id.
+	ID string `json:"id"`
+	// What it names. One of: domain, entity, sec_filer, lei, jurisdiction, state_registry, sam_uei, code_repository, api, mcp_server.
+	Kind string `json:"kind"`
+	// Why the reading names it.
+	Basis string `json:"basis"`
 }
 
 // Entity: A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md).

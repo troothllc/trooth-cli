@@ -118,6 +118,136 @@ export interface LogReceipt {
   checkpoint: string;
 }
 
+/** The payload Trooth signs for an MCP tool reading, carried as the payload of a witness-statement envelope (RFC 8785, Ed25519) and logged as an mcp_tools entry. It names every tool's description and definition hash, so the log alone tells when a server changed what it tells agents. */
+export interface McpToolsStatement {
+  /** The payload type. */
+  statement: "trooth.mcp-tools.v1";
+  /** trooth:mcp:<host and path>. */
+  subject_id: string;
+  /** The endpoint read. */
+  endpoint: string;
+  /** The reading's read_at. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** The manifest hash. */
+  manifest_sha256: string;
+  /** Each tool's hashes, sorted by name. */
+  tools: StatementTool[];
+  /** The previous manifest hash, or null for the first reading. */
+  previous_manifest_sha256: string | null;
+  /** SHA-256, hex, of the reading's RFC 8785 bytes. */
+  reading_sha256: string;
+  /** How those bytes were made. */
+  reading_canonicalization: "RFC8785";
+  /** When the statement was signed. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  issued_at: string;
+  /** The signing key, inside the signed bytes. */
+  signer: McpStatementSigner;
+}
+
+/** A tool as the statement names it. */
+export interface StatementTool {
+  /** The tool name. */
+  name: string;
+  /** The description hash. */
+  description_sha256: string;
+  /** The definition hash. */
+  definition_sha256: string;
+}
+
+/** The signing key. */
+export interface McpStatementSigner {
+  /** The kid on https://api.trooth.co/public/keys. */
+  key_id: string;
+  /** Always trooth.co. */
+  issuer: "trooth.co";
+}
+
+/** The tool list of an MCP server as Trooth read it with no credentials, each tool's description and definition hashed. Served at https://api.trooth.co/scan/mcp-tools/reading?endpoint=<url>. A statement naming the reading is signed and logged as an mcp_tools entry when the manifest changed. docs/EVIDENCE.md section 9 in trooth-cli is the normative text. A hash says what was listed, not that a tool does what its description says. */
+export interface McpToolsReading {
+  /** The format. */
+  format: "trooth.mcp-tools.v1";
+  /** The MCP endpoint read (streamable HTTP). */
+  endpoint: string;
+  /** trooth:mcp:<host and path>. */
+  subject_id: string;
+  /** When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** What the server said about itself in initialize. */
+  server: McpServer;
+  /** Every tool listed, sorted by name, at most 500. */
+  tools: ToolHash[];
+  /** SHA-256, hex, of the RFC 8785 bytes of [{name, definition_sha256}] sorted by name. */
+  manifest_sha256: string;
+  /** The manifest of the reading before this one, or null for the first. */
+  previous: PreviousManifest | null;
+  /** Tools added, removed or changed since the previous reading, or null for the first. */
+  changed: ManifestDiff | null;
+  /** What the reading is and is not. */
+  note: string;
+  /** When Trooth last read the server and found this manifest. Served beside the reading; not part of the bytes it names. */
+  last_checked?: string;
+  /** The statement naming the reading, and its log receipt. Not part of the bytes it names. */
+  signed?: McpToolsSigned;
+}
+
+/** The server's own description. */
+export interface McpServer {
+  /** serverInfo.name. */
+  name: string | null;
+  /** serverInfo.version. */
+  version: string | null;
+  /** The protocol version agreed. */
+  protocol_version: string | null;
+}
+
+/** One tool as listed. */
+export interface ToolHash {
+  /** The tool name. */
+  name: string;
+  /** The title, from the tool or its annotations. */
+  title: string | null;
+  /** The description as listed (empty when there is none). */
+  description: string;
+  /** SHA-256, hex, of the description's UTF-8 bytes. */
+  description_sha256: string;
+  /** SHA-256, hex, of the RFC 8785 bytes of the whole tool object as listed. */
+  definition_sha256: string;
+}
+
+/** The reading before. */
+export interface PreviousManifest {
+  /** Its manifest hash. */
+  manifest_sha256: string;
+  /** When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+}
+
+/** Tool names by what happened to them. */
+export interface ManifestDiff {
+  /** Tools new in this reading. */
+  added: string[];
+  /** Tools no longer listed. */
+  removed: string[];
+  /** Tools whose definition hash changed. */
+  changed: string[];
+}
+
+/** The statement naming the reading. */
+export interface McpToolsSigned {
+  /** SHA-256, hex, of the RFC 8785 bytes of the reading without last_checked and signed. */
+  reading_sha256: string;
+  /** The signed envelope; its payload is an mcp-tools-statement.v1 document. Null when it could not be signed. */
+  statement: WitnessStatement | null;
+  /** trooth:statement:<sha256 of the payload>. */
+  statement_id: string | null;
+  /** The receipt of the statement as an mcp_tools entry, or null when it was not logged. */
+  log: LogReceipt | null;
+  /** What could not be done, or null. */
+  problem: string | null;
+  /** The read_at of the reading that was logged. */
+  logged_at_read: string | null;
+}
+
 /** The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true. */
 export interface PublicRecordStatement {
   /** The payload type. */
@@ -160,7 +290,7 @@ export interface StatementSigner {
   issuer: "trooth.co";
 }
 
-/** What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text. */
+/** What a company has published outside its own website, read from the authorities that hold it (SEC EDGAR, the GLEIF LEI registry, DNS, a Certificate Transparency monitor, the OFAC list, and since trooth 0.12.0 SAM.gov, the USPTO, four state registries, the FTC and RDAP), beside what its own site states, and the evidence tying each identifier to the domain. Served at https://api.trooth.co/scan/public-record/<domain>. Every fact carries the URL to read it again. Since trooth 0.11.0 each reading also carries `signed`: a statement naming the SHA-256 of the reading's RFC 8785 bytes (everything except `signed`), signed with Trooth's statement key and logged. Nothing in it grades, rates or ranks a company. docs/EVIDENCE.md in trooth-cli is the normative text. */
 export interface PublicRecordReading {
   /** The format. */
   format: "trooth.public-record.v1";
@@ -194,8 +324,200 @@ export interface PublicRecordReading {
   not_read: NotRead[];
   /** What the reading is and is not, as a paragraph. */
   note: string;
+  /** SAM.gov registrations and exclusions under the legal name, or null when SAM.gov was not read (not_read says why). A name match is not an identification. Added in trooth 0.12.0. */
+  sam?: SamReading | null;
+  /** Patent applications whose first applicant is the legal name, from the USPTO Open Data Portal, or null when it was not read. Added in trooth 0.12.0. */
+  patents?: PatentReading | null;
+  /** Exact-name entries in the state business registries that publish open data (New York, Colorado, Connecticut, Oregon). A name match is not an identification. Added in trooth 0.12.0. */
+  registries?: RegistryEntry[];
+  /** Hart-Scott-Rodino early termination notices the FTC published naming the legal name as a party, or null when they were not read. Added in trooth 0.12.0. */
+  merger_review?: MergerReview | null;
+  /** The domain's registration, from RDAP, or null when no RDAP service answered. Added in trooth 0.12.0. */
+  domain_registration?: DomainRegistration | null;
+  /** What the sources in this reading record as having changed (renames, acquisitions and dispositions, changes in control, previous legal names, parents, merger review, domain registration), newest first. Added in trooth 0.12.0. */
+  changes?: Change[];
+  /** Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0. */
+  subjects?: NamedSubject[];
   /** The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0. */
   signed?: Signed;
+}
+
+/** SAM.gov, read under one legal name with Trooth's key (the key is never in the record). Cached for 30 days per name, so read_at can be earlier than the reading's. */
+export interface SamReading {
+  /** The SAM.gov API read. */
+  source: string;
+  /** When SAM.gov was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** The legal names searched. */
+  names_checked: string[];
+  /** Entity registrations with exactly that legal name, at most 10. */
+  registrations: SamRegistration[];
+  /** Exclusion records with exactly that name, at most 20. A name match is not an identification. */
+  exclusions: SamExclusion[];
+}
+
+/** A SAM.gov entity registration. */
+export interface SamRegistration {
+  /** The Unique Entity ID. */
+  uei: string | null;
+  /** The CAGE code. */
+  cage: string | null;
+  /** The legal business name registered. */
+  legal_name: string;
+  /** The registration status. */
+  status: string | null;
+  /** The registration expiration date. */
+  expires: string | null;
+  /** The purpose of registration. */
+  purpose: string | null;
+}
+
+/** A SAM.gov exclusion record. */
+export interface SamExclusion {
+  /** The name excluded. */
+  name: string;
+  /** The UEI on the record. */
+  uei: string | null;
+  /** The CAGE code on the record. */
+  cage: string | null;
+  /** Firm, Individual, Vessel or Special Entity Designation. */
+  classification: string | null;
+  /** The exclusion type. */
+  type: string | null;
+  /** The exclusion program. */
+  program: string | null;
+  /** The excluding agency. */
+  agency: string | null;
+  /** The activation date. */
+  active: string | null;
+  /** The termination date, or Indefinite. */
+  terminates: string | null;
+  /** The record status. */
+  record_status: string | null;
+}
+
+/** Patent applications from the USPTO Open Data Portal. Cached for 7 days per name. */
+export interface PatentReading {
+  /** The search API read. */
+  source: string;
+  /** When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** The first-applicant names searched. */
+  applicant_names: string[];
+  /** How many applications the search counted. */
+  applications: number;
+  /** The newest applications, at most 5. */
+  recent: PatentApplication[];
+}
+
+/** A patent application. */
+export interface PatentApplication {
+  /** The application number. */
+  application: string;
+  /** The title of the invention. */
+  title: string | null;
+  /** The filing date. */
+  filed: string | null;
+  /** The application status. */
+  status: string | null;
+  /** The patent number, once granted. */
+  patent: string | null;
+  /** The grant date. */
+  granted: string | null;
+}
+
+/** An entry in a state business registry with exactly the legal name. */
+export interface RegistryEntry {
+  /** The registry's jurisdiction, ISO 3166-2. */
+  jurisdiction: string;
+  /** The registry and dataset. */
+  registry: string;
+  /** The entity's number in that registry. */
+  id: string;
+  /** The name as registered. */
+  name: string;
+  /** The status the registry gives (Active for the datasets of active entities only). */
+  status: string | null;
+  /** The entity type. */
+  entity_type: string | null;
+  /** The formation or registration date in that state. */
+  formed: string | null;
+  /** Where the entity was formed, as the registry writes it. */
+  formation_jurisdiction: string | null;
+  /** The open-data URL for this entry. */
+  source: string;
+}
+
+/** FTC early termination notices under the HSR Act, searched by words of the legal name and kept when a party has exactly that name. Cached for 7 days per name. */
+export interface MergerReview {
+  /** The FTC API read. */
+  source: string;
+  /** When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z). */
+  read_at: string;
+  /** The legal names searched. */
+  names_checked: string[];
+  /** Notices naming the company as a party, at most 20. */
+  notices: MergerNotice[];
+  /** How many notices the word search returned before names were compared. */
+  matched_in_search: number;
+}
+
+/** An early termination notice. */
+export interface MergerNotice {
+  /** The HSR transaction number. */
+  transaction: string;
+  /** The date early termination was granted. */
+  date: string | null;
+  /** The acquiring person. */
+  acquiring: string | null;
+  /** The acquired person. */
+  acquired: string | null;
+  /** The acquired entities named. */
+  acquired_entities: string[];
+  /** The company's role in the notice. */
+  role: "acquiring" | "acquired";
+  /** The notice on ftc.gov. */
+  url: string;
+}
+
+/** A domain's registration from RDAP (RFC 9083). */
+export interface DomainRegistration {
+  /** The RDAP URL read. */
+  source: string;
+  /** The registrar. */
+  registrar: string | null;
+  /** The registration date. */
+  registered: string | null;
+  /** The last-changed date. */
+  changed: string | null;
+  /** The expiration date. */
+  expires: string | null;
+  /** The last transfer date. */
+  transferred: string | null;
+  /** EPP status values. */
+  status: string[];
+}
+
+/** A change a source records. */
+export interface Change {
+  /** What changed. */
+  kind: "renamed" | "previous_legal_name" | "acquisition_or_disposition" | "change_in_control" | "merger_review" | "parent" | "domain_registered" | "domain_transferred";
+  /** When, as the source dates it; null when it gives no date. */
+  date: string | null;
+  /** The change in words. */
+  detail: string;
+  /** Where to read it. */
+  source: string;
+}
+
+/** A subject the reading names (docs/IDS.md). */
+export interface NamedSubject {
+  /** The Trooth id. */
+  id: string;
+  /** What it names. */
+  kind: "domain" | "entity" | "sec_filer" | "lei" | "jurisdiction" | "state_registry" | "sam_uei" | "code_repository" | "api" | "mcp_server";
+  /** Why the reading names it. */
+  basis: string;
 }
 
 /** A legal entity, named by a Trooth id derived from its LEI or SEC CIK (docs/IDS.md). */
