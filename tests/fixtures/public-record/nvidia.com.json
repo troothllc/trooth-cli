@@ -1,0 +1,1175 @@
+{
+  "format": "trooth.public-record.v1",
+  "domain": "nvidia.com",
+  "subject_id": "trooth:domain:nvidia.com",
+  "read_at": "2026-10-07T03:59:36.938Z",
+  "site": {
+    "legal_names": [
+      {
+        "name": "NVIDIA Corporation",
+        "source": "https://nvidia.com/"
+      }
+    ],
+    "read": true,
+    "reason": null,
+    "links": [
+      {
+        "kind": "investor_relations",
+        "url": "https://investor.nvidia.com/home/default.aspx"
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "identifier": "cik",
+      "value": "0001045810",
+      "id": "trooth:cik:0001045810",
+      "found_by": "site_legal_name",
+      "status": "corroborated",
+      "for": [
+        {
+          "kind": "site_names_registry_name",
+          "detail": "https://nvidia.com/ names NVIDIA Corporation; the SEC record names NVIDIA CORP. A site can name any company, so this alone ties nothing.",
+          "source": "https://nvidia.com/"
+        },
+        {
+          "kind": "filing_namespace_names_domain",
+          "detail": "the 10-K filed 2026-02-25 declares its extension taxonomy under www.nvidia.com",
+          "source": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/nvda-20260125.htm"
+        }
+      ],
+      "against": []
+    },
+    {
+      "identifier": "lei",
+      "value": "549300S4KLFTLO7GSQ80",
+      "id": "trooth:lei:549300S4KLFTLO7GSQ80",
+      "found_by": "registry_name_match",
+      "status": "corroborated",
+      "for": [
+        {
+          "kind": "site_names_registry_name",
+          "detail": "https://nvidia.com/ names NVIDIA Corporation; the LEI record names NVIDIA CORPORATION",
+          "source": "https://nvidia.com/"
+        },
+        {
+          "kind": "registries_agree",
+          "detail": "the SEC and the LEI registry both name NVIDIA CORPORATION, jurisdiction US-DE",
+          "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+        },
+        {
+          "kind": "through_corroborated_filer",
+          "detail": "the LEI record and the SEC filer 0001045810 name the same entity, and the filer's own filing ties it to nvidia.com",
+          "source": null
+        }
+      ],
+      "against": []
+    }
+  ],
+  "sec": {
+    "cik": "0001045810",
+    "facts": [
+      {
+        "key": "sec.name",
+        "label": "Name on file with the SEC",
+        "value": "NVIDIA CORP",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.cik",
+        "label": "SEC Central Index Key",
+        "value": "0001045810",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.tickers",
+        "label": "Ticker symbols",
+        "value": [
+          "NVDA"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.exchanges",
+        "label": "Exchanges",
+        "value": [
+          "Nasdaq"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.entity_type",
+        "label": "Entity type",
+        "value": "operating",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.filer_category",
+        "label": "Filer category",
+        "value": "Large accelerated filer",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.sic",
+        "label": "Standard Industrial Classification",
+        "value": "3674 Semiconductors & Related Devices",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.state_of_incorporation",
+        "label": "State or country of incorporation",
+        "value": "DE",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.fiscal_year_end",
+        "label": "Fiscal year end (MMDD)",
+        "value": "0131",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.business_address",
+        "label": "Business address",
+        "value": "2788 SAN TOMAS EXPRESSWAY, SANTA CLARA, CA, 95051",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.phone",
+        "label": "Phone on file",
+        "value": "408-486-2000",
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.website",
+        "label": "Website on file",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.investor_website",
+        "label": "Investor website on file",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.lei",
+        "label": "LEI on file with the SEC",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.former_names",
+        "label": "Former names",
+        "value": [
+          "NVIDIA CORP/CA"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+      },
+      {
+        "key": "sec.xbrl_namespace_authorities",
+        "label": "Authorities of the extension taxonomy in the 10-K filed 2026-02-25",
+        "value": [
+          "www.nvidia.com"
+        ],
+        "source": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/nvda-20260125.htm"
+      }
+    ],
+    "latest": {
+      "8-K": {
+        "form": "8-K",
+        "filed": "2026-09-03",
+        "report_date": "2026-09-02",
+        "items": [
+          "8.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000078/nvda-20260902.htm"
+      },
+      "10-Q": {
+        "form": "10-Q",
+        "filed": "2026-08-26",
+        "report_date": "2026-07-26",
+        "items": [],
+        "description": "10-Q",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000075/nvda-20260726.htm"
+      },
+      "SD": {
+        "form": "SD",
+        "filed": "2026-05-15",
+        "report_date": null,
+        "items": [],
+        "description": "SD",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000043/a2026formsd.htm"
+      },
+      "ARS": {
+        "form": "ARS",
+        "filed": "2026-05-12",
+        "report_date": "2026-01-25",
+        "items": [],
+        "description": "ARS",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000038/a2026-annualxreportxwebxfi.pdf"
+      },
+      "DEF 14A": {
+        "form": "DEF 14A",
+        "filed": "2026-05-12",
+        "report_date": "2026-06-24",
+        "items": [],
+        "description": "DEF 14A",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000036/nvda-20260512.htm"
+      },
+      "10-K": {
+        "form": "10-K",
+        "filed": "2026-02-25",
+        "report_date": "2026-01-25",
+        "items": [],
+        "description": "10-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/nvda-20260125.htm"
+      },
+      "S-3": {
+        "form": "S-3",
+        "filed": "2023-02-28",
+        "report_date": null,
+        "items": [],
+        "description": "S-3",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581023000021/nvidia-formsx3.htm"
+      }
+    },
+    "events": [
+      {
+        "form": "8-K",
+        "filed": "2026-09-03",
+        "report_date": "2026-09-02",
+        "items": [
+          "8.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000078/nvda-20260902.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-08-26",
+        "report_date": "2026-08-26",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/nvda-20260826.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-08-17",
+        "report_date": "2026-08-17",
+        "items": [
+          "1.01",
+          "2.03",
+          "7.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000069/nvda-20260817.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-07-02",
+        "report_date": "2026-06-28",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000060/nvda-20260628.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-06-30",
+        "report_date": "2026-06-24",
+        "items": [
+          "5.07"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000056/nvda-20260624.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-06-18",
+        "report_date": "2026-06-15",
+        "items": [
+          "8.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000119312526275783/d48176d8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-05-20",
+        "report_date": "2026-05-20",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000051/nvda-20260520.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-05-08",
+        "report_date": "2026-05-07",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000028/nvda-20260507.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-04-27",
+        "report_date": "2026-04-24",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000026/nvda-20260424.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-03-06",
+        "report_date": "2026-03-02",
+        "items": [
+          "5.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000024/nvda-20260302.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-02-25",
+        "report_date": "2026-02-25",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000019/nvda-20260225.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-01-23",
+        "report_date": "2026-01-20",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000003/nvda-20260120.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-11-19",
+        "report_date": "2025-11-19",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000228/nvda-20251119.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-08-27",
+        "report_date": "2025-08-27",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000207/nvda-20250827.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-08-05",
+        "report_date": "2025-07-31",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000197/nvda-20250731.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-07-01",
+        "report_date": "2025-06-25",
+        "items": [
+          "5.07"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000179/nvda-20250625.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-05-28",
+        "report_date": "2025-05-28",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000115/nvda-20250528.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-04-15",
+        "report_date": "2025-04-09",
+        "items": [
+          "8.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000082/nvda-20250409.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-03-07",
+        "report_date": "2025-03-03",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000039/nvda-20250303.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-02-26",
+        "report_date": "2025-02-26",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000021/nvda-20250226.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-01-17",
+        "report_date": "2025-01-13",
+        "items": [
+          "8.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000007/nvda-20250113.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2024-11-20",
+        "report_date": "2024-11-20",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581024000315/nvda-20241120.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2024-11-07",
+        "report_date": "2024-11-07",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581024000300/nvda-20241107.htm"
+      }
+    ],
+    "events_cover_since": "2024-10-07",
+    "cybersecurity_incidents": [],
+    "auditor_changes": [],
+    "non_reliance": [],
+    "insider_forms_last_90_days": 17,
+    "financials": [
+      {
+        "tag": "us-gaap:Revenues",
+        "label": "Revenue",
+        "value": 215938000000,
+        "unit": "USD",
+        "period_start": "2025-01-27",
+        "period_end": "2026-01-25",
+        "form": "10-K",
+        "filed": "2026-02-25",
+        "accession": "0001045810-26-000021",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/Revenues.json"
+      },
+      {
+        "tag": "us-gaap:NetIncomeLoss",
+        "label": "Net income (loss)",
+        "value": 120067000000,
+        "unit": "USD",
+        "period_start": "2025-01-27",
+        "period_end": "2026-01-25",
+        "form": "10-K",
+        "filed": "2026-02-25",
+        "accession": "0001045810-26-000021",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetIncomeLoss.json"
+      },
+      {
+        "tag": "us-gaap:Assets",
+        "label": "Total assets",
+        "value": 206803000000,
+        "unit": "USD",
+        "period_start": null,
+        "period_end": "2026-01-25",
+        "form": "10-K",
+        "filed": "2026-02-25",
+        "accession": "0001045810-26-000021",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/Assets.json"
+      }
+    ]
+  },
+  "lei": {
+    "lei": "549300S4KLFTLO7GSQ80",
+    "facts": [
+      {
+        "key": "lei.lei",
+        "label": "Legal Entity Identifier",
+        "value": "549300S4KLFTLO7GSQ80",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.legal_name",
+        "label": "Legal name",
+        "value": "NVIDIA CORPORATION",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.other_names",
+        "label": "Other and previous names",
+        "value": [],
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.jurisdiction",
+        "label": "Jurisdiction",
+        "value": "US-DE",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.legal_form",
+        "label": "Legal form (ISO 20275 code)",
+        "value": "XTIQ",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.registry",
+        "label": "Business registry (GLEIF registration authority code)",
+        "value": "RA000602",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.registry_number",
+        "label": "Number in that registry",
+        "value": "2862596",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.entity_status",
+        "label": "Entity status",
+        "value": "ACTIVE",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.created",
+        "label": "Entity created",
+        "value": "1998-02-24T00:00:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.legal_address",
+        "label": "Legal address (city, region, country)",
+        "value": "WILMINGTON, US-DE, US",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.headquarters",
+        "label": "Headquarters (city, region, country)",
+        "value": "SANTA CLARA, US-CA, US",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.registration_status",
+        "label": "LEI registration status",
+        "value": "ISSUED",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.first_registered",
+        "label": "LEI first registered",
+        "value": "2013-04-09T17:39:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.last_updated",
+        "label": "LEI record last updated",
+        "value": "2026-01-07T01:29:18Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.next_renewal",
+        "label": "LEI next renewal due",
+        "value": "2027-02-06T17:45:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      },
+      {
+        "key": "lei.corroboration",
+        "label": "How the LEI issuer corroborated the record",
+        "value": "FULLY_CORROBORATED",
+        "source": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+      }
+    ],
+    "direct_parent": null,
+    "ultimate_parent": null
+  },
+  "dns": [
+    {
+      "key": "dns.dnssec",
+      "label": "Zone signed with DNSSEC and validated",
+      "value": false,
+      "source": "dns:nvidia.com A/DS"
+    },
+    {
+      "key": "dns.mta_sts",
+      "label": "MTA-STS record",
+      "value": null,
+      "source": "dns:_mta-sts.nvidia.com TXT"
+    },
+    {
+      "key": "dns.mta_sts_mode",
+      "label": "MTA-STS policy mode",
+      "value": null,
+      "source": "https://mta-sts.nvidia.com/.well-known/mta-sts.txt"
+    },
+    {
+      "key": "dns.tls_rpt",
+      "label": "SMTP TLS reporting record",
+      "value": null,
+      "source": "dns:_smtp._tls.nvidia.com TXT"
+    },
+    {
+      "key": "dns.bimi",
+      "label": "BIMI record",
+      "value": "v=BIMI1; l=https://www.nvidia.com/content/dam/logos/nvidia_corporation.svg; a=https://www.nvidia.com/content/dam/logos/nvidia_corporation.pem;",
+      "source": "dns:default._bimi.nvidia.com TXT"
+    },
+    {
+      "key": "dns.dmarc_policy",
+      "label": "DMARC policy",
+      "value": "reject",
+      "source": "dns:_dmarc.nvidia.com TXT"
+    }
+  ],
+  "entity": {
+    "id": "trooth:entity:lei:549300S4KLFTLO7GSQ80",
+    "name": "NVIDIA CORPORATION",
+    "identifiers": [
+      "trooth:lei:549300S4KLFTLO7GSQ80",
+      "trooth:cik:0001045810"
+    ],
+    "basis": "the LEI binding is corroborated and so is the SEC filer binding"
+  },
+  "certificates": {
+    "source": "https://api.certspotter.com/v1/issuances?domain=nvidia.com&expand=issuer",
+    "unexpired": 7,
+    "issuers": [
+      "DigiCert",
+      "Amazon Trust Services"
+    ],
+    "newest_issued": "2026-09-20T00:00:00Z",
+    "soonest_expiry": "2026-11-03T23:59:59Z",
+    "page_full": false
+  },
+  "security_txt": null,
+  "sanctions": null,
+  "sam": {
+    "source": "https://api.sam.gov/entity-information/v4",
+    "read_at": "2026-10-07T04:10:00.000Z",
+    "names_checked": [
+      "NVIDIA CORPORATION"
+    ],
+    "registrations": [
+      {
+        "uei": "ABCDEFG12345",
+        "cage": "1A2B3",
+        "legal_name": "NVIDIA CORPORATION",
+        "status": "Active",
+        "expires": "2027-05-01",
+        "purpose": "All Awards"
+      }
+    ],
+    "exclusions": []
+  },
+  "patents": {
+    "source": "https://api.uspto.gov/api/v1/patent/applications/search",
+    "read_at": "2026-10-07T04:10:00.000Z",
+    "applicant_names": [
+      "NVIDIA CORPORATION"
+    ],
+    "applications": 12345,
+    "recent": [
+      {
+        "application": "19000001",
+        "title": "Example invention",
+        "filed": "2026-09-01",
+        "status": "Docketed New Case - Ready for Examination",
+        "patent": null,
+        "granted": null
+      }
+    ]
+  },
+  "registries": [
+    {
+      "jurisdiction": "US-NY",
+      "registry": "New York Department of State, active corporations",
+      "source": "https://data.ny.gov/resource/n9v6-gdp6.json?dos_id=4986044",
+      "id": "4986044",
+      "name": "NVIDIA CORPORATION",
+      "status": "Active",
+      "entity_type": "FOREIGN BUSINESS CORPORATION",
+      "formed": "2016-08-01",
+      "formation_jurisdiction": "Delaware"
+    },
+    {
+      "jurisdiction": "US-CO",
+      "registry": "Colorado Secretary of State, business entities",
+      "source": "https://data.colorado.gov/resource/4ykn-tg5h.json?entityid=20011213457",
+      "id": "20011213457",
+      "name": "NVIDIA CORPORATION",
+      "status": "Good Standing",
+      "entity_type": "FPC",
+      "formed": "2001-11-06",
+      "formation_jurisdiction": "DE"
+    },
+    {
+      "jurisdiction": "US-CT",
+      "registry": "Connecticut Secretary of the State, business registry",
+      "source": "https://data.ct.gov/resource/n7gp-d28j.json?accountnumber=2340400",
+      "id": "2340400",
+      "name": "NVIDIA CORPORATION",
+      "status": "Active",
+      "entity_type": "Stock",
+      "formed": "2021-09-09",
+      "formation_jurisdiction": "DELAWARE"
+    },
+    {
+      "jurisdiction": "US-OR",
+      "registry": "Oregon Secretary of State, active businesses",
+      "source": "https://data.oregon.gov/resource/tckn-sxa6.json?registry_number=4781894",
+      "id": "4781894",
+      "name": "NVIDIA CORPORATION",
+      "status": "Active",
+      "entity_type": "FOREIGN BUSINESS CORPORATION",
+      "formed": "2001-11-05",
+      "formation_jurisdiction": "DE"
+    }
+  ],
+  "merger_review": {
+    "source": "https://api.ftc.gov/v0/hsr-early-termination-notices",
+    "read_at": "2026-10-07T03:59:41.451Z",
+    "names_checked": [
+      "NVIDIA CORPORATION"
+    ],
+    "notices": [
+      {
+        "transaction": "20260110",
+        "date": "2025-12-18",
+        "acquiring": "NVIDIA Corporation",
+        "acquired": "Intel Corporation",
+        "acquired_entities": [
+          "Intel Corporation"
+        ],
+        "role": "acquiring",
+        "url": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20260110"
+      },
+      {
+        "transaction": "20170732",
+        "date": "2017-02-17",
+        "acquiring": "Harvey C. Jones",
+        "acquired": "NVIDIA Corporation",
+        "acquired_entities": [
+          "NVIDIA Corporation"
+        ],
+        "role": "acquired",
+        "url": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20170732"
+      },
+      {
+        "transaction": "20170034",
+        "date": "2016-10-25",
+        "acquiring": "Tench Coxe",
+        "acquired": "NVIDIA Corporation",
+        "acquired_entities": [
+          "NVIDIA Corporation"
+        ],
+        "role": "acquired",
+        "url": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20170034"
+      },
+      {
+        "transaction": "20030828",
+        "date": "2003-08-15",
+        "acquiring": "nVIDIA Corporation",
+        "acquired": "MediaQ, Inc.",
+        "acquired_entities": [
+          "MediaQ, Inc."
+        ],
+        "role": "acquiring",
+        "url": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20030828"
+      }
+    ],
+    "matched_in_search": 5
+  },
+  "domain_registration": {
+    "source": "https://rdap.org/domain/nvidia.com",
+    "registrar": "SafeNames Ltd.",
+    "registered": "1993-04-20",
+    "changed": "2025-04-01",
+    "expires": "2034-04-21",
+    "transferred": null,
+    "status": [
+      "client delete prohibited",
+      "client transfer prohibited",
+      "server delete prohibited",
+      "server transfer prohibited",
+      "server update prohibited"
+    ]
+  },
+  "changes": [
+    {
+      "kind": "merger_review",
+      "date": "2025-12-18",
+      "detail": "HSR transaction 20260110: acquiring person NVIDIA Corporation, acquired person Intel Corporation; the FTC granted early termination of the waiting period. A filing can be for voting securities as well as a whole company.",
+      "source": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20260110"
+    },
+    {
+      "kind": "merger_review",
+      "date": "2017-02-17",
+      "detail": "HSR transaction 20170732: acquiring person Harvey C. Jones, acquired person NVIDIA Corporation; the FTC granted early termination of the waiting period. A filing can be for voting securities as well as a whole company.",
+      "source": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20170732"
+    },
+    {
+      "kind": "merger_review",
+      "date": "2016-10-25",
+      "detail": "HSR transaction 20170034: acquiring person Tench Coxe, acquired person NVIDIA Corporation; the FTC granted early termination of the waiting period. A filing can be for voting securities as well as a whole company.",
+      "source": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20170034"
+    },
+    {
+      "kind": "merger_review",
+      "date": "2003-08-15",
+      "detail": "HSR transaction 20030828: acquiring person nVIDIA Corporation, acquired person MediaQ, Inc.; the FTC granted early termination of the waiting period. A filing can be for voting securities as well as a whole company.",
+      "source": "https://www.ftc.gov/legal-library/browse/early-termination-notices/20030828"
+    },
+    {
+      "kind": "renamed",
+      "date": "2002-06-04",
+      "detail": "filed with the SEC as NVIDIA CORP/CA from 1998-05-07 to 2002-06-04",
+      "source": "https://data.sec.gov/submissions/CIK0001045810.json"
+    },
+    {
+      "kind": "domain_registered",
+      "date": "1993-04-20",
+      "detail": "the domain was registered; registrar SafeNames Ltd.",
+      "source": "https://rdap.org/domain/nvidia.com"
+    }
+  ],
+  "subjects": [
+    {
+      "id": "trooth:domain:nvidia.com",
+      "kind": "domain",
+      "basis": "the domain read"
+    },
+    {
+      "id": "trooth:entity:lei:549300S4KLFTLO7GSQ80",
+      "kind": "entity",
+      "basis": "a corroborated binding (entity)"
+    },
+    {
+      "id": "trooth:cik:0001045810",
+      "kind": "sec_filer",
+      "basis": "binding status: corroborated"
+    },
+    {
+      "id": "trooth:lei:549300S4KLFTLO7GSQ80",
+      "kind": "lei",
+      "basis": "binding status: corroborated"
+    },
+    {
+      "id": "trooth:jurisdiction:US-DE",
+      "kind": "jurisdiction",
+      "basis": "the LEI record's jurisdiction (https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80)"
+    },
+    {
+      "id": "trooth:registry:US-NY:4986044",
+      "kind": "state_registry",
+      "basis": "a name match in the New York Department of State, active corporations; not an identification"
+    },
+    {
+      "id": "trooth:registry:US-CO:20011213457",
+      "kind": "state_registry",
+      "basis": "a name match in the Colorado Secretary of State, business entities; not an identification"
+    },
+    {
+      "id": "trooth:registry:US-CT:2340400",
+      "kind": "state_registry",
+      "basis": "a name match in the Connecticut Secretary of the State, business registry; not an identification"
+    },
+    {
+      "id": "trooth:registry:US-OR:4781894",
+      "kind": "state_registry",
+      "basis": "a name match in the Oregon Secretary of State, active businesses; not an identification"
+    },
+    {
+      "id": "trooth:uei:ABCDEFG12345",
+      "kind": "sam_uei",
+      "basis": "a name match in SAM.gov registrations; not an identification"
+    },
+    {
+      "id": "trooth:api:developer.nvidia.com",
+      "kind": "api",
+      "basis": "linked from the home page (https://developer.nvidia.com/)"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://nvidia.com/",
+      "status": 200,
+      "sha256": "68135e6bd47c135d15757deb6657945a63cfa15ddc3e0b49f96b01a5454795f3",
+      "bytes": 745539,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:36.939Z"
+    },
+    {
+      "url": "https://data.sec.gov/submissions/CIK0001045810.json",
+      "status": 200,
+      "sha256": "0b3ce6a0cd78c43d69b19b7efb9effcd79d0c6bd4c43606aac84d0f872cc9c73",
+      "bytes": 159785,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:37.906Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+      "status": 200,
+      "sha256": "e9b2ce25e35f73f913d1a8d2f1f8daaf3c49ccab2e02e903f31943bc64447250",
+      "bytes": 4975,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:38.075Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/Revenues.json",
+      "status": 200,
+      "sha256": "a110a9c6472ec39a5a7d10c6064e9794f2285a5153ec77215b33736f2ff20a63",
+      "bytes": 42315,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:38.228Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/SalesRevenueNet.json",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T03:59:38.372Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetIncomeLoss.json",
+      "status": 200,
+      "sha256": "adc6c1e85f24848df63d82926f0c9ca9fd55c4fd7d6babe5db57a4f197898685",
+      "bytes": 46902,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:38.463Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/Assets.json",
+      "status": 200,
+      "sha256": "9463cb6fa2408fa323a52436a9718cd7a32a58180f2b13b833a34d1b2e3742a8",
+      "bytes": 18802,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:38.745Z"
+    },
+    {
+      "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/nvda-20260125.htm",
+      "status": 200,
+      "sha256": "354ee7d51d16e5213a59fa7197984427122dd4899e6d755ea135874ff3515f44",
+      "bytes": 262144,
+      "complete": false,
+      "fetched_at": "2026-10-07T03:59:38.898Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=NVIDIA%20CORP&page%5Bsize%5D=100",
+      "status": 200,
+      "sha256": "9529f57e4c829b74b61db8e17818683835b776c77ac7053ff33a9741355bba54",
+      "bytes": 441,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:38.981Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=NVIDIA&page%5Bsize%5D=100",
+      "status": 200,
+      "sha256": "9cefc6c0d67d06730f9c1d021fbea26383dff598136f99952d0219611d314d07",
+      "bytes": 59036,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:39.548Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80",
+      "status": 200,
+      "sha256": "2e21d35803b1e578556036ef7ac01c320165ab85be2b9a42f45d6cb47cba0e32",
+      "bytes": 3281,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:40.267Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80/direct-parent",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T03:59:40.519Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80/ultimate-parent",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T03:59:40.762Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=nvidia.com&type=A&do=1",
+      "status": 200,
+      "sha256": "b1f795909e8f963bf2aa527d2519dc708883acae6ffd1f2ed348c2268a897010",
+      "bytes": 185,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.022Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=nvidia.com&type=DS&do=1",
+      "status": 200,
+      "sha256": "e5eca7f0c2358868d1abb428b3ea8b576e2b22842ba000d85725305aa7d084a3",
+      "bytes": 1122,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.023Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_mta-sts.nvidia.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "8112aad23e73c1d638953990e18662e530972802d257b62341e0cf60a4bfb4e9",
+      "bytes": 257,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.024Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_smtp._tls.nvidia.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "5858d0beb6af4947624cd68a2cfb69ecab6815a747f2277b248b3edfcfa23687",
+      "bytes": 259,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.024Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=default._bimi.nvidia.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "0979761fda78f110d79bbd1f953932fd17413f176107cdd1956bfeeec3aef58d",
+      "bytes": 348,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.025Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_dmarc.nvidia.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "b40cdbde67c1de7efcd6dfcd89cdf2e7c79da40b964edf3e4266ac64ade4a1b0",
+      "bytes": 257,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.026Z"
+    },
+    {
+      "url": "https://nvidia.com/.well-known/security.txt",
+      "status": 403,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T03:59:41.143Z"
+    },
+    {
+      "url": "https://api.certspotter.com/v1/issuances?domain=nvidia.com&expand=issuer",
+      "status": 200,
+      "sha256": "560287bcd54904dff5ef1b54935a4215686b47dca636ca9a4ca07795b39fcbb6",
+      "bytes": 4167,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.284Z"
+    },
+    {
+      "url": "https://api.ftc.gov/v0/hsr-early-termination-notices?api_key=REDACTED&filter%5Btitle%5D%5Boperator%5D=CONTAINS&filter%5Btitle%5D%5Bvalue%5D=NVIDIA&sort=-date&page%5Blimit%5D=50",
+      "status": 200,
+      "sha256": "fad330594a764bfd57260cfa3a19b74f2b376ab0452fc319ca8e17c24894afdb",
+      "bytes": 6727,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:41.451Z"
+    },
+    {
+      "url": "https://data.ny.gov/resource/n9v6-gdp6.json?$where=upper(current_entity_name)%20in%20('NVIDIA%20CORPORATION')&$limit=20",
+      "status": 200,
+      "sha256": "0f0580859026d63b05cd2580179434966373c3fa7d2190576cede2c0c56c2802",
+      "bytes": 519,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:43.546Z"
+    },
+    {
+      "url": "https://data.colorado.gov/resource/4ykn-tg5h.json?$where=upper(entityname)%20in%20('NVIDIA%20CORPORATION')&$limit=20",
+      "status": 200,
+      "sha256": "ea607332f9334bc8d40f7929d00caaa4cbab9f4f022524fde9b07cef81d8d5f3",
+      "bytes": 682,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:43.840Z"
+    },
+    {
+      "url": "https://data.ct.gov/resource/n7gp-d28j.json?$where=upper(name)%20in%20('NVIDIA%20CORPORATION')&$limit=20",
+      "status": 200,
+      "sha256": "ae946dd52ce9564c0491cb0c0b725a87cac6e3b108a4e3a59fc29bc36d051d2e",
+      "bytes": 982,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:44.233Z"
+    },
+    {
+      "url": "https://data.oregon.gov/resource/tckn-sxa6.json?$where=upper(business_name)%20in%20('NVIDIA%20CORPORATION')&$limit=20",
+      "status": 200,
+      "sha256": "d7f8340a0ba3078185b2ab0ad73ffce97c3181c1e072579f88eb2c260ae6ab75",
+      "bytes": 1520,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:44.744Z"
+    },
+    {
+      "url": "https://rdap.org/domain/nvidia.com",
+      "status": 200,
+      "sha256": "d0acdb0b1aa54f8e3fe75ff304a270afd9cf8885eb16a1369895fc8d41b81c32",
+      "bytes": 2863,
+      "complete": true,
+      "fetched_at": "2026-10-07T03:59:45.594Z"
+    }
+  ],
+  "not_read": [
+    {
+      "source": "https://nvidia.com/.well-known/security.txt",
+      "reason": "the site answered 403"
+    },
+    {
+      "source": "OFAC sanctions list",
+      "reason": "the list could not be read"
+    },
+    {
+      "source": "Investor relations, sustainability and trust-center pages",
+      "reason": "linked from the home page when found (site.links), not read: they are often served behind bot protection, and a page that cannot be read is never guessed at"
+    },
+    {
+      "source": "Trademark registrations",
+      "reason": "not read in this version"
+    },
+    {
+      "source": "State business registries beyond New York, Colorado, Connecticut and Oregon",
+      "reason": "not read: the other states publish no open-data registry with a common query interface"
+    }
+  ],
+  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. A sanctions entry, a SAM.gov exclusion, a state registry entry or a merger notice with the same name is not an identification. Nothing here grades, rates or ranks the company. Trooth signs a statement that names this reading by its SHA-256 and logs it; the signature says what Trooth read and when, not that what the sources say is true."
+}

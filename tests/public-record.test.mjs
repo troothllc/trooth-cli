@@ -158,3 +158,19 @@ test('a changed record, a forged signature, a compromised key or a bad log proof
     assert.match(r.out, /compromised/);
   } finally { srv.close(); }
 });
+
+test('0.12.0 sections: SAM.gov, patents, state registries, merger review, the domain, changes and subjects', async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'nvidia.com'], port);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /SAM\.gov\s+NVIDIA CORPORATION UEI ABCDEFG12345 \(Active, expires 2027-05-01\)/);
+    assert.match(r.out, /patents\s+12,345 applications with first applicant NVIDIA CORPORATION/);
+    assert.match(r.out, /registries\s+US-NY 4986044 Active, formed in Delaware · US-CO 20011213457 Good Standing/);
+    assert.match(r.out, /mergers\s+\d+ FTC early termination notices? naming NVIDIA CORPORATION/);
+    assert.match(r.out, /domain\s+registered 1993-04-20 · registrar SafeNames Ltd\./);
+    assert.match(r.out, /changes\s+\d+ recorded, newest first:/);
+    assert.match(r.out, /filed with the SEC as NVIDIA CORP\/CA from 1998-05-07 to 2002-06-04/);
+    assert.match(r.out, /subjects\s+trooth:domain:nvidia\.com, trooth:entity:lei:549300S4KLFTLO7GSQ80/);
+  } finally { srv.close(); }
+});

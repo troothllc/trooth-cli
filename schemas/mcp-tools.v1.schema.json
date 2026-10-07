@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/mcp-tools.v1.schema.json",
+  "title": "McpToolsReading",
+  "description": "The tool list of an MCP server as Trooth read it with no credentials, each tool's description and definition hashed. Served at https://api.trooth.co/scan/mcp-tools/reading?endpoint=<url>. A statement naming the reading is signed and logged as an mcp_tools entry when the manifest changed. docs/EVIDENCE.md section 9 in trooth-cli is the normative text. A hash says what was listed, not that a tool does what its description says.",
+  "type": "object",
+  "required": [
+    "format",
+    "endpoint",
+    "subject_id",
+    "read_at",
+    "server",
+    "tools",
+    "manifest_sha256",
+    "previous",
+    "changed",
+    "note"
+  ],
+  "properties": {
+    "format": {
+      "type": "string",
+      "description": "The format.",
+      "const": "trooth.mcp-tools.v1"
+    },
+    "endpoint": {
+      "type": "string",
+      "description": "The MCP endpoint read (streamable HTTP)."
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "trooth:mcp:<host and path>.",
+      "pattern": "^trooth:mcp:.+$"
+    },
+    "read_at": {
+      "type": "string",
+      "description": "When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+    },
+    "server": {
+      "$ref": "#/$defs/McpServer",
+      "description": "What the server said about itself in initialize."
+    },
+    "tools": {
+      "type": "array",
+      "description": "Every tool listed, sorted by name, at most 500.",
+      "items": {
+        "$ref": "#/$defs/ToolHash"
+      }
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "description": "SHA-256, hex, of the RFC 8785 bytes of [{name, definition_sha256}] sorted by name.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "previous": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PreviousManifest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The manifest of the reading before this one, or null for the first."
+    },
+    "changed": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ManifestDiff"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Tools added, removed or changed since the previous reading, or null for the first."
+    },
+    "note": {
+      "type": "string",
+      "description": "What the reading is and is not."
+    },
+    "last_checked": {
+      "type": "string",
+      "description": "When Trooth last read the server and found this manifest. Served beside the reading; not part of the bytes it names."
+    },
+    "signed": {
+      "$ref": "#/$defs/McpToolsSigned",
+      "description": "The statement naming the reading, and its log receipt. Not part of the bytes it names."
+    }
+  },
+  "$defs": {
+    "McpServer": {
+      "title": "McpServer",
+      "type": "object",
+      "description": "The server's own description.",
+      "required": [
+        "name",
+        "version",
+        "protocol_version"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "serverInfo.name."
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "serverInfo.version."
+        },
+        "protocol_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The protocol version agreed."
+        }
+      }
+    },
+    "ToolHash": {
+      "title": "ToolHash",
+      "type": "object",
+      "description": "One tool as listed.",
+      "required": [
+        "name",
+        "title",
+        "description",
+        "description_sha256",
+        "definition_sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The tool name."
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The title, from the tool or its annotations."
+        },
+        "description": {
+          "type": "string",
+          "description": "The description as listed (empty when there is none)."
+        },
+        "description_sha256": {
+          "type": "string",
+          "description": "SHA-256, hex, of the description's UTF-8 bytes.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "definition_sha256": {
+          "type": "string",
+          "description": "SHA-256, hex, of the RFC 8785 bytes of the whole tool object as listed.",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "PreviousManifest": {
+      "title": "PreviousManifest",
+      "type": "object",
+      "description": "The reading before.",
+      "required": [
+        "manifest_sha256",
+        "read_at"
+      ],
+      "properties": {
+        "manifest_sha256": {
+          "type": "string",
+          "description": "Its manifest hash.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "read_at": {
+          "type": "string",
+          "description": "When it was read. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z)."
+        }
+      }
+    },
+    "ManifestDiff": {
+      "title": "ManifestDiff",
+      "type": "object",
+      "description": "Tool names by what happened to them.",
+      "required": [
+        "added",
+        "removed",
+        "changed"
+      ],
+      "properties": {
+        "added": {
+          "type": "array",
+          "description": "Tools new in this reading.",
+          "items": {
+            "type": "string",
+            "description": "A tool name."
+          }
+        },
+        "removed": {
+          "type": "array",
+          "description": "Tools no longer listed.",
+          "items": {
+            "type": "string",
+            "description": "A tool name."
+          }
+        },
+        "changed": {
+          "type": "array",
+          "description": "Tools whose definition hash changed.",
+          "items": {
+            "type": "string",
+            "description": "A tool name."
+          }
+        }
+      }
+    },
+    "McpToolsSigned": {
+      "title": "McpToolsSigned",
+      "type": "object",
+      "description": "The statement naming the reading.",
+      "required": [
+        "reading_sha256",
+        "statement",
+        "statement_id",
+        "log",
+        "problem",
+        "logged_at_read"
+      ],
+      "properties": {
+        "reading_sha256": {
+          "type": "string",
+          "description": "SHA-256, hex, of the RFC 8785 bytes of the reading without last_checked and signed.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "statement": {
+          "oneOf": [
+            {
+              "$ref": "witness-statement.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The signed envelope; its payload is an mcp-tools-statement.v1 document. Null when it could not be signed."
+        },
+        "statement_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "trooth:statement:<sha256 of the payload>."
+        },
+        "log": {
+          "oneOf": [
+            {
+              "$ref": "log-receipt.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The receipt of the statement as an mcp_tools entry, or null when it was not logged."
+        },
+        "problem": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What could not be done, or null."
+        },
+        "logged_at_read": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The read_at of the reading that was logged."
+        }
+      }
+    }
+  }
+}

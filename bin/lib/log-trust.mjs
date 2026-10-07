@@ -12,6 +12,15 @@ export const PINNED_LOG_VKEYS = [
   "trooth.co/witness-log/v1+06471ca9+AY9UdmLMbCX5Ib3ksDeoE8x3CburcWGJE9eJiPiYP5sZ",
 ];
 
+// The log's hardware key: an Ed25519 key generated inside AWS Key Management
+// Service that never leaves it (docs/KEY-CEREMONY.md, ceremony v2). Since
+// that ceremony every checkpoint carries a second signature line, by this
+// key, under the same origin; `trooth log checkpoint` reports whether it is
+// there. The software key above stays the key checkpoints and receipts are
+// checked against, and the key the witnesses follow, until a release retires
+// it. null in a release made before the ceremony.
+export const HARDWARE_LOG_VKEY = "trooth.co/witness-log/v1+f4b81466+AcjcIpgAKstxGk9aocMnXweRMG//0mCqvyJXQwc1K+cW";
+
 // The witnesses whose cosignatures `trooth log checkpoint` and `trooth log
 // monitor` count (docs/LOG.md section 7): the staging witnesses of the
 // witness network (witness-network.org) that cosign with Ed25519. A key here

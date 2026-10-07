@@ -102,13 +102,14 @@ import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from '
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
 import { verifyStatement, bundleInputs, makeBundle, BundleError } from './lib/verify.mjs';
-import { openCheckpoint, verifyConsistency, fromB64, toB64, parseVkey, checkReceipt, LOG_ORIGIN } from './lib/tlog.mjs';
-import { PINNED_LOG_VKEYS, PINNED_WITNESSES } from './lib/log-trust.mjs';
+import { openCheckpoint, verifyConsistency, verifyNote, fromB64, toB64, parseVkey, checkReceipt, LOG_ORIGIN } from './lib/tlog.mjs';
+import { PINNED_LOG_VKEYS, PINNED_WITNESSES, HARDWARE_LOG_VKEY } from './lib/log-trust.mjs';
 import { checkCosignatures } from './lib/witness.mjs';
 import { checkCoseReceipt, keysFromKeySet } from './lib/cose.mjs';
 import { canonicalize, canonicalizeRecord, isCanonical } from './lib/jcs.mjs';
 import { keyTrust, keyBytes } from './lib/verify.mjs';
 import { statementId } from './lib/ids.mjs';
+import { hashTool, manifestOf, diffTools, listTools } from './lib/mcp-tools.mjs';
 import { createRequire } from 'node:module';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -225,6 +226,7 @@ const FLAGS = {
   verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
   log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
   'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey'] },
+  'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -278,6 +280,7 @@ ${B}Usage${X}
   trooth log monitor --state <file>   Check the log only grew since the checkpoint in <file>
   trooth log receipt <index>  Fetch and check the COSE receipt (RFC 9942) for one log entry
   trooth public-record <domain>  What the company published to regulators and registries, signed
+  trooth mcp-tools [endpoint]  The MCP servers whose tool lists Trooth logs, or one server's tool hashes
   trooth --help | --version
 
 ${B}Examples${X}
@@ -289,6 +292,7 @@ ${B}Examples${X}
   trooth verify --file saved.json --offline --keys keys.json --mapping 1.0.1.json
   trooth verify trooth.co --save-bundle trooth.co.bundle.json   ${D}# keep every input in one file${X}
   trooth verify --bundle trooth.co.bundle.json                  ${D}# check it later, with no network${X}
+  trooth mcp-tools https://api.trooth.co/public/mcp --live      ${D}# has the server changed its tools since Trooth logged them?${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
@@ -304,22 +308,24 @@ ${B}Flags${X}
                             mapping bytes to one file (refuses to overwrite)
   --bundle <path>           verify: check a saved bundle; sends nothing
   --no-log                  verify: do not ask the witness statement log
-  --log-vkey <key>          verify, log, public-record: check checkpoints against this log key, not the pinned one
+  --log-vkey <key>          verify, log, public-record, mcp-tools: check checkpoints against this log key, not the pinned one
   --state <path>            log monitor: the last checkpoint seen; written when the log only grew
   --witnesses <n>           log checkpoint, log monitor: require cosignatures from n pinned witnesses
   --out <path>              log receipt: write the COSE receipt bytes to a new file
   --cik, --lei, --ticker    public-record: name the SEC filer or LEI to read for the domain
+  --live                    mcp-tools: also read the server's tool list from this machine and compare
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
-  4 lint read incomplete   5 listed, but no witnessed reading in the record   6 withheld
+  4 lint read incomplete; mcp-tools --live: the server could not be read   5 listed, but no witnessed reading in the record   6 withheld
   7 output not delivered: stdout or stderr failed or closed before everything was written
   8 verify: signature does not check, or the key is not trusted
   9 verify: signature checks, but the domain, mapping, manifest, counts or log proof do not match
     log monitor: the log is not an extension of the checkpoint in --state
     log: fewer pinned witnesses cosigned than --witnesses asks; a COSE receipt does not check
     public-record: the record is not the one its statement names, or its log receipt does not check
-  8 also: public-record: the statement's signature or key does not hold
+    mcp-tools: a hash, the statement or its receipt does not match; with --live, the server lists other tools now
+  8 also: public-record, mcp-tools: the statement's signature or key does not hold
   10 verify: a correction Trooth signed and logged withdraws or replaces the statement
 
 ${D}check reads only public, already-published records. No key, no account. It reads
@@ -1516,6 +1522,20 @@ function printPublicRecord(d, sig) {
   if (d.security_txt) out(`  security.txt ${d.security_txt.contacts.join(', ')}${d.security_txt.expired ? ` ${bad('expired')}` : d.security_txt.expires ? ` ${D}(expires ${d.security_txt.expires.slice(0, 10)})${X}` : ''}`);
   if (d.site.links?.length) out(`  linked       ${d.site.links.map((l) => `${l.kind.replace(/_/g, ' ')} ${D}${l.url}${X}`).join(' · ')}`);
   if (d.sanctions) out(`  sanctions    ${d.sanctions.matches.length ? warn(`${d.sanctions.matches.length} OFAC SDN entr${d.sanctions.matches.length === 1 ? 'y' : 'ies'} with the same name: ${d.sanctions.matches.map((x) => `${x.name} (${x.programs})`).join('; ')}. A name match is not an identification.`) : `no OFAC SDN entity with the name ${d.sanctions.names_checked.join(' or ')}`}`);
+  if (d.sam) {
+    const regs = d.sam.registrations.map((x) => `${x.legal_name}${x.uei ? ` UEI ${x.uei}` : ''}${x.status ? ` (${x.status}${x.expires ? `, expires ${x.expires}` : ''})` : ''}`);
+    out(`  SAM.gov      ${regs.length ? regs.join('; ') : `no registration named ${d.sam.names_checked.join(' or ')}`} ${D}(read ${fmtDate(d.sam.read_at)})${X}`);
+    if (d.sam.exclusions.length) out(`               ${warn(`${d.sam.exclusions.length} exclusion record${d.sam.exclusions.length === 1 ? '' : 's'} with the same name: ${d.sam.exclusions.map((x) => `${x.name} (${[x.agency, x.type, x.record_status].filter(Boolean).join(', ')})`).join('; ')}. A name match is not an identification.`)}`);
+  }
+  if (d.patents) out(`  patents      ${num(d.patents.applications)} application${d.patents.applications === 1 ? '' : 's'} with first applicant ${d.patents.applicant_names.join(' or ')}${d.patents.recent[0] ? ` · newest ${d.patents.recent[0].application}${d.patents.recent[0].title ? ` "${d.patents.recent[0].title}"` : ''}${d.patents.recent[0].filed ? ` filed ${d.patents.recent[0].filed}` : ''}` : ''}`);
+  if (Array.isArray(d.registries) && d.registries.length) out(`  registries   ${d.registries.map((x) => `${x.jurisdiction} ${x.id}${x.status ? ` ${x.status}` : ''}${x.formation_jurisdiction ? `, formed in ${x.formation_jurisdiction}` : ''}`).join(' · ')} ${D}(exact-name matches)${X}`);
+  if (d.merger_review) out(`  mergers      ${d.merger_review.notices.length ? `${d.merger_review.notices.length} FTC early termination notice${d.merger_review.notices.length === 1 ? '' : 's'} naming ${d.merger_review.names_checked.join(' or ')}${d.merger_review.notices[0].date ? `, newest ${d.merger_review.notices[0].date}` : ''}` : `no FTC early termination notice names ${d.merger_review.names_checked.join(' or ')}`}`);
+  if (d.domain_registration) out(`  domain       registered ${d.domain_registration.registered || 'date not given'}${d.domain_registration.registrar ? ` · registrar ${d.domain_registration.registrar}` : ''}${d.domain_registration.expires ? ` · expires ${d.domain_registration.expires}` : ''}`);
+  if (Array.isArray(d.changes) && d.changes.length) {
+    out(`  changes      ${d.changes.length} recorded, newest first:`);
+    for (const c of d.changes.slice(0, 5)) out(`               ${c.date || 'undated'}  ${c.detail}`);
+  }
+  if (Array.isArray(d.subjects) && d.subjects.length) out(`  ${D}subjects     ${d.subjects.map((x) => x.id).join(', ')}${X}`);
   if (Array.isArray(d.sources)) out(`  ${D}sources      ${d.sources.length} responses read, each kept by its SHA-256${X}`);
   out(`  ${D}not read     ${d.not_read.map((x) => x.source).join('; ')}${X}`);
   if (sig) {
@@ -1523,6 +1543,135 @@ function printPublicRecord(d, sig) {
     out(`  signature    ${line}${sig.log?.vkey_source ? ` ${D}(log key ${sig.log.vkey_source})${X}` : ''}`);
   }
   out(`\n${D}${d.note}${X}`);
+}
+
+/* ------------------------------------------------------------ mcp-tools ---- */
+
+const MCP_TOOLS_STATEMENT = 'trooth.mcp-tools.v1';
+
+/**
+ * Check a signed statement envelope against Trooth's key list: RFC 8785
+ * bytes, Ed25519, the signer inside the bytes is the envelope key, and the
+ * key was trusted when the statement was issued. Returns {status, reason, key}.
+ */
+async function checkEnvelope(st, statementType) {
+  let p;
+  try { p = JSON.parse(String(st.payload)); } catch { return { status: 'not_trusted', reason: 'the statement payload is not JSON', key: null, payload: null }; }
+  if (p?.statement !== statementType) return { status: 'not_trusted', reason: `the payload is not a ${statementType} statement`, key: null, payload: p };
+  if (st.alg !== 'Ed25519' || st.canonicalization !== 'RFC8785' || !isCanonical(st.payload)) return { status: 'not_trusted', reason: 'the statement is not RFC 8785 bytes signed with Ed25519', key: null, payload: p };
+  if (p.signer?.key_id !== st.key_id || p.signer?.issuer !== 'trooth.co') return { status: 'not_trusted', reason: 'the signer inside the statement is not the envelope key', key: null, payload: p };
+  let keys;
+  try {
+    const kr = await getFrom(API, '/public/keys', MAX_BODY_SMALL);
+    if (kr.status !== 200) throw new Error(`HTTP ${kr.status}`);
+    keys = parseJsonBody(kr).keys;
+  } catch (e) { return { status: 'unsigned', reason: `the key list could not be read, so the signature was not checked: ${e.message}`, key: st.key_id, payload: p }; }
+  const published = (Array.isArray(keys) ? keys : []).find((k) => k && k.kid === st.key_id);
+  const m = /^ed25519:([A-Za-z0-9+/]+={0,2})$/.exec(String(st.signature));
+  const { createPublicKey, verify: edVerify } = await import('node:crypto');
+  let valid = false;
+  try { valid = !!(m && published && edVerify(null, Buffer.from(st.payload, 'utf8'), createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: keyBytes(published).toString('base64url') }, format: 'jwk' }), Buffer.from(m[1], 'base64'))); } catch { valid = false; }
+  if (!valid) return { status: 'not_trusted', reason: 'the signature does not check against the published key', key: st.key_id, payload: p };
+  const kt = keyTrust(st.key_id, keys, typeof p.issued_at === 'string' ? p.issued_at : null);
+  if (!kt.trusted) return { status: 'not_trusted', reason: kt.reason, key: st.key_id, payload: p };
+  return { status: 'signed', reason: null, key: st.key_id, payload: p };
+}
+
+/** Check an MCP tool reading (docs/EVIDENCE.md section 9). */
+async function checkMcpReading(d, flags) {
+  const res = { status: 'unsigned', reason: null, key: null, statement_id: null, log: null, hashes: 'checked' };
+  for (const t of d.tools) {
+    if (createHash('sha256').update(t.description, 'utf8').digest('hex') !== t.description_sha256) return { ...res, status: 'mismatch', hashes: 'mismatch', reason: `the description of ${t.name} is not the one its hash names` };
+  }
+  if (manifestOf(d.tools) !== d.manifest_sha256) return { ...res, status: 'mismatch', hashes: 'mismatch', reason: 'the manifest hash is not the hash of the tools listed' };
+  const { signed, last_checked, ...reading } = d;
+  void last_checked;
+  if (!signed) return { ...res, reason: 'the reading carries no signed block' };
+  const sha = createHash('sha256').update(canonicalizeRecord(reading), 'utf8').digest('hex');
+  if (sha !== signed.reading_sha256) return { ...res, status: 'mismatch', reason: 'the reading is not the one the statement names: its SHA-256 differs' };
+  const st = signed.statement;
+  if (!st) return { ...res, reason: signed.problem || 'the reading was not signed' };
+  res.statement_id = statementId(st.payload);
+  const env = await checkEnvelope(st, MCP_TOOLS_STATEMENT);
+  res.key = env.key;
+  if (env.status !== 'signed') return { ...res, status: env.status, reason: env.reason };
+  const p = env.payload;
+  const named = JSON.stringify((p.tools || []).map((t) => [t.name, t.description_sha256, t.definition_sha256]));
+  const listed = JSON.stringify(d.tools.map((t) => [t.name, t.description_sha256, t.definition_sha256]));
+  if (p.reading_sha256 !== sha || p.manifest_sha256 !== d.manifest_sha256 || p.endpoint !== d.endpoint || p.read_at !== d.read_at || named !== listed) return { ...res, status: 'mismatch', reason: 'the statement names another reading' };
+  if (signed.log) {
+    let { vkeys, source } = logVkeys(flags);
+    if (!vkeys.length) {
+      const v = await getFrom(LOG_BASE, '/vkey', 4096);
+      vkeys = v.status === 200 ? [v.text.trim()] : [];
+      source = 'served by the log (not pinned in this release)';
+    }
+    const r = checkReceipt({ kind: 'mcp_tools', statement: st, receipt: signed.log, vkeys });
+    res.log = { ...r, vkey_source: source };
+    if (r.status !== 'included') return { ...res, status: 'mismatch', reason: `the log receipt does not check: ${r.reason}` };
+  }
+  return { ...res, status: 'signed', reason: signed.log ? `signed by ${st.key_id}, and entry ${signed.log.index} of the log` : `signed by ${st.key_id}; ${signed.problem || 'not logged'}` };
+}
+
+async function mcpToolsCmd() {
+  const { flags, positional } = parseArgs('mcp-tools');
+  if (positional.length > 1) fail(EXIT.USAGE, 'trooth mcp-tools takes at most one <endpoint>. Try: trooth mcp-tools https://api.trooth.co/public/mcp');
+  try {
+    if (!positional.length) {
+      if (flags['--live']) fail(EXIT.USAGE, '--live needs an <endpoint>.');
+      const r = await getFrom(API, '/scan/mcp-tools', MAX_BODY_SMALL);
+      if (r.status !== 200) throw new Upstream(`the MCP tool index answered HTTP ${r.status}`, { http_status: r.status });
+      const d = parseJsonBody(r);
+      if (asJson) { emitJson(d); return EXIT.OK; }
+      out(`${B}MCP servers whose tool lists Trooth logs${X}`);
+      for (const e of d.endpoints || []) out(`  ${e.endpoint}  ${e.manifest_sha256 ? `${e.tools} tools · manifest ${e.manifest_sha256.slice(0, 16)}… · read ${fmtDate(e.read_at)}${e.log_index !== null ? ` · log entry ${e.log_index}` : ''}` : `${A}not read yet${X}`}`);
+      out(`\n${D}Check one, and compare it with what the server lists now: trooth mcp-tools <endpoint> --live${X}`);
+      return EXIT.OK;
+    }
+    let ep;
+    try { ep = new URL(positional[0]); } catch { fail(EXIT.USAGE, `${positional[0]} is not a URL.`); }
+    const loopback = ep.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(ep.hostname);
+    if ((ep.protocol !== 'https:' && !loopback) || ep.username || ep.password || ep.hash) fail(EXIT.USAGE, 'the endpoint is an https URL (or http on this machine) with no credentials and no fragment.');
+    const r = await getFrom(API, `/scan/mcp-tools/reading?endpoint=${encodeURIComponent(positional[0])}`, MAX_BODY_SMALL * 4);
+    if (r.status === 404) fail(EXIT.FINDING, `Trooth has no reading of ${positional[0]}. The servers it reads: trooth mcp-tools`);
+    if (r.status !== 200) throw new Upstream(`the MCP tool reading answered HTTP ${r.status}`, { http_status: r.status });
+    const d = parseJsonBody(r);
+    if (d?.format !== 'trooth.mcp-tools.v1' || !Array.isArray(d.tools)) throw new Upstream('the answer is not an MCP tool reading');
+    const sig = await checkMcpReading(d, flags);
+    let live = null;
+    if (flags['--live']) {
+      try {
+        const l = await listTools(positional[0], { userAgent: `trooth-cli/${VERSION}` });
+        const now = l.tools.map(hashTool);
+        const diff = diffTools(d.tools, now);
+        live = { tools: now.length, manifest_sha256: manifestOf(now), same: manifestOf(now) === d.manifest_sha256, ...diff, server: { name: l.server.name ?? null, version: l.server.version ?? null } };
+      } catch (e) { live = { error: e && e.message ? e.message : String(e) }; }
+    }
+    if (asJson) emitJson({ ...d, cli_check: sig, ...(live ? { live } : {}) });
+    else {
+      const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
+      out(`${B}${d.endpoint}${X}  ${D}${d.server.name || 'MCP server'}${d.server.version ? ` ${d.server.version}` : ''}, read ${fmtDate(d.read_at)}${d.last_checked ? `, unchanged when last checked ${fmtDate(d.last_checked)}` : ''}${X}`);
+      out(`  tools      ${d.tools.length} · manifest ${d.manifest_sha256}`);
+      for (const t of d.tools.slice(0, 40)) out(`             ${t.name.padEnd(28)} ${D}description ${t.description_sha256.slice(0, 12)}… definition ${t.definition_sha256.slice(0, 12)}…${X}`);
+      if (d.tools.length > 40) out(`             ${D}and ${d.tools.length - 40} more (--json for all)${X}`);
+      if (d.changed) out(`  since      ${d.previous ? `${fmtDate(d.previous.read_at)}: ` : ''}${[d.changed.added.length ? `added ${d.changed.added.join(', ')}` : '', d.changed.removed.length ? `removed ${d.changed.removed.join(', ')}` : '', d.changed.changed.length ? `changed ${d.changed.changed.join(', ')}` : ''].filter(Boolean).join('; ') || 'no change'}`);
+      out(`  signature  ${sig.status === 'signed' ? ok(sig.reason) : sig.status === 'unsigned' ? warn(sig.reason) : bad(sig.reason)}${sig.log?.vkey_source ? ` ${D}(log key ${sig.log.vkey_source})${X}` : ''}`);
+      if (live) {
+        if (live.error) out(`  live       ${warn(`the server could not be read from here: ${live.error}`)}`);
+        else if (live.same) out(`  live       ${ok('the server lists the same tools now, byte for byte')} ${D}(${live.tools} tools)${X}`);
+        else out(`  live       ${bad('the server lists different tools now')}: ${[live.added.length ? `added ${live.added.join(', ')}` : '', live.removed.length ? `removed ${live.removed.join(', ')}` : '', live.changed.length ? `changed ${live.changed.join(', ')}` : ''].filter(Boolean).join('; ')}`);
+      }
+      out(`\n${D}${d.note}${X}`);
+    }
+    if (sig.status === 'not_trusted') return EXIT.NOT_TRUSTED;
+    if (sig.status === 'mismatch') return EXIT.MISMATCH;
+    if (live && !live.error && !live.same) return EXIT.MISMATCH;
+    if (live && live.error) return EXIT.INCOMPLETE;
+    return EXIT.OK;
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
 }
 
 /* ----------------------------------------------------------------- log ---- */
@@ -1579,6 +1728,25 @@ async function readCheckpoint(flags) {
   let cp = null, why = '';
   for (const k of vkeys) { try { cp = openCheckpoint(r.text, k); break; } catch (e) { why = e.message; } }
   return { cp, why, note: r.text, vkeys, source };
+}
+
+/**
+ * The log's second signature, by its hardware key in AWS KMS (docs/KEY-CEREMONY.md
+ * ceremony v2): checked against the hardware vkey pinned in this release, when one is.
+ * The software key's signature is what makes a checkpoint check; this line says
+ * whether the hardware key signed it too.
+ */
+function hardwareSigned(note, flags) {
+  if (flags['--log-vkey']) return { pinned: false, signed: null, vkey: null, reason: '--log-vkey given; the hardware key was not checked' };
+  if (!HARDWARE_LOG_VKEY) return { pinned: false, signed: null, vkey: null, reason: `no hardware key is pinned in trooth ${VERSION}` };
+  let signed = false;
+  try { signed = !!verifyNote(note, HARDWARE_LOG_VKEY); } catch { signed = false; }
+  return { pinned: true, signed, vkey: HARDWARE_LOG_VKEY, reason: null };
+}
+
+function hardwareLine(h) {
+  if (!h.pinned) return `  hardware   ${D}${h.reason}${X}`;
+  return h.signed ? `  hardware   ${J}also signed by the hardware key${X} ${D}(AWS KMS, ${h.vkey.split('+')[1]})${X}` : `  hardware   ${A}not signed by the hardware key; the software key's signature stands${X}`;
 }
 
 /** --witnesses <n>: how many pinned witnesses must have cosigned. */
@@ -1647,14 +1815,16 @@ async function logCmd() {
     }
     const cos = checkCosignatures(note, PINNED_WITNESSES);
     const cosigned = cos.filter((c) => c.valid).length;
+    const hardware = hardwareSigned(note, flags);
     const witnessDoc = { required: need, cosigned, pinned: cos.length, cosignatures: cos };
     const short = need > cosigned ? `${cosigned} of the pinned witnesses cosigned this checkpoint; --witnesses asked for ${need}` : null;
     const now = { size: Number(cp.size), root: toB64(cp.root), checkpoint: note };
     if (sub === 'checkpoint') {
-      const doc = { log: LOG_ORIGIN, tree_size: now.size, root_hash: now.root, vkey_source: source, witnesses: witnessDoc, problem: short, checkpoint: note };
+      const doc = { log: LOG_ORIGIN, tree_size: now.size, root_hash: now.root, vkey_source: source, hardware_key: hardware, witnesses: witnessDoc, problem: short, checkpoint: note };
       if (asJson) emitJson(doc); else out(`${B}${LOG_ORIGIN}${X}  ${J}checkpoint checks${X}
   tree size  ${now.size}
   root hash  ${now.root}
+${hardwareLine(hardware)}
 ${cosignLines(cos)}${short ? `\n  ${R}${short}${X}` : ''}
   ${D}log key ${source}; witness keys pinned in trooth ${VERSION}${X}`);
       return short ? EXIT.MISMATCH : EXIT.OK;
@@ -1736,12 +1906,13 @@ async function main() {
   if (cmd === 'verify') return verifyCmd();
   if (cmd === 'log') return logCmd();
   if (cmd === 'public-record') return publicRecordCmd();
+  if (cmd === 'mcp-tools') return mcpToolsCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record, mcp-tools.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only

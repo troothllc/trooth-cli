@@ -39,7 +39,7 @@ func NodeHash(l, r []byte) []byte { return h([]byte{1}, l, r) }
 
 // EntryBytes is the exact log entry for a statement: RFC 8785 JSON of {kind, statement}.
 func EntryBytes(kind string, s WitnessStatement) ([]byte, error) {
-	if kind != "witness_statement" && kind != "correction" && kind != "public_record" {
+	if kind != "witness_statement" && kind != "correction" && kind != "public_record" && kind != "mcp_tools" {
 		return nil, fmt.Errorf("unknown log entry kind: %s", kind)
 	}
 	if s.Payload == "" || s.Signature == "" || s.KeyID == "" || s.Alg == "" || s.Canonicalization == "" {
