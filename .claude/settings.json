@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^mcp__.*(send|Stripe__.*write|Vercel__buy)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/bin/trooth.mjs\" guard hook --policy \"${CLAUDE_PROJECT_DIR}/.trooth/guard-policy.yaml\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

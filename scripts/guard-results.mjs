@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const root = new URL('../', import.meta.url);
-const files = ['tests/guard-policy.test.mjs', 'tests/guard.test.mjs', 'tests/guard-cli.test.mjs', 'tests/guard-adapters.test.mjs', 'tests/guard-adversarial.test.mjs', 'tests/guard-model.test.mjs'];
+const files = ['tests/guard-policy.test.mjs', 'tests/guard.test.mjs', 'tests/guard-cli.test.mjs', 'tests/guard-adapters.test.mjs', 'tests/guard-adversarial.test.mjs', 'tests/guard-model.test.mjs', 'tests/guard-fuzz.test.mjs'];
 const runs = {};
 for (const f of files) {
   const t0 = Date.now();
@@ -17,7 +17,7 @@ for (const f of files) {
   const out = r.stdout || '';
   const num = (k) => Number((new RegExp(`^# ${k} (\\d+)$`, 'm').exec(out) || [])[1] ?? NaN);
   const cases = [...out.matchAll(/^\s*(ok|not ok) \d+ - (.*)$/gm)].map((m) => ({ ok: m[1] === 'ok', name: m[2].replace(/\s+#\s*(SKIP|TODO).*$/, '') })).filter((c) => !/\.mjs$/.test(c.name));
-  runs[f] = { status: r.status, tests: num('tests'), pass: num('pass'), fail: num('fail'), skipped: num('skipped'), todo: num('todo'), cases, seconds: ((Date.now() - t0) / 1000).toFixed(1), model: (/# model: (.*)$/m.exec(out) || [])[1] ?? null };
+  runs[f] = { status: r.status, tests: num('tests'), pass: num('pass'), fail: num('fail'), skipped: num('skipped'), todo: num('todo'), cases, seconds: ((Date.now() - t0) / 1000).toFixed(1), model: (/# model: (.*)$/m.exec(out) || [])[1] ?? null, fuzz: [...out.matchAll(/^#\s*(?:\\#\s*)?fuzz: (.*)$/gm)].map((m) => m[1]) };
 }
 
 let tlc = null;
@@ -73,9 +73,17 @@ TLA+ (spec/GuardDecision.tla with spec/GuardDecision.cfg): ${tlc ? `TLC exit sta
 
 The invariants, in both: allow implies every required check held; source unreachable never yields allow; deny happens only for a failed proof or an absolute rule (or where the customer's policy itself chose deny for no record or no source); missing, stale or disputed evidence alone never denies (TLA+); the same inputs always give the same decision.
 
+## Malformed-input testing (tests/guard-fuzz.test.mjs)
+
+A seeded, deterministic generator (seed ${(/seed (\d+)/.exec(runs['tests/guard-fuzz.test.mjs'].fuzz.join(' ')) || [])[1] ?? 'not reported'}) makes malformed and mutated policies, facts, tool calls, cached bundles and hook input, and checks that parsePolicy returns a policy inside its schema or throws PolicyError within a per-case time bound, that decideFrom never allows facts lacking required evidence, that an offline guard with no cached bundle never allows, that a bundle with its signed bytes changed never allows, and that the hook exits only 0 or 2. Result: ${runs['tests/guard-fuzz.test.mjs'].fail === 0 && runs['tests/guard-fuzz.test.mjs'].pass === runs['tests/guard-fuzz.test.mjs'].tests ? `all ${runs['tests/guard-fuzz.test.mjs'].tests} tests passed` : 'FAILED'}. The lines the run printed:
+
+\`\`\`
+${runs['tests/guard-fuzz.test.mjs'].fuzz.join('\n') || '(none)'}
+\`\`\`
+
 ## What these results do not show
 
-They show that the guard, as written, reaches the stated decisions on these inputs. They are not an outside security review (OPEN) and not evidence of use in production by teams outside Trooth (OPEN).
+They show that the guard, as written, reaches the stated decisions on these inputs. They come from Trooth's internal review gate (docs/GUARD-THREAT-MODEL.md, "Review status"); they are not an outside security review and not evidence of use in production by teams outside Trooth. Both of those are launch-phase items.
 `;
 writeFileSync(new URL('docs/GUARD-RESULTS.md', root), md);
 console.log(`wrote docs/GUARD-RESULTS.md: ${total.pass}/${total.tests} passed${tlc ? `; TLC exit ${tlc.status}` : ''}`);

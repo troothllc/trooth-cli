@@ -1,0 +1,13 @@
+# Trooth-run pilot policy: procurement agent, live Trooth API
+policy: pilot-procurement
+version: 1
+applies_to:
+  tools: ["create_purchase_order"]
+host_from: ["vendor_url", "url", "domain"]
+log: { required: true, min_witnesses: 0 }
+rules:
+  - id: signed-reading
+    require: { claim: trooth_reading }
+    on_fail: hold
+unknown_counterparty: hold
+source_unreachable: hold

@@ -1,0 +1,13 @@
+# Trooth-run pilot policy: payments agent, live Trooth API
+policy: pilot-payments
+version: 1
+applies_to:
+  tools: ["create_payout", "stripe.create_payout"]
+host_from: ["url", "endpoint", "host", "domain", "base_url", "webhook_url", "email", "to"]
+log: { required: true, min_witnesses: 0 }
+rules:
+  - id: signed-reading
+    require: { claim: trooth_reading }
+    on_fail: hold
+unknown_counterparty: hold
+source_unreachable: hold

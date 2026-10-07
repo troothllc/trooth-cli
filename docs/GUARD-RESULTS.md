@@ -1,18 +1,19 @@
 # Guard results
 
-Written by `node scripts/guard-results.mjs --tlc <tla2tools.jar>` on 2026-10-07T20:43:15.088Z (Node v22.22.0), from an actual run of the files below. Do not edit by hand; run the script again.
+Written by `node scripts/guard-results.mjs --tlc <tla2tools.jar>` on 2026-10-07T23:31:44.767Z (Node v22.22.0), from an actual run of the files below. Do not edit by hand; run the script again.
 
 ## Test files
 
 | File | Tests | Pass | Fail | Skipped | Seconds |
 |---|---|---|---|---|---|
 | tests/guard-policy.test.mjs | 15 | 15 | 0 | 0 | 0.2 |
-| tests/guard.test.mjs | 25 | 25 | 0 | 0 | 1.3 |
-| tests/guard-cli.test.mjs | 9 | 9 | 0 | 0 | 6.4 |
+| tests/guard.test.mjs | 25 | 25 | 0 | 0 | 1.2 |
+| tests/guard-cli.test.mjs | 10 | 10 | 0 | 0 | 6.1 |
 | tests/guard-adapters.test.mjs | 26 | 26 | 0 | 0 | 0.2 |
-| tests/guard-adversarial.test.mjs | 11 | 11 | 0 | 0 | 0.6 |
-| tests/guard-model.test.mjs | 5 | 5 | 0 | 0 | 7.6 |
-| all | 91 | 91 | 0 | 0 | |
+| tests/guard-adversarial.test.mjs | 11 | 11 | 0 | 0 | 0.5 |
+| tests/guard-model.test.mjs | 5 | 5 | 0 | 0 | 7.7 |
+| tests/guard-fuzz.test.mjs | 10 | 10 | 0 | 0 | 10.9 |
+| all | 102 | 102 | 0 | 0 | |
 
 ## Adversarial suite (tests/guard-adversarial.test.mjs)
 
@@ -42,11 +43,11 @@ TLA+ (spec/GuardDecision.tla with spec/GuardDecision.cfg): TLC exit status 0. Th
 
 ```
 TLC2 Version 2026.10.06.014338 (rev: 94d0c50)
-Finished computing initial states: 26873856 distinct states generated at 2026-10-07 20:42:28.
+Finished computing initial states: 26873856 distinct states generated at 2026-10-07 23:30:58.
 Model checking completed. No error has been found.
 53747712 states generated, 26873856 distinct states found, 0 states left on queue.
 The depth of the complete state graph search is 1.
-Finished in 02min 13s at (2026-10-07 20:43:13)
+Finished in 02min 07s at (2026-10-07 23:31:42)
 ```
 
 As a check that the invariants can fail, the same run model-checked a mutant of the spec with the absolute-rule branch removed (MaxRules = 1). TLC exit status 12:
@@ -57,6 +58,19 @@ Error: Invariant AllowOnlyWithEvidence is violated by the initial state:
 
 The invariants, in both: allow implies every required check held; source unreachable never yields allow; deny happens only for a failed proof or an absolute rule (or where the customer's policy itself chose deny for no record or no source); missing, stale or disputed evidence alone never denies (TLA+); the same inputs always give the same decision.
 
+## Malformed-input testing (tests/guard-fuzz.test.mjs)
+
+A seeded, deterministic generator (seed 20261007) makes malformed and mutated policies, facts, tool calls, cached bundles and hook input, and checks that parsePolicy returns a policy inside its schema or throws PolicyError within a per-case time bound, that decideFrom never allows facts lacking required evidence, that an offline guard with no cached bundle never allows, that a bundle with its signed bytes changed never allows, and that the hook exits only 0 or 2. Result: all 10 tests passed. The lines the run printed:
+
+```
+policies 41849 cases (seed 20261007): 3802 accepted and inside the schema, 38040 refused with PolicyError; by kind seed 20, byte-flip 13527, truncation 13527, random-bytes 2500, structural 8000, duplicate-key 1000, prototype-key 150, lookalike 2500, deep-nesting 606, huge-string 12, not-text 7
+facts 30000 cases: 2437 allow (each with every required piece of evidence), 20798 hold, 6063 deny, 702 refused with an error (malformed now); no allow without the evidence: true
+offline guard, empty cache: 9748 tool calls and hosts: 2252 not covered (null), 3476 hold, 272 deny, 0 allow expected; failures 0
+cached bundles 800 cases: 759 with signed bytes changed (none allowed), 19 allowed with only unsigned fields changed; failures 0
+hook 64 runs: exit 0 20 (8 silent, each for a tool the policy does not cover; the rest ask), exit 2 44, any other exit 0
+total 82461 cases in 10.7 s
+```
+
 ## What these results do not show
 
-They show that the guard, as written, reaches the stated decisions on these inputs. They are not an outside security review (OPEN) and not evidence of use in production by teams outside Trooth (OPEN).
+They show that the guard, as written, reaches the stated decisions on these inputs. They come from Trooth's internal review gate (docs/GUARD-THREAT-MODEL.md, "Review status"); they are not an outside security review and not evidence of use in production by teams outside Trooth. Both of those are launch-phase items.

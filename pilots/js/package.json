@@ -1,0 +1,13 @@
+{
+  "name": "trooth-guard-pilots",
+  "private": true,
+  "type": "module",
+  "description": "Trooth-run pilot integrations of the Trooth guard (imported from this repository) against the real framework packages, in a test harness. .github/workflows/guard-pilots.yml installs the latest published versions of these packages before each run.",
+  "dependencies": {
+    "@langchain/core": "latest",
+    "@langchain/langgraph": "latest",
+    "@openai/agents": "latest",
+    "langchain": "latest",
+    "zod": "latest"
+  }
+}

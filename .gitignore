@@ -12,3 +12,5 @@ coverage/
 __pycache__/
 *.pyc
 *.egg-info/
+pilots/logs/
+pilots/py/.venv/
