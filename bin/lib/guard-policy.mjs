@@ -22,8 +22,8 @@ export const KNOWN_CLAIMS = [
   'no_sam_exclusion_name_match',
   'domain_registration_record',
   'security_txt_published',
-  // Named so a policy that asks for it reads, but it is not a signed claim
-  // today: a rule requiring it always finds it missing (hold).
+  // Since 0.14.0, from a confirmed proof of domain control in the signed
+  // public record (guard-evidence.mjs domainControl, docs/GUARD.md section 4).
   'domain_control_confirmed',
 ];
 export const CHECK_CLAIM = /^check:[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;

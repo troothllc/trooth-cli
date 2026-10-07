@@ -9,6 +9,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { loadSchemas, makeValidator } from './lib/mini-schema.mjs';
 import { formatId, parseId, statementId } from '../bin/lib/ids.mjs';
 import { canonicalize, isCanonical, CanonicalizationError } from '../bin/lib/jcs.mjs';
+import { generateDeclarationKey, buildDeclaration } from '../bin/lib/declaration.mjs';
 
 const schemaDir = new URL('../schemas/', import.meta.url);
 const schemas = loadSchemas(schemaDir);
@@ -20,7 +21,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 16);
+  assert.equal(Object.keys(schemas).length, 17);
   // The guard decision keeps the $id the brief published for it (docs/GUARD.md).
   const publishedIds = { 'guard-decision.v1.schema.json': 'https://trooth.co/schemas/guard-decision.v1.json' };
   for (const [f, s] of Object.entries(schemas)) {
@@ -210,4 +211,42 @@ test('contact ids: security.txt contacts in canonical form (docs/IDS.md 1.4)', (
   assert.equal(parseId(`trooth:contact:${'a'.repeat(490)}.example.com`), null, 'longer than 500 characters');
   const r = { subjects: [{ id: 'trooth:contact:mailto:psirt@widget.example', kind: 'representative', basis: 'a contact the site publishes in security.txt; not a person authorized to act for the entity' }, { id: 'trooth:key:trooth-master-2026-09', kind: 'signing_authority', basis: "the key that signed this reading's statement" }] };
   for (const s of r.subjects) assert.ok(parseId(s.id), s.id);
+});
+
+test('0.14.0: proofs, the declaration, the new subject kinds, continuity kinds and evidence classes validate; values outside their enums do not', () => {
+  const r = JSON.parse(readFileSync(new URL('./fixtures/public-record/proofs.example.json', import.meta.url), 'utf8'));
+  ok('public-record.v1.schema.json', r, 'a reading with proofs and a declaration');
+  ok('public-record.v1.schema.json', { ...r, declaration: null }, 'a reading that did not look for a declaration');
+  for (const s of r.subjects) assert.ok(parseId(s.id), s.id);
+  for (const p of r.proofs) for (const b of p.binds) assert.ok(parseId(b), b);
+  const bad = (v, label) => assert.notDeepEqual(validate('public-record.v1.schema.json', v), [], label);
+  bad({ ...r, proofs: [{ ...r.proofs[0], proof_method: 'trusted' }] }, 'an unknown proof method');
+  bad({ ...r, proofs: [{ ...r.proofs[0], status: 'verified' }] }, 'an unknown proof status');
+  bad({ ...r, proofs: [{ ...r.proofs[0], binds: [r.proofs[0].binds[0]] }] }, 'a proof binding one subject');
+  bad({ ...r, declaration: { ...r.declaration, status: 'trusted' } }, 'an unknown declaration status');
+  bad({ ...r, bindings: [{ ...r.bindings[0], proof_method: 'self_asserted' }] }, 'an unknown binding proof method');
+  ok('public-record.v1.schema.json', { ...r, bindings: r.bindings.map((b) => ({ ...b, proof_method: 'domain_signed_declaration' })) }, 'a new proof method on a binding');
+});
+
+test('a declaration trooth declare sign writes validates against declaration.v1, and one with a private key or an extra member does not', () => {
+  const k = generateDeclarationKey();
+  const d = buildDeclaration({ domain: 'acme.com', privateJwk: k.privateJwk, record: 'https://trooth.co/network/company/acme', products: [{ id: 'widget', name: 'Widget', url: 'https://acme.com/widget' }], apis: [{ base_url: 'https://api.acme.com', mcp: { url: 'https://api.acme.com/mcp', manifest_sha256: 'a'.repeat(64) } }], repositories: ['https://github.com/acme'] });
+  ok('declaration.v1.schema.json', d, 'a signed declaration');
+  assert.notDeepEqual(validate('declaration.v1.schema.json', { ...d, keys: [{ ...d.keys[0], d: k.privateJwk.d }] }), [], 'a private key');
+  assert.notDeepEqual(validate('declaration.v1.schema.json', { ...d, extra: 1 }), [], 'an extra member');
+  assert.notDeepEqual(validate('declaration.v1.schema.json', { ...d, products: [{ id: 'Widget', name: 'W', url: 'https://acme.com/' }] }), [], 'a product id outside the pattern');
+});
+
+test('company, product and person ids, and a company key id (docs/IDS.md 1.5)', () => {
+  assert.equal(formatId('company', 'Acme-Cloud'), 'trooth:company:acme-cloud');
+  assert.equal(formatId('product', 'ACME.com/widget'), 'trooth:product:acme.com/widget');
+  assert.equal(formatId('person', '3f9a0c2b7d1e4a65'), 'trooth:person:3f9a0c2b7d1e4a65');
+  assert.deepEqual(parseId('trooth:key:acme.com#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k'), { type: 'key', value: 'acme.com#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k' });
+  assert.deepEqual(parseId('trooth:key:trooth-master-2026-09'), { type: 'key', value: 'trooth-master-2026-09' });
+  for (const bad of ['trooth:company:-acme', 'trooth:company:acme-', 'trooth:company:Acme', 'trooth:company:acme.com', `trooth:company:${'a'.repeat(65)}`,
+    'trooth:product:acme.com', 'trooth:product:acme.com/Widget', 'trooth:product:ACME.com/widget', 'trooth:product:acme.com/-w', 'trooth:product:acme.com/a/b',
+    'trooth:person:3F9A0C2B7D1E4A65', 'trooth:person:3f9a0c2b7d1e4a6', 'trooth:person:3f9a0c2b7d1e4a650', 'trooth:person:jane.doe',
+    'trooth:key:acme.com#short', 'trooth:key:Acme.com#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k', 'trooth:key:acme#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k']) assert.equal(parseId(bad), null, bad);
+  assert.throws(() => formatId('person', 'Jane Doe'));
+  assert.throws(() => formatId('product', 'acme.com'));
 });

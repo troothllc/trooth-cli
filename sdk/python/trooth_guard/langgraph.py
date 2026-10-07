@@ -48,6 +48,7 @@ def guard_node(
     command: Optional[Callable[..., Any]] = None,
     deny_goto: Optional[str] = None,
     hold_goto: Optional[str] = None,
+    tools_goto: Optional[str] = None,
     on_decision: Optional[Callable[[dict], None]] = None,
     **decide_kw: Any,
 ) -> Callable[[Any], Any]:
@@ -59,6 +60,11 @@ def guard_node(
         interrupt = _interrupt
     if (deny_goto or hold_goto) and command is None:
         raise TypeError("deny_goto and hold_goto need command (langgraph.types.Command)")
+    # LangGraph runs a node's static edges in addition to a returned Command's goto,
+    # so a static edge to the tool node would also run after a routed deny. Routing
+    # needs tools_goto, no static edge from this node, and destinations declared.
+    if (deny_goto or hold_goto) and not tools_goto:
+        raise TypeError("deny_goto and hold_goto need tools_goto, and the graph must have no static edge from this node")
 
     def update(decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
         return {decisions_key: decisions} if decisions_key else {}
@@ -90,6 +96,8 @@ def guard_node(
                 if hold_goto:
                     return command(goto=hold_goto, update=update(decisions))
                 raise GuardHold(held[0]["decision"])
+        if tools_goto:
+            return command(goto=tools_goto, update=update(decisions))
         return update(decisions)
 
     return trooth_guard_node

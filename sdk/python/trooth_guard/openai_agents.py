@@ -148,6 +148,8 @@ def needs_approval(
 
     async def policy(run_context: Any, params: Dict[str, Any], call_id: str) -> bool:
         d = await asyncio.to_thread(decide, policy_path, tool_name, None, params, **decide_kw)
+        if d is None:
+            return False  # the policy does not cover this tool; nothing was decided
         if on_decision:
             on_decision(d)
         return d["decision"] == "hold"

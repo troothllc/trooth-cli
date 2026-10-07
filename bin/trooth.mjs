@@ -63,6 +63,14 @@
 //                           to Trooth; the action never is. `hook` is a Claude Code
 //                           PreToolUse hook; `ci` fails a build that adds a destination
 //                           the policy does not list; `cache` saves bundles for offline use.
+//   trooth declare init|sign|check
+//                           The domain-signed declaration (docs/DECLARATION.md): make
+//                           an Ed25519 key kept on this machine, sign the document a
+//                           company publishes at https://<domain>/.well-known/trooth.json
+//                           (its key, products, APIs and repositories), and check one,
+//                           read from the site (no redirects, 64 KB at most) or a file,
+//                           with the optional key pin at _trooth-key.<domain> read over
+//                           DNS over HTTPS. Nothing secret is printed.
 //   trooth --help           Show help.   trooth --version  Show version.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
@@ -100,6 +108,13 @@
 //                               the log is not an extension of the saved checkpoint)
 //  10  superseded              (new in 0.9.0, verify: everything held, and a correction
 //                               Trooth signed and logged withdraws or replaces the statement)
+//  11  expired                 (new in 0.14.0, declare check: the declaration checks in every
+//                               other way, and its expires_at has passed)
+//   declare check also uses 0 (it checks), 1 (the site answers 404 or 410: no declaration),
+//   3 (the site or DNS could not be read), 8 (the signature does not check, or its kid is
+//   not one of the keys) and 9 (any other rule fails: wrong domain, a URL on another host,
+//   more than 400 days, oversize, not JSON, a redirect; or the DNS pin names another key).
+//   declare init and sign use 0 and 2 (including a refusal to overwrite a file).
 //   verify also uses 4 (a mapping or manifest was not supplied, so the binding is only
 //   partially checked) and 5 (the record carries no signed statement).
 //  20  guard hold              (new with trooth guard, guard decide: route the action to a person)
@@ -112,7 +127,7 @@
 // With --json, stdout carries exactly one JSON document and nothing else. Every
 // diagnostic goes to stderr.
 
-import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { unitsOf, InvalidDeclaration, ENCRYPTION, encryptionState, regionsIn, credentialLiterals, opensToAnyAddress, markedPublic, referenceText } from './lib/declarations.mjs';
 import { createHash } from 'node:crypto';
 import { verifyStatement, bundleInputs, makeBundle, BundleError } from './lib/verify.mjs';
@@ -128,6 +143,9 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { loadPolicy as loadGuardPolicy, createGuard, PolicyError } from './lib/guard.mjs';
 import { addedLines, scanLines } from './lib/guard-ci.mjs';
+import { generateDeclarationKey, readPrivateJwk, publicJwkOf, buildDeclaration, checkDeclaration, fetchDeclaration, readKeyPin, pinStatus, pinLine, isSignatureProblem, DeclarationError, DECLARATION_PATH, MAX_VALIDITY_DAYS, DEFAULT_VALIDITY_DAYS, DOH_URL, keyIdFor, jwkThumbprint } from './lib/declaration.mjs';
+import { ID_TYPES } from './lib/ids.mjs';
+import { homedir } from 'node:os';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
 // The record projection, GET /api/network/profile, is served by the website:
@@ -145,7 +163,7 @@ const require = createRequire(import.meta.url);
 let VERSION = '0.11.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10, GUARD_HOLD: 20, GUARD_DENY: 21, GUARD_CI_FOUND: 22 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10, EXPIRED: 11, GUARD_HOLD: 20, GUARD_DENY: 21, GUARD_CI_FOUND: 22 };
 
 // Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -244,6 +262,7 @@ const FLAGS = {
   log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
   'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey'] },
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
+  declare: { bool: ['--json', '--no-dns'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
   guard: { bool: ['--json', '--offline'], value: ['--policy', '--tool', '--host', '--args', '--cache', '--max-age', '--base', '--log-vkey', '--timeout-ms'], multi: ['--witness'] },
 };
 
@@ -306,6 +325,9 @@ ${B}Usage${X}
   trooth guard hook --policy <file>   Claude Code PreToolUse hook (reads the hook JSON on stdin)
   trooth guard ci --policy <file> [--base <ref>] [paths...]   Fail a build that adds an unlisted destination
   trooth guard cache --policy <file> --cache <dir> <domain>...   Save signed bundles for offline decisions
+  trooth declare init --domain <d> [--key <path>]   Make the Ed25519 key for your domain's declaration
+  trooth declare sign --domain <d> --key <path> --out <file>   Sign /.well-known/trooth.json
+  trooth declare check <domain> | --file <path>   Check a domain's signed declaration and its DNS pin
   trooth --help | --version
 
 ${B}Examples${X}
@@ -346,6 +368,11 @@ ${B}Flags${X}
   --offline                 guard decide, hook: read only cached bundles; none means hold
   --base <ref>              guard ci: compare HEAD with this ref (default origin/main)
   --witness <vkey>          guard: a witness cosigner key to count, in place of the pinned ones (repeatable)
+  --domain, --key           declare: the domain, and the private JWK (init default ~/.trooth/declaration-key/<domain>.jwk)
+  --product id=name=url     declare sign: a product (repeatable); --api base_url[,mcp_url,manifest_sha256],
+                            --repo <url>, --add-key <jwk> (a second key, for rotation) repeat too
+  --record <url>, --days N  declare sign: the company's Trooth record; validity in days (default 365, at most 400)
+  --file <path>, --no-dns   declare check: check a saved file; do not read the _trooth-key TXT pin
 
 ${B}Exit codes${X}
   0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
@@ -359,6 +386,8 @@ ${B}Exit codes${X}
     mcp-tools: a hash, the statement or its receipt does not match; with --live, the server lists other tools now
   8 also: public-record, mcp-tools: the statement's signature or key does not hold
   10 verify: a correction Trooth signed and logged withdraws or replaces the statement
+  11 declare check: the declaration expired; 8 its signature or key does not hold; 9 another rule fails
+     or the DNS pin names another key; 1 the site publishes none; 3 the site or DNS could not be read
   20 guard decide: hold (route the action to a person)   21 guard decide: deny
   22 guard ci: the change adds a destination host the policy does not list
      guard hook follows Claude Code instead: 0 allow or ask (the JSON on stdout says which), 2 deny
@@ -1579,6 +1608,26 @@ function printPublicRecord(d, sig) {
     const read = d.evidence_classes.filter((c) => c.read);
     if (read.length) out(`  ${D}freshness    ${read.map((c) => `${c.class.replace(/_/g, ' ')} until ${String(c.stale_after).slice(0, 10)}`).join('; ')}${X}`);
   }
+  if (d.declaration === null) out(`  ${D}declaration  not looked for in this reading${X}`);
+  else if (d.declaration && typeof d.declaration === 'object') {
+    const dc = d.declaration;
+    const label = dc.status === 'checked' ? ok('checked') : dc.status === 'absent' ? `${D}absent${X}` : dc.status === 'not_read' ? warn('not read') : bad(dc.status);
+    const parts = [];
+    if (dc.status === 'checked' || dc.status === 'expired') {
+      parts.push(`key${dc.keys.length === 1 ? '' : 's'} ${dc.keys.join(', ')}`, dc.key_pinned_by_dns ? 'pinned by DNS' : 'not pinned by DNS');
+      if (dc.expires_at) parts.push(`${dc.status === 'expired' ? 'expired' : 'valid until'} ${String(dc.expires_at).slice(0, 10)}`);
+      parts.push(`${dc.products.length} product${dc.products.length === 1 ? '' : 's'}, ${dc.apis.length} API${dc.apis.length === 1 ? '' : 's'}, ${dc.repositories.length} repositor${dc.repositories.length === 1 ? 'y' : 'ies'}`);
+    }
+    if (dc.reason && dc.status !== 'checked') parts.push(dc.reason);
+    out(`  declaration  ${label} ${dc.url} ${D}${parts.length ? `(${parts.join('; ')})` : ''}${X}`);
+  }
+  if (Array.isArray(d.proofs)) {
+    if (!d.proofs.length) out(`  ${D}proofs       none in this reading${X}`);
+    for (const p of d.proofs) {
+      const label = p.status === 'confirmed' ? ok('confirmed') : p.status === 'claimed' ? warn('claimed') : p.status === 'not_found' ? bad('not found') : warn('not read');
+      out(`  proof        ${String(p.proof_method).replace(/_/g, ' ')} ${label} ${D}${(p.binds || []).join(' to ')}: ${p.detail} (${p.source}${p.observed_at ? `, ${String(p.observed_at).slice(0, 10)}` : ''})${X}`);
+    }
+  }
   if (Array.isArray(d.subjects) && d.subjects.length) out(`  ${D}subjects     ${d.subjects.map((x) => x.id).join(', ')}${X}`);
   if (Array.isArray(d.sources)) out(`  ${D}sources      ${d.sources.length} responses read, each kept by its SHA-256${X}`);
   out(`  ${D}not read     ${d.not_read.map((x) => x.source).join('; ')}${X}`);
@@ -2090,6 +2139,188 @@ async function guardCmd() {
   return EXIT.OK;
 }
 
+/* -------------------------------------------------------------- declare ---- */
+
+// The domain-signed declaration (docs/DECLARATION.md): a company signs, with its
+// own Ed25519 key, a document it publishes at https://<domain>/.well-known/trooth.json
+// naming that key, its products, its APIs and its code repositories. `init` makes
+// the key and keeps it on this machine; `sign` writes the document; `check` reads
+// one (from the site, or a file) and checks every rule. Nothing secret is printed.
+
+function declareDomain(raw, flag = '--domain') {
+  const d = String(raw ?? '').trim().toLowerCase().replace(/\.$/, '');
+  if (!d) fail(EXIT.USAGE, `${flag} <domain> is required.`);
+  if (!ID_TYPES.domain.test(d)) fail(EXIT.USAGE, `${flag}: ${String(raw).slice(0, 100)} is not a domain name (lowercase ASCII, IDNA A-labels, no scheme or path).`);
+  return d;
+}
+
+function defaultKeyPath(domain) { return join(homedir(), '.trooth', 'declaration-key', `${domain}.jwk`); }
+
+function readKeyFile(path) {
+  if (!existsSync(path)) fail(EXIT.USAGE, `the key file was not found: ${path}`);
+  let text;
+  try { text = readFileSync(path, 'utf8'); } catch (e) { fail(EXIT.USAGE, `the key file could not be read: ${e && e.code ? e.code : e}`); }
+  try { return readPrivateJwk(text); } catch (e) { fail(EXIT.USAGE, `${path}: ${e.message}`); }
+}
+
+function readPublicJwkFile(path) {
+  if (!existsSync(path)) fail(EXIT.USAGE, `--add-key: file not found: ${path}`);
+  let j;
+  try { j = JSON.parse(readFileSync(path, 'utf8')); } catch { fail(EXIT.USAGE, `--add-key: ${path} is not JSON.`); }
+  try { const pub = publicJwkOf(j); jwkThumbprint(pub); return pub; } catch (e) { fail(EXIT.USAGE, `--add-key: ${path}: ${e.message}`); }
+}
+
+function parseProduct(v) {
+  const i = v.indexOf('=');
+  const rest = i < 0 ? '' : v.slice(i + 1);
+  const j = rest.indexOf('=https://');
+  if (i < 1 || j < 1) fail(EXIT.USAGE, `--product is id=name=url, for example widget=Widget=https://acme.com/widget (got ${v.slice(0, 120)}).`);
+  return { id: v.slice(0, i), name: rest.slice(0, j), url: rest.slice(j + 1) };
+}
+
+function parseApi(v) {
+  const parts = v.split(',');
+  if (parts.length === 1) return { base_url: parts[0] };
+  if (parts.length === 3) return { base_url: parts[0], mcp: { url: parts[1], manifest_sha256: parts[2].toLowerCase() } };
+  fail(EXIT.USAGE, `--api is base_url or base_url,mcp_url,manifest_sha256 (got ${v.slice(0, 160)}).`);
+}
+
+async function declareCmd() {
+  const { flags, positional } = parseArgs('declare');
+  const sub = positional[0];
+  const rest = positional.slice(1);
+  if (!['init', 'sign', 'check'].includes(sub)) fail(EXIT.USAGE, 'trooth declare takes init, sign or check. Try: trooth declare init --domain acme.com');
+  const allowed = { init: ['--json', '--domain', '--key'], sign: ['--json', '--domain', '--key', '--record', '--days', '--out', '--product', '--api', '--repo', '--add-key'], check: ['--json', '--domain', '--file', '--no-dns'] }[sub];
+  for (const f of Object.keys(flags)) if (!allowed.includes(f)) fail(EXIT.USAGE, `${f} is not a flag of \`trooth declare ${sub}\`. Its flags: ${allowed.join(', ')}.`);
+
+  if (sub === 'init') {
+    if (rest.length) fail(EXIT.USAGE, `unexpected argument: ${rest.join(' ')}`);
+    const domain = declareDomain(flags['--domain']);
+    const path = flags['--key'] || defaultKeyPath(domain);
+    if (existsSync(path)) fail(EXIT.USAGE, `${path} already exists; trooth declare init never overwrites a key. Choose another --key path.`);
+    const k = generateDeclarationKey();
+    try {
+      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+      writeFileSync(path, JSON.stringify({ ...k.privateJwk, kid: keyIdFor(domain, k.publicJwk) }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+      chmodSync(path, 0o600);
+    } catch (e) {
+      if (e && e.code === 'EEXIST') fail(EXIT.USAGE, `${path} already exists; trooth declare init never overwrites a key.`);
+      fail(EXIT.USAGE, `the key could not be written to ${path}: ${e && e.code ? e.code : e}`);
+    }
+    const doc = { domain, key_path: path, kid: keyIdFor(domain, k.publicJwk), thumbprint: k.thumbprint, public_jwk: k.publicJwk, pin_txt: pinLine(domain, k.thumbprint) };
+    if (asJson) emitJson(doc);
+    else {
+      out(`${J}key created${X}  ${path} ${D}(mode 0600; the private key never leaves this file)${X}`);
+      out(`  kid          ${doc.kid}`);
+      out(`  next         trooth declare sign --domain ${domain} --key ${path} --out trooth.json`);
+      out(`  ${D}optional DNS pin: ${doc.pin_txt}${X}`);
+    }
+    return EXIT.OK;
+  }
+
+  if (sub === 'sign') {
+    if (rest.length) fail(EXIT.USAGE, `unexpected argument: ${rest.join(' ')}`);
+    const domain = declareDomain(flags['--domain']);
+    if (!flags['--key']) fail(EXIT.USAGE, '--key <path> is required: the private JWK trooth declare init wrote.');
+    if (!flags['--out']) fail(EXIT.USAGE, '--out <file> is required: where to write the signed declaration.');
+    if (existsSync(flags['--out'])) fail(EXIT.USAGE, `--out will not overwrite ${flags['--out']}; choose a new path.`);
+    let days = DEFAULT_VALIDITY_DAYS;
+    if (flags['--days'] !== undefined) {
+      if (!/^[1-9][0-9]{0,3}$/.test(flags['--days']) || Number(flags['--days']) > MAX_VALIDITY_DAYS) fail(EXIT.USAGE, `--days is a whole number from 1 to ${MAX_VALIDITY_DAYS}.`);
+      days = Number(flags['--days']);
+    }
+    const jwk = readKeyFile(flags['--key']);
+    try { if (process.platform !== 'win32' && (statSync(flags['--key']).mode & 0o077)) diag(`note: ${flags['--key']} can be read by other users of this machine; chmod 600 it.`); } catch {}
+    let doc;
+    try {
+      doc = buildDeclaration({
+        domain, privateJwk: jwk, days,
+        record: flags['--record'] ?? null,
+        products: (flags['--product'] || []).map(parseProduct),
+        apis: (flags['--api'] || []).map(parseApi),
+        repositories: flags['--repo'] || [],
+        extraKeys: (flags['--add-key'] || []).map(readPublicJwkFile),
+      });
+    } catch (e) {
+      if (e instanceof DeclarationError) fail(EXIT.USAGE, `the declaration would not check: ${e.message}`);
+      throw e;
+    }
+    const text = JSON.stringify(doc, null, 2) + '\n';
+    try { writeFileSync(flags['--out'], text, { flag: 'wx' }); }
+    catch (e) { fail(EXIT.USAGE, `could not write ${flags['--out']}: ${e && e.code ? e.code : e}`); }
+    const tp = jwkThumbprint(publicJwkOf(jwk));
+    const res = { out: flags['--out'], domain, kid: doc.signature.kid, thumbprint: tp, issued_at: doc.issued_at, expires_at: doc.expires_at, sha256: createHash('sha256').update(text, 'utf8').digest('hex'), publish_at: `https://${domain}${DECLARATION_PATH}`, pin_txt: pinLine(domain, tp) };
+    if (asJson) emitJson(res);
+    else {
+      out(`${J}signed${X}  ${flags['--out']}  ${D}by ${res.kid}, valid until ${res.expires_at}${X}`);
+      out(`  publish at   ${res.publish_at} ${D}(served directly, no redirect, at most 64 KB)${X}`);
+      out(`  ${D}products ${doc.products.length} · apis ${doc.apis.length} · repositories ${doc.repositories.length}${doc.record ? ` · record ${doc.record}` : ''}${X}`);
+      out(`  DNS pin      add this TXT record to bind the key to the zone as well:`);
+      out(`               ${res.pin_txt}`);
+      out(`  then         trooth declare check ${domain}`);
+    }
+    return EXIT.OK;
+  }
+
+  // check
+  if (rest.length > 1) fail(EXIT.USAGE, `trooth declare check takes one <domain>, got: ${rest.join(' ')}`);
+  if (rest.length && flags['--file']) fail(EXIT.USAGE, 'give a <domain> or --file <path>, not both.');
+  if (!rest.length && !flags['--file']) fail(EXIT.USAGE, 'trooth declare check takes a <domain> or --file <path>. Try: trooth declare check acme.com');
+  let r, source, url = null, readFailure = null;
+  if (flags['--file']) {
+    const f = flags['--file'];
+    if (!existsSync(f) || !statSync(f).isFile()) fail(EXIT.USAGE, `not a file: ${f}`);
+    if (statSync(f).size > 10 * 1024 * 1024) fail(EXIT.USAGE, `${f} is far over the 64 KB a declaration may be.`);
+    const domain = flags['--domain'] !== undefined ? declareDomain(flags['--domain']) : null;
+    r = checkDeclaration(readFileSync(f), { domain, now: Date.now() });
+    source = 'file';
+    url = r.domain ? `https://${r.domain}${DECLARATION_PATH}` : null;
+  } else {
+    if (flags['--domain'] !== undefined) fail(EXIT.USAGE, '--domain goes with --file; with a <domain> the document must name the host it is served from.');
+    const domain = declareDomain(rest[0], '<domain>');
+    const got = await fetchDeclaration(domain, { timeoutMs: TIMEOUT_MS, userAgent: `trooth-cli/${VERSION}` });
+    source = 'network'; url = got.url;
+    if (got.status === 'read') r = checkDeclaration(got.bytes, { domain, now: Date.now() });
+    else { readFailure = got; r = { status: got.status, reason: got.reason, problems: got.status === 'invalid' ? [got.reason] : [], signature: 'not_checked', sha256: null, domain, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], record: null, products: [], apis: [], repositories: [], host_checked: true }; }
+  }
+  // The optional zone pin, read over DNS over HTTPS.
+  let pin = { status: 'not_read', name: r.domain ? `_trooth-key.${r.domain}` : null, thumbprints: [], reason: flags['--no-dns'] ? 'not asked (--no-dns)' : 'no domain to ask about' };
+  if (!flags['--no-dns'] && r.domain) pin = await readKeyPin(r.domain, { timeoutMs: TIMEOUT_MS, dohUrl: (process.env.TROOTH_DOH || DOH_URL) });
+  const ps = pinStatus(pin, r.status === 'checked' || r.status === 'expired' ? r.thumbprints : []);
+  const doc = {
+    url, source, status: r.status, reason: r.reason, problems: r.problems, sha256: r.sha256,
+    issued_at: r.issued_at, expires_at: r.expires_at, signature: r.signature, kid: r.kid, keys: r.keys,
+    key_pinned_by_dns: ps.pinned, dns_pin: { name: pin.name, status: pin.status, state: ps.state, thumbprints: pin.thumbprints, reason: pin.reason },
+    host_checked: r.host_checked, record: r.record, products: r.products, apis: r.apis, repositories: r.repositories,
+  };
+  if (r.status === 'checked' && ps.state === 'other_key') doc.problems = [...doc.problems, `${pin.name} pins ${ps.thumbprint}, which is not a key in the declaration`];
+  if (asJson) emitJson(doc);
+  else {
+    const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
+    out(`${B}${r.domain || '(no domain)'}${X}  ${D}declaration ${url || ''}${source === 'file' ? ` (read from ${flags['--file']})` : ''}${X}`);
+    const label = r.status === 'checked' ? ok('checked') : r.status === 'absent' ? warn('absent') : r.status === 'not_read' ? warn('not read') : bad(r.status);
+    out(`  status       ${label}  ${r.reason || ''}`);
+    for (const p of doc.problems.slice(r.status === 'checked' ? 0 : 1)) out(`               ${bad(p)}`);
+    if (source === 'file' && !r.host_checked) out(`  ${D}host         not checked: read from a file; pass --domain to require the domain it names${X}`);
+    if (r.sha256) out(`  ${D}sha256       ${r.sha256}${X}`);
+    if (r.status === 'checked' || r.status === 'expired') {
+      for (const k of r.keys) out(`  key          ${k}`);
+      out(`  DNS pin      ${ps.state === 'matches' ? ok(`${pin.name} pins ${ps.thumbprint}: the key is bound to the zone as well`) : ps.state === 'other_key' ? bad(`${pin.name} pins ${ps.thumbprint}, which is not a key in the declaration`) : ps.state === 'absent' ? `${D}none at ${pin.name}; to add one: ${pinLine(r.domain, r.thumbprints[0])}${X}` : warn(`not read: ${pin.reason}`)}`);
+      if (r.record) out(`  record       ${r.record}`);
+      for (const p of r.products) out(`  product      ${p.id}  ${p.name}  ${D}${p.url}${X}`);
+      for (const a of r.apis) out(`  api          ${a.base_url}${a.mcp ? `  ${D}MCP ${a.mcp.url} manifest sha256 ${a.mcp.manifest_sha256}${X}` : ''}`);
+      for (const x of r.repositories) out(`  repository   ${x}`);
+    }
+    out(`\n${D}A declaration that checks shows that whoever controlled the site's content when it was read published this key and these subjects. It does not establish the legal entity or a person's authority to act for it. No URL inside it was fetched.${X}`);
+  }
+  if (r.status === 'checked') return ps.state === 'other_key' ? EXIT.MISMATCH : EXIT.OK;
+  if (r.status === 'absent') return EXIT.FINDING;
+  if (r.status === 'not_read') return EXIT.UPSTREAM;
+  if (r.status === 'expired') return EXIT.EXPIRED;
+  if (readFailure) return EXIT.MISMATCH;
+  return isSignatureProblem(r) ? EXIT.NOT_TRUSTED : EXIT.MISMATCH;
+}
+
 function guardHookUsage(why) { diag(`trooth guard: ${why}`); return 2; }
 
 /** Set for `trooth guard hook`: Claude Code lets the tool run on any exit but 0 and 2. */
@@ -2105,12 +2336,13 @@ async function main() {
   if (cmd === 'public-record') return publicRecordCmd();
   if (cmd === 'mcp-tools') return mcpToolsCmd();
   if (cmd === 'guard') return guardCmd();
+  if (cmd === 'declare') return declareCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record, mcp-tools, guard.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record, mcp-tools, guard, declare.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only

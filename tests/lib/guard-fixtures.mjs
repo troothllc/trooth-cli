@@ -69,10 +69,10 @@ export function witnessStatement({ domain, signedDomain = domain, readAt = READ_
 }
 
 const BASE_RECORD = JSON.parse(readFileSync(new URL('../fixtures/public-record/apple.com.json', import.meta.url), 'utf8'));
-const CLASSES = [['regulator_filing', ['sec'], 90], ['registry_record', ['lei', 'registries'], 365], ['sanctions_list', ['sanctions'], 7], ['procurement_exclusion', ['sam'], 7], ['domain_registration', ['domain_registration'], 30], ['site_publication', ['site', 'security_txt'], 30]];
+const CLASSES = [['regulator_filing', ['sec'], 90], ['registry_record', ['lei', 'registries'], 365], ['sanctions_list', ['sanctions'], 7], ['procurement_exclusion', ['sam'], 7], ['domain_registration', ['domain_registration'], 30], ['site_publication', ['site', 'security_txt'], 30], ['domain_declaration', ['declaration', 'proofs'], 30], ['trooth_claim_record', ['proofs'], 365]];
 
 /** A public record reading for `domain`, with evidence_classes, before signing. */
-export function publicRecord({ domain, readAt = READ_AT, sanctionsMatches = [], samExclusions = [], entity = true, securityTxt = true, injection = null, classes = true } = {}) {
+export function publicRecord({ domain, readAt = READ_AT, sanctionsMatches = [], samExclusions = [], entity = true, securityTxt = true, injection = null, classes = true, proofs = null } = {}) {
   const r = JSON.parse(JSON.stringify(BASE_RECORD));
   r.domain = domain; r.subject_id = `trooth:domain:${domain}`; r.read_at = readAt;
   r.entity = entity ? { id: 'trooth:entity:lei:HWUPKR0MPOU8FGXBT394', name: injection ?? 'Acme Test Inc.', identifiers: ['trooth:lei:HWUPKR0MPOU8FGXBT394'], basis: 'the LEI binding is corroborated' } : null;
@@ -81,6 +81,7 @@ export function publicRecord({ domain, readAt = READ_AT, sanctionsMatches = [], 
   r.domain_registration = { source: `https://rdap.org/domain/${domain}`, registrar: 'Test Registrar', registered: '2001-01-01', changed: null, expires: '2030-01-01', transferred: null, status: [] };
   r.security_txt = securityTxt ? { url: `https://${domain}/.well-known/security.txt`, contacts: [`mailto:security@${domain}`], expires: '2027-06-21T01:00:00.000Z', expired: false, policy: null, canonical: [], signed: false } : null;
   if (injection) { r.site = { ...r.site, legal_names: [{ name: injection, source: `https://${domain}/` }] }; r.note = injection; }
+  if (proofs) r.proofs = proofs;
   if (classes) r.evidence_classes = CLASSES.map(([c, sections, days]) => ({ class: c, sections, stale_after_days: days, does_not_establish: 'test', read: true, observed_at: readAt, stale_after: new Date(Date.parse(readAt) + days * 86400000).toISOString() }));
   return r;
 }

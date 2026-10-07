@@ -193,7 +193,7 @@ rules:
   const by = Object.fromEntries(d.reasons.map((r) => [r.rule_id, r]));
   for (const id of ['reading', 's1', 'sam', 'rdap', 'txt']) assert.equal(by[id].code, 'RULE_PASSED', id);
   assert.equal(by.s2.code, 'EVIDENCE_MISSING'); assert.equal(by.s2.needed, 'check:S2'); assert.match(by.s2.detail, /not as expected/);
-  assert.equal(by.control.code, 'EVIDENCE_MISSING'); assert.match(by.control.detail, /not in any signed Trooth artifact/);
+  assert.equal(by.control.code, 'EVIDENCE_MISSING'); assert.match(by.control.detail, /holds no proof binding the domain to the company record or to its declaration key/);
   assert.equal(d.decision, 'hold');
   // Ten days later: the SAM.gov answer (procurement_exclusion, 7 days) is stale; the RDAP one (30) is not.
   d = await guardFor(makeWorld({ domains: ACME }), policy, { now: () => NOW + 10 * DAY }).decideToolCall({ name: 'pay', arguments: { domain: 'acme.com' } });
@@ -318,4 +318,99 @@ test('a withheld record with a signed public record still holds: every claim is 
   assert.ok(disputed.length >= 1, JSON.stringify(d.reasons));
   assert.ok(disputed.every((r) => /withheld while a report about it is reviewed/.test(r.detail)));
   assert.ok(!d.reasons.some((r) => r.code === 'RULE_PASSED' && /legal-entity|no-sanctions/.test(r.rule_id)));
+});
+
+/* ---- domain_control_confirmed, from the proofs in the signed public record (docs/GUARD.md section 4) ---- */
+
+const CONTROL = parsePolicy(`policy: control
+version: 1
+applies_to: { tools: ["pay"] }
+rules:
+  - id: control
+    require: { claim: domain_control_confirmed }
+`);
+const TP = 'kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k';
+const proof = (method, status = 'confirmed', other = 'trooth:company:acme', extra = {}) => ({ id: `${method}:1`, binds: ['trooth:domain:acme.com', other], proof_method: method, status, detail: 'test', source: 'trooth record', observed_at: '2026-10-06T12:00:00.000Z', ...extra });
+async function control(proofs, now) {
+  const w = makeWorld({ domains: { 'acme.com': { witness: {}, public: { proofs } } } });
+  const d = valid(await guardFor(w, CONTROL, now ? { now: () => now } : {}).decideToolCall({ name: 'pay', arguments: { domain: 'acme.com' } }));
+  return { d, r: d.reasons.find((x) => x.rule_id === 'control') };
+}
+
+test('domain_control_confirmed: present with each qualifying method, to the company record or to the declaration key', async () => {
+  for (const m of ['dns_txt', 'domain_email_code', 'identity_provider_sign_in', 'domain_signed_declaration']) {
+    for (const other of ['trooth:company:acme', `trooth:key:acme.com#${TP}`]) {
+      const { d, r } = await control([proof(m, 'confirmed', other)]);
+      assert.equal(r.code, 'RULE_PASSED', `${m} ${other}`);
+      assert.equal(d.decision, 'allow');
+      const e = d.evidence.find((x) => x.fact_id.endsWith('#domain_control_confirmed'));
+      assert.ok(e, 'the evidence names the claim');
+      assert.match(e.statement_sha256, /^[0-9a-f]{64}$/);
+      assert.equal(typeof e.log_index, 'number');
+      assert.equal(e.observed_at, '2026-10-06T12:00:00.000Z');
+      const days = other.startsWith('trooth:key:') ? 30 : 365;
+      assert.equal(e.stale_after, iso(Date.parse(e.observed_at) + days * DAY), `${m} ${other}: the stale-after of its evidence class`);
+    }
+  }
+});
+
+test('domain_control_confirmed: absent when the proof is claimed, not_found or not_read', async () => {
+  for (const st of ['claimed', 'not_found', 'not_read']) {
+    const { d, r } = await control([proof('dns_txt', st)]);
+    assert.equal(r.code, 'EVIDENCE_MISSING', st);
+    assert.equal(r.needed, 'domain_control_confirmed');
+    assert.match(r.detail, new RegExp(`dns_txt ${st}`));
+    assert.equal(d.decision, 'hold');
+  }
+});
+
+test('domain_control_confirmed: absent with a method that does not show domain control, or a binding to anything else', async () => {
+  for (const m of ['repository_control', 'registry_record', 'regulator_filing', 'site_statement', 'registry_name_match', 'asked', 'none']) {
+    const { r } = await control([proof(m)]);
+    assert.equal(r.code, 'EVIDENCE_MISSING', m);
+    assert.match(r.detail, /does not show domain control/);
+  }
+  for (const proofs of [
+    [proof('dns_txt', 'confirmed', 'trooth:repo:github.com/acme')],
+    [proof('domain_signed_declaration', 'confirmed', `trooth:key:other.com#${TP}`)],
+    [proof('dns_txt', 'confirmed', 'trooth:key:trooth-master-2026-09')],
+    [{ ...proof('dns_txt'), binds: ['trooth:domain:other.com', 'trooth:company:acme'] }],
+    [{ ...proof('dns_txt'), binds: ['trooth:domain:acme.com'] }],
+    [{ ...proof('dns_txt'), binds: ['trooth:domain:acme.com', 'trooth:company:acme', 'trooth:company:x'] }],
+    [],
+  ]) {
+    const { r } = await control(proofs);
+    assert.equal(r.code, 'EVIDENCE_MISSING', JSON.stringify(proofs));
+  }
+});
+
+test('domain_control_confirmed: stale per evidence class (domain_declaration 30 days, trooth_claim_record 365)', async () => {
+  const key = proof('domain_signed_declaration', 'confirmed', `trooth:key:acme.com#${TP}`);
+  const claim = proof('identity_provider_sign_in', 'confirmed', 'trooth:company:acme');
+  assert.equal((await control([key], NOW + 29 * DAY)).r.code, 'RULE_PASSED');
+  assert.equal((await control([key], NOW + 31 * DAY)).r.code, 'EVIDENCE_STALE', 'a declaration read 31 days ago');
+  assert.equal((await control([claim], NOW + 31 * DAY)).r.code, 'RULE_PASSED', 'the claim record keeps for a year');
+  assert.equal((await control([claim, key], NOW + 31 * DAY)).r.code, 'RULE_PASSED', 'with both, the fresher one counts');
+  const old = { ...claim, observed_at: iso(NOW - 366 * DAY) };
+  assert.equal((await control([old])).r.code, 'EVIDENCE_STALE', 'a claim confirmed 366 days ago');
+  const future = { ...key, observed_at: iso(NOW + 300 * DAY) };
+  const { d } = await control([future], NOW + 31 * DAY);
+  assert.equal(d.reasons[0].code, 'EVIDENCE_STALE', 'an observed_at after the reading counts from the reading, never later');
+});
+
+test('domain_control_confirmed: a rule max_age_days overrides the class; an unsigned record carries none', async () => {
+  const strict = parsePolicy(`policy: control
+version: 1
+applies_to: { tools: ["pay"] }
+rules:
+  - id: control
+    require: { claim: domain_control_confirmed, max_age_days: 7 }
+`);
+  const w = makeWorld({ domains: { 'acme.com': { witness: {}, public: { proofs: [proof('dns_txt')] } } } });
+  const d = await guardFor(w, strict, { now: () => NOW + 10 * DAY }).decideToolCall({ name: 'pay', arguments: { domain: 'acme.com' } });
+  assert.equal(d.reasons[0].code, 'EVIDENCE_STALE');
+  const u = makeWorld({ domains: { 'acme.com': { witness: {}, public: 'unsigned' } } });
+  const d2 = await guardFor(u, CONTROL).decideToolCall({ name: 'pay', arguments: { domain: 'acme.com' } });
+  assert.equal(d2.reasons[0].code, 'EVIDENCE_MISSING');
+  assert.match(d2.reasons[0].detail, /not signed/);
 });

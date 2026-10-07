@@ -71,7 +71,7 @@
       "required": ["claim"],
       "additionalProperties": false,
       "properties": {
-        "claim": { "description": "trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (not a signed claim today, so always missing).", "type": "string", "pattern": "^(trooth_reading|legal_entity_registry_record|no_sanctions_name_match|no_sam_exclusion_name_match|domain_registration_record|security_txt_published|domain_control_confirmed|check:[A-Za-z0-9][A-Za-z0-9_.-]{0,63})$" },
+        "claim": { "description": "trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (since trooth 0.14.0, from a confirmed proof in the signed public record binding the domain to the company record or to its declaration key).", "type": "string", "pattern": "^(trooth_reading|legal_entity_registry_record|no_sanctions_name_match|no_sam_exclusion_name_match|domain_registration_record|security_txt_published|domain_control_confirmed|check:[A-Za-z0-9][A-Za-z0-9_.-]{0,63})$" },
         "max_age_days": { "description": "The oldest observation the rule accepts, in days. Default: the evidence class's stale-after.", "type": "integer", "minimum": 1 }
       }
     },

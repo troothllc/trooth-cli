@@ -32,6 +32,67 @@ class CorrectionReason(BaseModel):
     code: Literal["evaluator_defect", "mapping_defect", "source_misread", "signing_key_compromised", "dispute_upheld", "withdrawn_by_trooth"] = Field(..., description="evaluator_defect: the evaluator read wrongly. mapping_defect: the check mapping was wrong. source_misread: a source was misread. signing_key_compromised: the key that signed it is compromised. dispute_upheld: a dispute about the reading was upheld. withdrawn_by_trooth: withdrawn for another stated reason.")
     explanation: str = Field(..., description="The reason in words, 10 to 1000 characters.")
 
+class DomainDeclaration(BaseModel):
+    "The domain-signed declaration a company publishes at https://<domain>/.well-known/trooth.json (docs/DECLARATION.md): its own Ed25519 key, its products, its APIs and its code repositories, signed with that key over the RFC 8785 bytes of the document without `signature`. At most 64 KB. It is self-signed: a declaration that checks shows that whoever controlled the site's content when it was read published this key and these subjects; it does not establish the legal entity or a person's authority to act for it. Added in trooth 0.14.0."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    format: Literal["trooth.declaration.v1"] = Field(..., description="The format.")
+    domain: str = Field(..., description="The domain, lower case. It must equal the host the document is served from.")
+    issued_at: str = Field(..., description="When the declaration was signed, ISO 8601 in UTC. Not in the future.")
+    expires_at: str = Field(..., description="When the declaration stops checking, ISO 8601 in UTC; after issued_at and at most 400 days after it.")
+    record: Optional[str] = Field(None, description="Optional: the company's Trooth record, https://trooth.co/network/company/<slug>. The one URL not on the domain.")
+    keys: List[DeclarationKey] = Field(..., description="The company's own public keys, one to eight; more than one during a key rotation. Never a private key.")
+    products: Optional[List[DeclaredProduct]] = Field(None, description="Products the domain's owner names. Each url is on the domain or a subdomain of it.")
+    apis: Optional[List[DeclaredApi]] = Field(None, description="APIs the domain's owner names, each with an optional MCP server and the SHA-256 of its tool manifest.")
+    repositories: Optional[List[str]] = Field(None, description="Organizations or users on a code host (github.com, gitlab.com, bitbucket.org, codeberg.org) the domain's owner names.")
+    signature: DeclarationSignature = Field(..., description="Ed25519 over the RFC 8785 bytes of the document without this member, by one of `keys`.")
+
+class DeclarationKey(BaseModel):
+    "An Ed25519 public key as a JWK (RFC 8037) with its id."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kid: str = Field(..., description="<domain>#<the RFC 7638 JWK thumbprint of the key, base64url>.")
+    kty: Literal["OKP"] = Field(..., description="The key type.")
+    crv: Literal["Ed25519"] = Field(..., description="The curve.")
+    x: str = Field(..., description="The 32-byte public key, base64url without padding.")
+
+class DeclaredProduct(BaseModel):
+    "A product the domain's owner names. Its subject id is trooth:product:<domain>/<id>."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="The product's id, unique in the declaration.")
+    name: str = Field(..., description="The product's name, 1 to 200 characters.")
+    url: str = Field(..., description="An https URL on the domain or a subdomain of it.")
+
+class DeclaredMcp(BaseModel):
+    "The MCP server of an API."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    url: str = Field(..., description="The MCP endpoint, an https URL on the domain or a subdomain of it.")
+    manifest_sha256: str = Field(..., description="Lowercase hex SHA-256 of the server's tool manifest (docs/EVIDENCE.md section 9).")
+
+class DeclaredApi(BaseModel):
+    "An API the domain's owner names."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    base_url: str = Field(..., description="The API's base URL, https, on the domain or a subdomain of it.")
+    mcp: Optional[DeclaredMcp] = Field(None, description="Optional: its MCP server.")
+
+class DeclarationSignature(BaseModel):
+    "The signature over the declaration."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kid: str = Field(..., description="The kid of the key in `keys` that signed.")
+    alg: Literal["Ed25519"] = Field(..., description="The algorithm.")
+    canonicalization: Literal["RFC8785"] = Field(..., description="The canonicalization of the signed bytes.")
+    value: str = Field(..., description="ed25519: and the 64-byte signature in base64.")
+
 class ManifestEntry(BaseModel):
     "One check and the evidence behind it: a public `source`, or a `commitment` to a private one. Exactly one of the two."
 
@@ -141,7 +202,7 @@ class GuardClaimRequire(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    claim: str = Field(..., description="trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (not a signed claim today, so always missing).")
+    claim: str = Field(..., description="trooth_reading, check:<check_id>, legal_entity_registry_record, no_sanctions_name_match, no_sam_exclusion_name_match, domain_registration_record, security_txt_published, or domain_control_confirmed (since trooth 0.14.0, from a confirmed proof in the signed public record binding the domain to the company record or to its declaration key).")
     max_age_days: Optional[int] = Field(None, description="The oldest observation the rule accepts, in days. Default: the evidence class's stale-after.")
 
 class GuardSignatureRequire(BaseModel):
@@ -377,6 +438,8 @@ class PublicRecordReading(BaseModel):
     subjects: Optional[List[NamedSubject]] = Field(None, description="Every subject this reading names, each with why: the domain, the entity, filer and LEI ids, jurisdictions, state registry entries, SAM.gov UEIs, and the code repositories, APIs and MCP servers the home page links to (docs/IDS.md). Added in trooth 0.12.0.")
     evidence_classes: Optional[List[EvidenceClass]] = Field(None, description="Each class of evidence in this reading with its stale-after rule, when it was observed and what it does not establish (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.")
     continuity: Optional[Continuity] = Field(None, description="What changed since the previous cached reading of the same domain (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.")
+    proofs: Optional[List[Proof]] = Field(None, description="Each proof that binds two subjects, with its method and status (docs/EVIDENCE.md section 11): the domain to the company record (dns_txt, domain_email_code or identity_provider_sign_in, from Trooth's record of the claim or the challenge TXT), the domain to the company's own key (domain_signed_declaration, and dns_txt when the key pin matches), the domain to a code repository (repository_control). Optional; added in trooth 0.14.0.")
+    declaration: Optional[DeclarationReading] = Field(None, description="The domain-signed declaration read at https://<domain>/.well-known/trooth.json (docs/DECLARATION.md), or null when it was not looked for. Only what checked is carried into subjects. Optional; added in trooth 0.14.0.")
     signed: Optional[Signed] = Field(None, description="The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.")
 
 class SamReading(BaseModel):
@@ -509,7 +572,7 @@ class NamedSubject(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     id: str = Field(..., description="The Trooth id.")
-    kind: Literal["domain", "entity", "sec_filer", "lei", "jurisdiction", "state_registry", "sam_uei", "code_repository", "api", "mcp_server", "representative", "signing_authority"] = Field(..., description="What it names. representative: a contact the site publishes in security.txt (a trooth:contact id); not a person authorized to act for the entity. signing_authority: the key that signed this reading's statement (a trooth:key id), named at signing.")
+    kind: Literal["domain", "entity", "sec_filer", "lei", "jurisdiction", "state_registry", "sam_uei", "code_repository", "api", "mcp_server", "representative", "signing_authority", "company", "product", "person"] = Field(..., description="What it names. representative: a contact the site publishes in security.txt (a trooth:contact id); not a person authorized to act for the entity. signing_authority: the key that signed this reading's statement (a trooth:key id), named at signing. Since trooth 0.14.0: company: the company's Trooth record (a trooth:company id). product: a product named in the domain's signed declaration (trooth:product:<domain>/<id>); never inferred from a name match. person: the representative Trooth recorded at claim time (trooth:person:<16 hex>); no personal data in the id. signing_authority is also the company's own key (trooth:key:<domain>#<thumbprint>) from a declaration that checks. api from the declaration names the MCP manifest hash in basis. code_repository is marked repository_control when that proof is confirmed.")
     basis: str = Field(..., description="Why the reading names it.")
 
 class Entity(BaseModel):
@@ -620,7 +683,7 @@ class EntityBinding(BaseModel):
     id: str = Field(..., description="The stable id: trooth:cik:<10 digits> or trooth:lei:<LEI> (docs/IDS.md).")
     found_by: Literal["asked", "ticker", "site_legal_name", "edgar_lei_field", "registry_name_match"] = Field(..., description="How the identifier was found: asked (given by the requester), ticker, site_legal_name (the legal name the site states matched exactly one listed SEC filer), edgar_lei_field, registry_name_match (exact legal name and, when the SEC gives one, the jurisdiction).")
     status: Literal["corroborated", "claimed_by_site", "registries_only", "uncorroborated", "contradicted", "not_found"] = Field(..., description="corroborated: authoritative evidence ties it to the domain (the company's own filing or the registry record names the domain). claimed_by_site: the site names this entity, and nothing authoritative ties it. registries_only: registries agree with each other, nothing ties the domain. uncorroborated: no evidence either way. contradicted: authoritative evidence points elsewhere. not_found: the registry holds no such identifier.")
-    proof_method: Optional[Literal["regulator_filing", "registry_record", "site_statement", "registry_name_match", "asked", "none"]] = Field(None, description="What ties the identifier to the domain, strongest first. regulator_filing: the company's 10-K XBRL namespace names the domain. registry_record: the LEI registry record lists the domain. site_statement: the site states the legal name; this is the site's claim. registry_name_match: a name match only; nothing ties the domain. asked: the caller supplied the identifier and nothing above ties it. none: no evidence ties it. Optional; added in trooth 0.13.0 (docs/EVIDENCE.md section 10).")
+    proof_method: Optional[Literal["regulator_filing", "registry_record", "site_statement", "registry_name_match", "asked", "none", "dns_txt", "domain_signed_declaration", "identity_provider_sign_in", "domain_email_code", "repository_control"]] = Field(None, description="What ties the identifier to the domain, strongest first. regulator_filing: the company's 10-K XBRL namespace names the domain. registry_record: the LEI registry record lists the domain. site_statement: the site states the legal name; this is the site's claim. registry_name_match: a name match only; nothing ties the domain. asked: the caller supplied the identifier and nothing above ties it. none: no evidence ties it. Optional; added in trooth 0.13.0 (docs/EVIDENCE.md section 10). dns_txt: a TXT record in the domain's zone (Trooth's claim challenge at _trooth-challenge.<domain> with a value starting trooth-domain-challenge=, or the key pin trooth-key=<thumbprint> at _trooth-key.<domain>). domain_signed_declaration: a /.well-known/trooth.json that checks (docs/DECLARATION.md). identity_provider_sign_in: the publisher signed in through the company's identity provider at the domain (Google Workspace hosted domain or Microsoft Entra tenant), as Trooth recorded at claim time. domain_email_code: a code sent to a mailbox at the domain, as Trooth recorded at claim time. repository_control: the code host marks a domain of the organization as confirmed by the code host (GitHub is_verified). The five values after none were added in trooth 0.14.0.")
     for_: List[BindingEvidence] = Field(..., alias="for", description="Evidence for the binding.")
     against: List[BindingEvidence] = Field(..., description="Evidence against it.")
 
@@ -725,7 +788,7 @@ class EvidenceClass(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30.")
+    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review", "domain_declaration", "trooth_claim_record"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity).")
     sections: List[str] = Field(..., description="The sections of this record that hold this class of evidence.")
     stale_after_days: int = Field(..., description="After this many days from observed_at a reader should take the evidence as stale and read again.")
     does_not_establish: str = Field(..., description="What this class of evidence does not show, in one sentence.")
@@ -738,7 +801,7 @@ class ContinuityEvent(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    kind: Literal["entity_changed", "entity_appeared", "entity_disappeared", "renamed", "parent_changed", "registrar_changed", "domain_transferred", "unchanged"] = Field(..., description="What differs. entity_changed: the domain now ties to a different legal entity. entity_appeared: it now ties to one and did not before. entity_disappeared: it tied to one and now ties to none. renamed: the same entity under a new name. parent_changed: the LEI record names a different direct or ultimate parent. registrar_changed: RDAP names a different registrar. domain_transferred: RDAP records a transfer after the previous reading. unchanged: none of these.")
+    kind: Literal["entity_changed", "entity_appeared", "entity_disappeared", "renamed", "parent_changed", "registrar_changed", "domain_transferred", "unchanged", "declaration_appeared", "declaration_key_changed", "declaration_disappeared"] = Field(..., description="What differs. entity_changed: the domain now ties to a different legal entity. entity_appeared: it now ties to one and did not before. entity_disappeared: it tied to one and now ties to none. renamed: the same entity under a new name. parent_changed: the LEI record names a different direct or ultimate parent. registrar_changed: RDAP names a different registrar. domain_transferred: RDAP records a transfer after the previous reading. unchanged: none of these. Since trooth 0.14.0: declaration_appeared: a declaration that checks is published and the previous reading had none. declaration_key_changed: the declaration's keys differ from the previous reading's. declaration_disappeared: the previous reading had a declaration that checked and this one does not.")
     detail: str = Field(..., description="The difference in words, naming both readings' values.")
 
 class ContinuityPrevious(BaseModel):
@@ -756,6 +819,36 @@ class Continuity(BaseModel):
 
     previous: Optional[ContinuityPrevious] = Field(..., description="The previous reading compared with; null when there is none.")
     events: List[ContinuityEvent] = Field(..., description="What differs; empty when there is no previous reading, and a single unchanged event when nothing listed differs.")
+
+class Proof(BaseModel):
+    "One proof binding two subjects."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="<proof kind>:<n>, unique in the reading.")
+    binds: List[str] = Field(..., description="The two subject ids the proof binds, the domain first.")
+    proof_method: Literal["regulator_filing", "registry_record", "site_statement", "registry_name_match", "asked", "none", "dns_txt", "domain_signed_declaration", "identity_provider_sign_in", "domain_email_code", "repository_control"] = Field(..., description="How the binding was shown (the same values as bindings[].proof_method).")
+    status: Literal["confirmed", "claimed", "not_found", "not_read"] = Field(..., description="confirmed: the proof holds as read. claimed: asserted, and nothing read confirms it. not_found: looked for and not there. not_read: the source could not be read (a 403 or 404 from a code host is not read, never absent).")
+    detail: str = Field(..., description="What was read, in words.")
+    source: str = Field(..., description="The URL read, or \"trooth record\" for Trooth's own record of the claim.")
+    observed_at: Optional[str] = Field(..., description="When the proof was observed: the reading's read_at, or for Trooth's record of the claim, when the claim was confirmed. Null when not read.")
+
+class DeclarationReading(BaseModel):
+    "The domain-signed declaration as this reading found it."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    url: str = Field(..., description="https://<domain>/.well-known/trooth.json.")
+    status: Literal["checked", "invalid", "expired", "absent", "not_read"] = Field(..., description="checked: every rule in docs/DECLARATION.md holds. invalid: a rule fails (reason says which). expired: it checks but expires_at has passed. absent: the site answers 404 or 410. not_read: the site could not be read.")
+    reason: Optional[str] = Field(..., description="Why, in words.")
+    sha256: Optional[str] = Field(..., description="Lowercase hex SHA-256 of the bytes served; null when nothing was read.")
+    issued_at: Optional[str] = Field(..., description="The declaration's issued_at.")
+    expires_at: Optional[str] = Field(..., description="The declaration's expires_at.")
+    keys: List[str] = Field(..., description="The kids of the keys it publishes (<domain>#<thumbprint>).")
+    key_pinned_by_dns: bool = Field(..., description="Whether the TXT record at _trooth-key.<domain> names one of the keys.")
+    products: List[DeclaredProduct] = Field(..., description="The products it names, when it checks; empty otherwise.")
+    apis: List[DeclaredApi] = Field(..., description="The APIs it names, when it checks; empty otherwise.")
+    repositories: List[str] = Field(..., description="The repositories it names, when it checks; empty otherwise.")
 
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
@@ -1047,6 +1140,12 @@ EvidenceManifest = List[ManifestEntry]
 
 CorrectionPayload.model_rebuild()
 CorrectionReason.model_rebuild()
+DomainDeclaration.model_rebuild()
+DeclarationKey.model_rebuild()
+DeclaredProduct.model_rebuild()
+DeclaredMcp.model_rebuild()
+DeclaredApi.model_rebuild()
+DeclarationSignature.model_rebuild()
 ManifestEntry.model_rebuild()
 GuardDecision.model_rebuild()
 GuardReason.model_rebuild()
@@ -1111,6 +1210,8 @@ EvidenceClass.model_rebuild()
 ContinuityEvent.model_rebuild()
 ContinuityPrevious.model_rebuild()
 Continuity.model_rebuild()
+Proof.model_rebuild()
+DeclarationReading.model_rebuild()
 VerificationBundle.model_rebuild()
 BundleLog.model_rebuild()
 LoggedCorrection.model_rebuild()

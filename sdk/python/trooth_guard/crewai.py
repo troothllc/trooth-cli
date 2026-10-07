@@ -76,6 +76,11 @@ def task_guardrail(
             return (True, output)
         return (False, describe(d))
 
+    # CrewAI checks the return annotation with typing.get_origin when the Task
+    # is built. Under `from __future__ import annotations` the annotation is the
+    # string "Tuple[bool, Any]", which that check refuses, so give it the real type.
+    guardrail.__annotations__["return"] = Tuple[bool, Any]
+    guardrail.__annotations__["output"] = Any
     return guardrail
 
 

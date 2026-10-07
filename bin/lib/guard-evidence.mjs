@@ -27,7 +27,7 @@ const PROJECTION_CONTRACT = 2;
 const DAY = 86400000;
 
 /** Default stale-after days when a record carries no evidence_classes (the scan worker's own values). */
-export const CLASS_DEFAULT_DAYS = { regulator_filing: 90, registry_record: 365, sanctions_list: 7, procurement_exclusion: 7, domain_registration: 30, site_publication: 30 };
+export const CLASS_DEFAULT_DAYS = { regulator_filing: 90, registry_record: 365, sanctions_list: 7, procurement_exclusion: 7, domain_registration: 30, site_publication: 30, domain_declaration: 30, trooth_claim_record: 365 };
 /** The freshness of a claim from a witness statement when the rule gives no max_age_days. */
 export const READING_DEFAULT_DAYS = 30;
 
@@ -42,10 +42,13 @@ async function get(ctx, url, maxBytes, accept = 'application/json') {
   const left = Number.isFinite(ctx.deadline) ? ctx.deadline - Date.now() : Infinity;
   if (left <= 0) throw new Unreachable(`${new URL(url).host} was not asked: the decision deadline passed`);
   let res;
+  // When the deadline is nearer than the request timeout, it is the deadline that cuts the request off; say so.
+  const byDeadline = left < ctx.timeoutMs;
+  const bound = Math.max(1, Math.min(ctx.timeoutMs, left));
   try {
-    res = await ctx.fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(Math.max(1, Math.min(ctx.timeoutMs, left))), headers: { accept, 'user-agent': ctx.userAgent } });
+    res = await ctx.fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(bound), headers: { accept, 'user-agent': ctx.userAgent } });
   } catch (e) {
-    throw new Unreachable(`${new URL(url).host} could not be reached: ${e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? `no answer within ${ctx.timeoutMs} ms` : (e && e.message) || e}`);
+    throw new Unreachable(`${new URL(url).host} could not be reached: ${e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? (byDeadline ? `no answer before the decision deadline (${ctx.deadlineMs} ms)` : `no answer within ${ctx.timeoutMs} ms`) : (e && e.message) || e}`);
   }
   const len = Number(res.headers?.get?.('content-length'));
   if (Number.isFinite(len) && len > maxBytes) { try { await res.body?.cancel(); } catch {} throw new Unreachable(`${url.split('?')[0]} is ${len} bytes, over the ${maxBytes}-byte limit`); }
@@ -261,6 +264,50 @@ const safe = (v) => String(v ?? '').replace(/[^A-Za-z0-9._:/@+#-]/g, '?').slice(
 const prose = (v) => String(v ?? '').replace(/[^A-Za-z0-9 ._:/@+#,()-]/g, '?').slice(0, 160);
 function plusDays(at, days) { const t = Date.parse(at); return Number.isFinite(t) ? iso(t + days * DAY) : null; }
 
+/** The proof methods that show control of the domain (docs/GUARD.md section 4). */
+export const DOMAIN_CONTROL_METHODS = ['dns_txt', 'domain_email_code', 'identity_provider_sign_in', 'domain_signed_declaration'];
+const COMPANY_ID = /^trooth:company:[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+const THUMBPRINT = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * `domain_control_confirmed` from a signed public record (docs/GUARD.md
+ * section 4): a proof binding trooth:domain:<domain> to a trooth:company record
+ * or to trooth:key:<domain>#<thumbprint>, by one of DOMAIN_CONTROL_METHODS,
+ * with status confirmed. Its freshness is the evidence class of that proof:
+ * trooth_claim_record for the company record (365 days by default),
+ * domain_declaration for the key (30 days by default), counted from the
+ * proof's observed_at (never later than the reading). With several, the one
+ * that stays fresh longest. Returns { time: {observed_at, stale_after} } or { why }.
+ */
+export function domainControl(d, domain, classes = []) {
+  const domId = `trooth:domain:${domain}`;
+  const keyPrefix = `trooth:key:${domain}#`;
+  const seen = [];
+  let best = null;
+  for (const pr of Array.isArray(d?.proofs) ? d.proofs : []) {
+    if (!pr || typeof pr !== 'object' || !Array.isArray(pr.binds) || pr.binds.length !== 2 || pr.binds[0] === pr.binds[1] || !pr.binds.includes(domId)) continue;
+    const other = pr.binds.find((b) => b !== domId);
+    const toCompany = typeof other === 'string' && COMPANY_ID.test(other);
+    const toKey = typeof other === 'string' && other.startsWith(keyPrefix) && THUMBPRINT.test(other.slice(keyPrefix.length));
+    if (!toCompany && !toKey) continue;
+    if (!DOMAIN_CONTROL_METHODS.includes(pr.proof_method)) { seen.push(`${safe(pr.proof_method)}, which does not show domain control`); continue; }
+    if (pr.status !== 'confirmed') { seen.push(`${safe(pr.proof_method)} ${safe(pr.status)}`); continue; }
+    const klass = toKey ? 'domain_declaration' : 'trooth_claim_record';
+    const c = classes.find((x) => x && x.class === klass);
+    const days = c && Number.isInteger(c.stale_after_days) && c.stale_after_days > 0 ? c.stale_after_days : CLASS_DEFAULT_DAYS[klass];
+    const readAt = Date.parse(d.read_at);
+    const own = typeof pr.observed_at === 'string' ? Date.parse(pr.observed_at) : NaN;
+    const at = Number.isFinite(own) && (!Number.isFinite(readAt) || own <= readAt) ? iso(own) : (Number.isFinite(readAt) ? iso(readAt) : null);
+    const staleAfter = at ? plusDays(at, days) : null;
+    if (!staleAfter) { seen.push(`${safe(pr.proof_method)} with no time observed`); continue; }
+    if (!best || Date.parse(staleAfter) > Date.parse(best.stale_after)) best = { observed_at: at, stale_after: staleAfter };
+  }
+  if (best) return { time: best };
+  return { why: seen.length
+    ? `the signed public record has no confirmed proof of domain control (dns_txt, domain_email_code, identity_provider_sign_in or domain_signed_declaration) binding the domain to the company record or its declaration key; it has ${seen.join('; ')}`
+    : 'the signed public record holds no proof binding the domain to the company record or to its declaration key' };
+}
+
 /**
  * Check one guard bundle for `domain` (the record's subject, the host or a
  * parent of it) and reduce it to the facts guard-decide.mjs reads. Pure but
@@ -338,7 +385,7 @@ export function factsFromBundle(bundle, { domain, host, vkeys, witnesses, now })
 
   /* --- the public record statement --- */
   const d = bundle.public_record;
-  const prMissing = (why) => { for (const c of ['legal_entity_registry_record', 'no_sanctions_name_match', 'no_sam_exclusion_name_match', 'domain_registration_record', 'security_txt_published']) claimsDetail[c] = claimsDetail[c] || why; };
+  const prMissing = (why) => { for (const c of ['legal_entity_registry_record', 'no_sanctions_name_match', 'no_sam_exclusion_name_match', 'domain_registration_record', 'security_txt_published', 'domain_control_confirmed']) claimsDetail[c] = claimsDetail[c] || why; };
   if (!d) prMissing(bundle.public_record_unavailable ? `the public record could not be read: ${bundle.public_record_unavailable}` : `no cached public record reading of ${domain}`);
   else if (d.format !== PUBLIC_RECORD_FORMAT) {
     if (typeof d.format === 'string' && d.format.startsWith('trooth.public-record.')) { facts.schema_supported = false; note('schema', `the public record is ${safe(d.format)}; this guard reads ${PUBLIC_RECORD_FORMAT}`); }
@@ -411,6 +458,9 @@ export function factsFromBundle(bundle, { domain, host, vkeys, witnesses, now })
           const txt = d.security_txt;
           if (txt && typeof txt === 'object' && txt.expired !== true && !(typeof txt.expires === 'string' && Date.parse(txt.expires) <= now)) add('security_txt_published', cls('site_publication'));
           else claimsDetail.security_txt_published = txt ? 'the security.txt in the signed public record is expired' : 'the signed public record holds no security.txt';
+          const control = domainControl(d, domain, classes);
+          if (control.time) add('domain_control_confirmed', control.time);
+          else claimsDetail.domain_control_confirmed = control.why;
           artifacts.push('public_record');
         }
       }
@@ -419,7 +469,6 @@ export function factsFromBundle(bundle, { domain, host, vkeys, witnesses, now })
   // A record withheld while a report about it is reviewed: whatever its signed
   // public record says, every claim is disputed until the review closes.
   if (pj.withheld) for (const c of Object.values(facts.claims)) { c.disputed = true; c.disputed_by = 'withheld'; }
-  claimsDetail.domain_control_confirmed = 'domain control is not in any signed Trooth artifact today';
   if (facts.signature === 'absent') { facts.log = 'not_logged'; facts.witnesses = 0; }
   if (!Number.isFinite(facts.witnesses)) facts.witnesses = 0;
   return facts;

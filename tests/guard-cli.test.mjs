@@ -97,7 +97,7 @@ test('guard decide: usage errors exit 2 (bad policy, failMode allow, missing fla
   const help = await run(['--help']);
   assert.match(help.out, /trooth guard decide/); assert.match(help.out, /20 guard decide: hold/);
   const unknown = await run(['frobnicate']);
-  assert.match(unknown.err, /Commands: check, lint, verify, log, public-record, mcp-tools, guard\./);
+  assert.match(unknown.err, /Commands: check, lint, verify, log, public-record, mcp-tools, guard, declare\./);
 });
 
 test('guard hook: not covered exits 0 silently; allow exits 0 silently; hold asks; deny exits 2 with reason codes on stderr', async () => {
