@@ -5,7 +5,7 @@
 // the frameworks document. No framework package, no network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GuardHold, GuardDeny, GuardError, errorFor, describeDecision, failClosedDecision, isApproval } from '../bin/lib/guard/errors.mjs';
+import { GuardHold, GuardDeny, GuardError, errorFor, describeDecision, failClosedDecision, isApproval, guardDecisionOf } from '../bin/lib/guard/errors.mjs';
 import { troothToolInputGuardrail, troothNeedsApproval, guardTool, troothAgentInputGuardrail } from '../bin/lib/guard/openai-agents.mjs';
 import { troothMiddleware } from '../bin/lib/guard/langchain.mjs';
 import { createGuardNode } from '../bin/lib/guard/langgraph.mjs';
@@ -263,6 +263,40 @@ test('langgraph: all allowed -> empty update (or the decisions); uncovered calls
   assert.deepEqual(await node({ messages: [] }), {});
   assert.throws(() => createGuardNode(fakeGuard(), {}), TypeError);
   assert.throws(() => createGuardNode(fakeGuard(), { interrupt: () => 1, denyGoto: 'x' }), TypeError);
+  // Routing without toolsGoto is refused: a static edge to the tool node would also run after a routed deny.
+  assert.throws(() => createGuardNode(fakeGuard(), { interrupt: () => 1, Command: FakeCommand, denyGoto: 'x' }), /toolsGoto/);
+  assert.throws(() => createGuardNode(fakeGuard(), { interrupt: () => 1, Command: FakeCommand, holdGoto: 'x' }), /toolsGoto/);
+});
+
+test('langgraph: with routing, allow and an approved hold route to toolsGoto by Command', async () => {
+  const opts = { Command: FakeCommand, denyGoto: 'blocked', holdGoto: 'review', toolsGoto: 'tools' };
+  const ok = await createGuardNode(fakeGuard(), { interrupt: () => { throw new Error('no interrupt'); }, ...opts })(state({ name: 'pay.out', args: { url: 'good.example' }, id: 'a' }));
+  assert.ok(ok instanceof FakeCommand);
+  assert.equal(ok.goto, 'tools');
+  const approved = await createGuardNode(fakeGuard(), { interrupt: () => ({ type: 'approve' }), ...opts })(state({ name: 'pay.out', args: { url: 'unknown.example' }, id: 'a' }));
+  assert.equal(approved.goto, 'tools');
+  const rejected = await createGuardNode(fakeGuard(), { interrupt: () => ({ type: 'reject' }), ...opts })(state({ name: 'pay.out', args: { url: 'unknown.example' }, id: 'a' }));
+  assert.equal(rejected.goto, 'review');
+  const denied = await createGuardNode(fakeGuard(), { interrupt: () => true, ...opts })(state({ name: 'pay.out', args: { url: 'bad.example' }, id: 'a' }));
+  assert.equal(denied.goto, 'blocked');
+});
+
+test('errors: guardDecisionOf finds the Decision inside framework wrappers', () => {
+  const d = decisionFor('pay.out', 'bad.example', 'deny');
+  // LangChain JS createAgent: MiddlewareError with the GuardDeny in .cause
+  const mw = new Error('wrapped'); mw.cause = new GuardDeny(d);
+  assert.equal(guardDecisionOf(mw), d);
+  // @openai/agents: ToolCallError whose .error is the tripwire carrying the guardrail result
+  const tc = new Error('Failed to run function tools'); tc.error = Object.assign(new Error('Tool input guardrail triggered'), { result: { output: { behavior: { type: 'throwException' }, outputInfo: { covered: true, decision: d } } } });
+  assert.equal(guardDecisionOf(tc), d);
+  // A second copy of the module: matched by code, not class
+  const copy = Object.assign(new Error('x'), { code: 'TROOTH_GUARD_HOLD', decision: decisionFor('pay.out', 'u.example', 'hold') });
+  assert.equal(guardDecisionOf(copy).decision, 'hold');
+  assert.equal(guardDecisionOf(new Error('unrelated')), null);
+  assert.equal(guardDecisionOf(null), null);
+  assert.equal(guardDecisionOf(Object.assign(new Error('x'), { code: 'TROOTH_GUARD_DENY', decision: { decision: 'maybe' } })), null);
+  const loop = new Error('loop'); loop.cause = loop;
+  assert.equal(guardDecisionOf(loop), null);
 });
 
 test('langgraph: a hold calls interrupt once for every held call; approve continues, reject stops', async () => {
@@ -273,7 +307,7 @@ test('langgraph: a hold calls interrupt once for every held call; approve contin
   assert.equal(payloads.length, 1);
   assert.deepEqual(payloads[0].held.map((x) => x.tool_call.id), ['a', 'b']);
   await assert.rejects(node({ type: 'reject' })(s), GuardHold);
-  const routed = await node(false, { Command: FakeCommand, holdGoto: 'review' })(s);
+  const routed = await node(false, { Command: FakeCommand, holdGoto: 'review', toolsGoto: 'tools' })(s);
   assert.ok(routed instanceof FakeCommand);
   assert.equal(routed.goto, 'review');
 });
@@ -282,7 +316,7 @@ test('langgraph: a deny stops before any interrupt, by error or by Command', asy
   let asked = 0;
   const s = state({ name: 'pay.out', args: { url: 'unknown.example' }, id: 'a' }, { name: 'pay.out', args: { url: 'bad.example' }, id: 'b' });
   await assert.rejects(createGuardNode(fakeGuard(), { interrupt: () => { asked++; return true; } })(s), GuardDeny);
-  const c = await createGuardNode(fakeGuard(), { interrupt: () => { asked++; return true; }, Command: FakeCommand, denyGoto: 'blocked', decisionsKey: 'd' })(s);
+  const c = await createGuardNode(fakeGuard(), { interrupt: () => { asked++; return true; }, Command: FakeCommand, denyGoto: 'blocked', toolsGoto: 'tools', decisionsKey: 'd' })(s);
   assert.equal(c.goto, 'blocked');
   assert.equal(c.update.d.length, 2);
   assert.equal(asked, 0);

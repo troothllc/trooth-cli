@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 export const ID_TYPES = {
   domain: /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/,
   reading: /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/,
-  key: /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/,
+  key: /^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}|(?=[^#]{1,253}#)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?#[A-Za-z0-9_-]{43})$/,
   mapping: /^\d+\.\d+\.\d+$/,
   statement: /^[0-9a-f]{64}$/,
   entity: /^(?:lei:[A-Z0-9]{18}[0-9]{2}|cik:[0-9]{10})$/,
@@ -23,6 +23,9 @@ export const ID_TYPES = {
   repo: /^(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)\/[a-z0-9_.-]{1,100}$/,
   api: /^(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?$/,
   mcp: /^(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?$/,
+  company: /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/,
+  product: /^(?=[^/]{1,253}\/)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\/[a-z0-9][a-z0-9-]{0,62}$/,
+  person: /^[0-9a-f]{16}$/,
   contact: /^(?:mailto:[^\s?#@]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]|(?=.{1,500}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?:\/[^\s?#]*)?)$/,
 };
 
@@ -30,9 +33,16 @@ export const ID_TYPES = {
 export function formatId(type, value) {
   const re = ID_TYPES[type];
   if (!re) throw new Error(`unknown Trooth id type: ${type}`);
-  const v = type === 'domain' ? String(value).toLowerCase().replace(/\.$/, '') : type === 'cik' ? String(value).padStart(10, '0') : type === 'lei' ? String(value).toUpperCase() : type === 'contact' ? contactValue(value) : String(value);
+  const v = type === 'domain' || type === 'company' ? String(value).toLowerCase().replace(/\.$/, '') : type === 'product' ? productValue(value) : type === 'cik' ? String(value).padStart(10, '0') : type === 'lei' ? String(value).toUpperCase() : type === 'contact' ? contactValue(value) : String(value);
   if (!re.test(v)) throw new Error(`not a valid ${type} value for a Trooth id: ${value}`);
   return `trooth:${type}:${v}`;
+}
+
+/** A product id's value with its domain lowercased (docs/IDS.md 1.5): <domain>/<id>. */
+function productValue(raw) {
+  const s = String(raw);
+  const i = s.indexOf('/');
+  return i < 0 ? s : `${s.slice(0, i).toLowerCase().replace(/\.$/, '')}${s.slice(i)}`;
 }
 
 /**

@@ -2,6 +2,18 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.14.0 (2026-10-07)
+
+### Proof methods, the domain-signed declaration, and the remaining first-class subjects
+
+- New `trooth declare` command and `trooth/declaration` library (docs/DECLARATION.md). `declare init --domain <d> [--key <path>]` makes an Ed25519 key with node:crypto and saves it as a private JWK (default `~/.trooth/declaration-key/<domain>.jwk`, mode 0600, never overwritten, never printed). `declare sign` writes a signed `trooth.declaration.v1` document (Ed25519 over the RFC 8785 bytes without `signature`; the key named `<domain>#<RFC 7638 thumbprint>`) with the company's Trooth record, products, APIs with an MCP manifest hash, and repositories, valid for at most 400 days, and prints the `_trooth-key.<domain>` TXT pin line. `declare check <domain>|--file <path>` fetches `https://<domain>/.well-known/trooth.json` (no redirects, 64 KB, a deadline) or reads a file, checks every rule, and reads the pin over DNS over HTTPS. Exit 0 checks, 1 none published, 3 not read, 8 signature or key, 9 another rule or a pin naming another key, and the new 11 expired.
+- Schemas: new `declaration.v1`; `public-record.v1` gains (optional) `proofs` and `declaration`, the proof methods `dns_txt`, `domain_signed_declaration`, `identity_provider_sign_in`, `domain_email_code` and `repository_control` on bindings and proofs, the subject kinds `company`, `product` and `person`, the continuity events `declaration_appeared`, `declaration_key_changed` and `declaration_disappeared`, and the evidence classes `domain_declaration` (30 days) and `trooth_claim_record` (365 days). Types regenerated for TypeScript, Python and Go.
+- Ids (`docs/IDS.md` 1.5): `company` (slug), `product` (`<domain>/<id>`), `person` (16 lowercase hex), and `key` values of the form `<domain>#<thumbprint>` for a company's own key.
+- `trooth public-record` prints each proof (method, status, what it binds) and the declaration line.
+- The guard: `domain_control_confirmed` is now a signed claim, derived from the signed public record: present when a proof binding the domain to the company record or to its declaration key is `confirmed` by `dns_txt`, `domain_email_code`, `identity_provider_sign_in` or `domain_signed_declaration`; fresh for `trooth_claim_record` (365 days) or `domain_declaration` (30 days). docs/GUARD.md section 4 updated.
+- docs/DECLARATION.md (new), docs/EVIDENCE.md 1.4 (section 11), docs/GUARD.md, docs/GUARD-RESULTS.md (rerun).
+- The guard's adapters were run against the real framework packages in three Trooth-run pilots (docs/GUARD-PILOTS.md: @openai/agents 0.19.0 and openai-agents 0.20.0, @langchain/langgraph 1.4.21 and langchain 1.5.15, crewai 1.15.24, and the Claude Code hook). Four defects they found are fixed: `guardDecisionOf(err)` finds the Decision inside framework error wrappers; LangGraph routing requires `toolsGoto` (a static edge from the guard node let a denied call run); the Python `needs_approval` no longer fails on a tool the policy does not cover; the CrewAI task guardrail is accepted by `Task`. These are pilots Trooth ran itself; they are not production use by outside teams and not an outside review, and both of those Phase 4 conditions stay open.
+
 ## 0.13.0 (2026-10-07)
 
 ### The guard: an open pre-execution check for consequential agent actions

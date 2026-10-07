@@ -18,7 +18,7 @@ import unicodedata
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
 # The trooth release whose CLI has `trooth guard`. TROOTH_CMD or trooth_cmd overrides it.
-TROOTH_VERSION = "0.13.0"
+TROOTH_VERSION = "0.14.0"
 
 EXIT_ALLOW = 0
 EXIT_HOLD = 20

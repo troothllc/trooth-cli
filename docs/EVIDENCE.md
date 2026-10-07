@@ -1,6 +1,6 @@
 # What a company publishes, and what Trooth reads
 
-Version 1.3, October 7, 2026. Version 1.3 adds the proof method of each binding, evidence classes with their stale-after days, continuity between readings, and the representative and signing authority subjects (section 10). Version 1.2 added SAM.gov registrations and exclusions, patent applications, four state business registries, FTC merger review, the domain's registration (RDAP), the changes those sources record, the subjects a reading names (section 7), and MCP tool description hashes (section 9). Version 1.1 added certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
+Version 1.4, October 7, 2026. Version 1.4 adds the proofs that bind a domain to its company record, its own key and its repositories, the domain-signed declaration, the company, product and person subjects, three continuity events and two evidence classes (section 11). Version 1.3 added the proof method of each binding, evidence classes with their stale-after days, continuity between readings, and the representative and signing authority subjects (section 10). Version 1.2 added SAM.gov registrations and exclusions, patent applications, four state business registries, FTC merger review, the domain's registration (RDAP), the changes those sources record, the subjects a reading names (section 7), and MCP tool description hashes (section 9). Version 1.1 added certificates in Certificate Transparency logs, security.txt, the pages a home page links to, the OFAC list, the entity id, the record of every source read, and the signed statement that names each reading (section 5). Normative for the public-record reading (`https://api.trooth.co/scan/public-record/<domain>`, [schema](../schemas/public-record.v1.schema.json), [statement schema](../schemas/public-record-statement.v1.schema.json), `trooth public-record`) and the reference list of evidence classes for the Trooth Network.
 
 A company publishes about itself in three places: its own website and DNS, the regulators and registries it must file with, and outside parties that describe it. This document lists what is published in each, says for every item whether Trooth reads it today, and sets the rules for reading it. Nothing here grades, rates or ranks a company.
 
@@ -203,3 +203,44 @@ A reader that has no rule of its own takes evidence past `stale_after` as stale 
 
 - `representative`: a contact the site publishes in security.txt, named by a `contact` id ([IDS.md](IDS.md) 1.4), such as `trooth:contact:mailto:psirt@example.com` or `trooth:contact:security.example.com/report`. It is a contact the site publishes; it is not a person authorized to act for the entity. Contacts of other kinds (telephone, plain HTTP) are not kept, and a site that opted out of reading is not read for contacts.
 - `signing_authority`: the key that signs this reading's statement, `trooth:key:<kid>`, filled in at signing. A reading with no signature names no signing authority.
+
+## 11. Proofs and the domain-signed declaration
+
+Added in version 1.4 (trooth 0.14.0). Additive: the format stays `trooth.public-record.v1`, and a reading taken before these fields does not carry them.
+
+**Proof methods.** `bindings[].proof_method` and `proofs[].proof_method` gain five values:
+
+| `proof_method` | Meaning |
+|---|---|
+| `dns_txt` | A TXT record in the domain's zone: Trooth's claim challenge at `_trooth-challenge.<domain>` with a value starting `trooth-domain-challenge=`, or the key pin `trooth-key=<thumbprint>` at `_trooth-key.<domain>` ([DECLARATION.md](DECLARATION.md) section 4) |
+| `domain_signed_declaration` | A `/.well-known/trooth.json` that checks ([DECLARATION.md](DECLARATION.md)) |
+| `identity_provider_sign_in` | The publisher signed in through the company's identity provider at the domain (a Google Workspace hosted domain or a Microsoft Entra tenant), as Trooth recorded at claim time |
+| `domain_email_code` | A code sent to a mailbox at the domain, as Trooth recorded at claim time |
+| `repository_control` | The code host marks a domain of the organization as confirmed by the code host: GitHub's `GET https://api.github.com/orgs/<org>` answers `is_verified: true` and its blog or website host is the domain or a subdomain. Read without authentication; a 403 or 404 is not read, never absent |
+
+**Proofs.** `proofs` lists each proof that binds two subjects: `{ id, binds: [<subject id>, <subject id>], proof_method, status, detail, source, observed_at }`. `id` is `<proof kind>:<n>`. `status` is `confirmed` (the proof holds as read), `claimed` (asserted, and nothing read confirms it), `not_found` (looked for and not there) or `not_read` (the source could not be read). `source` is the URL read, or `trooth record` for Trooth's own record of a claim. The proofs a reading can carry:
+
+- the domain and the company record (`trooth:company:<slug>`), by `dns_txt` (the challenge TXT is present), or by `identity_provider_sign_in`, `domain_email_code` or `dns_txt` from Trooth's record of the claim: the record projection's `authority.claim` (`{ method, confirmed_at, representative }`, absent on older deployments), confirmed when `confirmed_at` is set, observed at `confirmed_at`;
+- the domain and the company's own key (`trooth:key:<domain>#<thumbprint>`), by `domain_signed_declaration`, and by `dns_txt` as a second proof when the key pin names the same key;
+- the domain and a code repository (`trooth:repo:github.com/<org>`), by `repository_control`.
+
+**The declaration.** `declaration` is null when the reading did not look for one, or `{ url, status, reason, sha256, issued_at, expires_at, keys, key_pinned_by_dns, products, apis, repositories }`. `status` is `checked`, `invalid`, `expired`, `absent` or `not_read`; `sha256` is of the bytes served. Only a declaration that checks carries `products`, `apis` and `repositories`, and only those reach `subjects`. The declaration is fetched only through the scan worker's fetch guard (DNS resolved, https only, no redirect to another host, 64 KB), and no URL inside it is followed.
+
+**New subjects.** `subjects` gains three kinds and widens two:
+
+- `company`: the company's Trooth record, `trooth:company:<slug>` ([IDS.md](IDS.md) 1.5). It names the record, not a legal entity.
+- `product`: `trooth:product:<domain>/<id>`, with the basis "claimed by the domain's owner in its signed declaration". A product is never inferred from a name match.
+- `person`: `trooth:person:<16 hex>`, the representative Trooth recorded at claim time. The id carries no personal data. It does not establish that the person may act for the legal entity.
+- `signing_authority` also names the company's own key, `trooth:key:<domain>#<thumbprint>`, with the basis "the company's key, published at its domain in a declaration that checks, and logged in this reading".
+- `api` also comes from the declaration ("named in the company's signed declaration", with the MCP manifest hash in the basis); `code_repository` is marked `repository_control` when that proof is confirmed.
+
+**Continuity.** `continuity.events[].kind` gains `declaration_appeared` (a declaration that checks, where the previous reading had none), `declaration_key_changed` (its keys differ from the previous reading's) and `declaration_disappeared` (the previous reading had one that checked, and this one does not). Trooth's part is this record of the first key seen and every change, signed and logged.
+
+**Evidence classes.**
+
+| Class | Sections | Stale after (days) | Does not establish |
+|---|---|---|---|
+| `domain_declaration` | `declaration`, `proofs` | 30 | A key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it. |
+| `trooth_claim_record` | `proofs` | 365 | Domain control at claim time; it does not establish that the person may act for the legal entity. |
+
+**In the terminal and the guard.** `trooth public-record` prints the declaration line and each proof with its method and status. The guard derives `domain_control_confirmed` from these proofs ([GUARD.md](GUARD.md) section 4): a proof binding the domain to the company record or to the declaration key, confirmed by `dns_txt`, `domain_email_code`, `identity_provider_sign_in` or `domain_signed_declaration`, fresh for its evidence class.

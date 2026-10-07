@@ -1,0 +1,972 @@
+{
+  "format": "trooth.public-record.v1",
+  "domain": "proofs.example",
+  "subject_id": "trooth:domain:proofs.example",
+  "read_at": "2026-10-07T01:32:55.261Z",
+  "site": {
+    "legal_names": [
+      {
+        "name": "Apple Inc.",
+        "source": "https://apple.com/"
+      }
+    ],
+    "read": true,
+    "reason": null,
+    "links": [
+      {
+        "kind": "sustainability",
+        "url": "https://apple.com/environment/"
+      },
+      {
+        "kind": "investor_relations",
+        "url": "https://investor.apple.com/"
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "identifier": "cik",
+      "value": "0000320193",
+      "id": "trooth:cik:0000320193",
+      "found_by": "site_legal_name",
+      "status": "corroborated",
+      "for": [
+        {
+          "kind": "site_names_registry_name",
+          "detail": "https://apple.com/ names Apple Inc.; the SEC record names Apple Inc.. A site can name any company, so this alone ties nothing.",
+          "source": "https://apple.com/"
+        },
+        {
+          "kind": "filing_namespace_names_domain",
+          "detail": "the 10-K filed 2025-10-31 declares its extension taxonomy under www.apple.com",
+          "source": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
+        }
+      ],
+      "against": []
+    },
+    {
+      "identifier": "lei",
+      "value": "HWUPKR0MPOU8FGXBT394",
+      "id": "trooth:lei:HWUPKR0MPOU8FGXBT394",
+      "found_by": "registry_name_match",
+      "status": "corroborated",
+      "for": [
+        {
+          "kind": "site_names_registry_name",
+          "detail": "https://apple.com/ names Apple Inc.; the LEI record names Apple Inc.",
+          "source": "https://apple.com/"
+        },
+        {
+          "kind": "registries_agree",
+          "detail": "the SEC and the LEI registry both name Apple Inc., jurisdiction US-CA",
+          "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+        },
+        {
+          "kind": "through_corroborated_filer",
+          "detail": "the LEI record and the SEC filer 0000320193 name the same entity, and the filer's own filing ties it to apple.com",
+          "source": null
+        }
+      ],
+      "against": []
+    }
+  ],
+  "sec": {
+    "cik": "0000320193",
+    "facts": [
+      {
+        "key": "sec.name",
+        "label": "Name on file with the SEC",
+        "value": "Apple Inc.",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.cik",
+        "label": "SEC Central Index Key",
+        "value": "0000320193",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.tickers",
+        "label": "Ticker symbols",
+        "value": [
+          "AAPL"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.exchanges",
+        "label": "Exchanges",
+        "value": [
+          "Nasdaq"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.entity_type",
+        "label": "Entity type",
+        "value": "operating",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.filer_category",
+        "label": "Filer category",
+        "value": "Large accelerated filer",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.sic",
+        "label": "Standard Industrial Classification",
+        "value": "3571 Electronic Computers",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.state_of_incorporation",
+        "label": "State or country of incorporation",
+        "value": "CA",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.fiscal_year_end",
+        "label": "Fiscal year end (MMDD)",
+        "value": "0926",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.business_address",
+        "label": "Business address",
+        "value": "ONE APPLE PARK WAY, CUPERTINO, CA, 95014",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.phone",
+        "label": "Phone on file",
+        "value": "(408) 996-1010",
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.website",
+        "label": "Website on file",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.investor_website",
+        "label": "Investor website on file",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.lei",
+        "label": "LEI on file with the SEC",
+        "value": null,
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.former_names",
+        "label": "Former names",
+        "value": [
+          "APPLE INC",
+          "APPLE COMPUTER INC",
+          "APPLE COMPUTER INC/ FA"
+        ],
+        "source": "https://data.sec.gov/submissions/CIK0000320193.json"
+      },
+      {
+        "key": "sec.xbrl_namespace_authorities",
+        "label": "Authorities of the extension taxonomy in the 10-K filed 2025-10-31",
+        "value": [
+          "www.apple.com"
+        ],
+        "source": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
+      }
+    ],
+    "latest": {
+      "10-Q": {
+        "form": "10-Q",
+        "filed": "2026-07-31",
+        "report_date": "2026-06-27",
+        "items": [],
+        "description": "10-Q",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000020/aapl-20260627.htm"
+      },
+      "8-K": {
+        "form": "8-K",
+        "filed": "2026-07-30",
+        "report_date": "2026-07-30",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/aapl-20260730.htm"
+      },
+      "SD": {
+        "form": "SD",
+        "filed": "2026-05-28",
+        "report_date": null,
+        "items": [],
+        "description": "SD",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126023149/ef20073373_sd.htm"
+      },
+      "DEF 14A": {
+        "form": "DEF 14A",
+        "filed": "2026-01-08",
+        "report_date": "2026-02-24",
+        "items": [],
+        "description": "DEFINITIVE PROXY STATEMENT",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000130817926000008/aapl014016-def14a.htm"
+      },
+      "10-K": {
+        "form": "10-K",
+        "filed": "2025-10-31",
+        "report_date": "2025-09-27",
+        "items": [],
+        "description": "10-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
+      }
+    },
+    "events": [
+      {
+        "form": "8-K/A",
+        "filed": "2026-09-01",
+        "report_date": "2026-04-17",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K/A",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126035325/ef20081427_8ka.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-07-30",
+        "report_date": "2026-07-30",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/aapl-20260730.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-04-30",
+        "report_date": "2026-04-30",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000011/aapl-20260430.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-04-20",
+        "report_date": "2026-04-17",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126015711/ef20071035_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-02-24",
+        "report_date": "2026-02-24",
+        "items": [
+          "5.07",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126006577/ef20060722_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-01-29",
+        "report_date": "2026-01-29",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/aapl-20260129.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2026-01-02",
+        "report_date": "2025-12-30",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126000199/ef20060722_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-12-05",
+        "report_date": "2025-12-04",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036125044561/ef20060722_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-10-30",
+        "report_date": "2025-10-30",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000077/aapl-20251030.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-07-31",
+        "report_date": "2025-07-31",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000071/aapl-20250731.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-07-25",
+        "report_date": "2025-07-21",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036125027340/ef20052355_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-07-09",
+        "report_date": "2025-07-08",
+        "items": [
+          "5.02"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036125025275/ef20051741_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-05-12",
+        "report_date": "2025-05-05",
+        "items": [
+          "8.01",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036125018400/ef20048691_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-05-01",
+        "report_date": "2025-05-01",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000055/aapl-20250501.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-02-25",
+        "report_date": "2025-02-25",
+        "items": [
+          "5.07"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036125005876/ef20044022_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-01-30",
+        "report_date": "2025-01-30",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000007/aapl-20250130.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2025-01-03",
+        "report_date": "2024-12-30",
+        "items": [
+          "5.02"
+        ],
+        "description": "FORM 8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036125000228/ef20040370_8k.htm"
+      },
+      {
+        "form": "8-K",
+        "filed": "2024-10-31",
+        "report_date": "2024-10-31",
+        "items": [
+          "2.02",
+          "9.01"
+        ],
+        "description": "8-K",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000120/aapl-20241031.htm"
+      }
+    ],
+    "events_cover_since": "2024-10-07",
+    "cybersecurity_incidents": [],
+    "auditor_changes": [],
+    "non_reliance": [],
+    "insider_forms_last_90_days": 20,
+    "financials": [
+      {
+        "tag": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+        "label": "Revenue",
+        "value": 416161000000,
+        "unit": "USD",
+        "period_start": "2024-09-29",
+        "period_end": "2025-09-27",
+        "form": "10-K",
+        "filed": "2025-10-31",
+        "accession": "0000320193-25-000079",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json"
+      },
+      {
+        "tag": "us-gaap:NetIncomeLoss",
+        "label": "Net income (loss)",
+        "value": 112010000000,
+        "unit": "USD",
+        "period_start": "2024-09-29",
+        "period_end": "2025-09-27",
+        "form": "10-K",
+        "filed": "2025-10-31",
+        "accession": "0000320193-25-000079",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/NetIncomeLoss.json"
+      },
+      {
+        "tag": "us-gaap:Assets",
+        "label": "Total assets",
+        "value": 359241000000,
+        "unit": "USD",
+        "period_start": null,
+        "period_end": "2025-09-27",
+        "form": "10-K",
+        "filed": "2025-10-31",
+        "accession": "0000320193-25-000079",
+        "source": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/Assets.json"
+      }
+    ]
+  },
+  "lei": {
+    "lei": "HWUPKR0MPOU8FGXBT394",
+    "facts": [
+      {
+        "key": "lei.lei",
+        "label": "Legal Entity Identifier",
+        "value": "HWUPKR0MPOU8FGXBT394",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.legal_name",
+        "label": "Legal name",
+        "value": "Apple Inc.",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.other_names",
+        "label": "Other and previous names",
+        "value": [
+          "Apple Computer, Inc."
+        ],
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.jurisdiction",
+        "label": "Jurisdiction",
+        "value": "US-CA",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.legal_form",
+        "label": "Legal form (ISO 20275 code)",
+        "value": "H1UM",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.registry",
+        "label": "Business registry (GLEIF registration authority code)",
+        "value": "RA000598",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.registry_number",
+        "label": "Number in that registry",
+        "value": "806592",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.entity_status",
+        "label": "Entity status",
+        "value": "ACTIVE",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.created",
+        "label": "Entity created",
+        "value": "1977-01-03T00:00:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.legal_address",
+        "label": "Legal address (city, region, country)",
+        "value": "Glendale, US-CA, US",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.headquarters",
+        "label": "Headquarters (city, region, country)",
+        "value": "Cupertino, US-CA, US",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.registration_status",
+        "label": "LEI registration status",
+        "value": "ISSUED",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.first_registered",
+        "label": "LEI first registered",
+        "value": "2012-06-06T15:53:00Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.last_updated",
+        "label": "LEI record last updated",
+        "value": "2026-03-03T16:34:33Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.next_renewal",
+        "label": "LEI next renewal due",
+        "value": "2027-03-08T17:27:20Z",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      },
+      {
+        "key": "lei.corroboration",
+        "label": "How the LEI issuer corroborated the record",
+        "value": "FULLY_CORROBORATED",
+        "source": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      }
+    ],
+    "direct_parent": null,
+    "ultimate_parent": null
+  },
+  "dns": [
+    {
+      "key": "dns.dnssec",
+      "label": "Zone signed with DNSSEC and validated",
+      "value": false,
+      "source": "dns:apple.com A/DS"
+    },
+    {
+      "key": "dns.mta_sts",
+      "label": "MTA-STS record",
+      "value": null,
+      "source": "dns:_mta-sts.apple.com TXT"
+    },
+    {
+      "key": "dns.mta_sts_mode",
+      "label": "MTA-STS policy mode",
+      "value": null,
+      "source": "https://mta-sts.apple.com/.well-known/mta-sts.txt"
+    },
+    {
+      "key": "dns.tls_rpt",
+      "label": "SMTP TLS reporting record",
+      "value": null,
+      "source": "dns:_smtp._tls.apple.com TXT"
+    },
+    {
+      "key": "dns.bimi",
+      "label": "BIMI record",
+      "value": "v=BIMI1;l=https://www.apple.com/bimi/v2/apple.svg;a=https://www.apple.com/bimi/v2/apple.pem;",
+      "source": "dns:default._bimi.apple.com TXT"
+    },
+    {
+      "key": "dns.dmarc_policy",
+      "label": "DMARC policy",
+      "value": "quarantine",
+      "source": "dns:_dmarc.apple.com TXT"
+    }
+  ],
+  "entity": {
+    "id": "trooth:entity:lei:HWUPKR0MPOU8FGXBT394",
+    "name": "Apple Inc.",
+    "identifiers": [
+      "trooth:lei:HWUPKR0MPOU8FGXBT394",
+      "trooth:cik:0000320193"
+    ],
+    "basis": "the LEI binding is corroborated and so is the SEC filer binding"
+  },
+  "certificates": {
+    "source": "https://api.certspotter.com/v1/issuances?domain=apple.com&expand=issuer",
+    "unexpired": 5,
+    "issuers": [
+      "Apple"
+    ],
+    "newest_issued": "2026-09-30T15:28:37Z",
+    "soonest_expiry": "2026-10-20T19:10:47Z",
+    "page_full": false
+  },
+  "security_txt": {
+    "url": "https://apple.com/.well-known/security.txt",
+    "contacts": [
+      "https://security.apple.com"
+    ],
+    "expires": "2027-06-21T01:00:00.000Z",
+    "expired": false,
+    "policy": "https://security.apple.com/bounty/guidelines/",
+    "canonical": [],
+    "signed": false
+  },
+  "sanctions": {
+    "list": "OFAC Specially Designated Nationals and Blocked Persons List (entities, primary names)",
+    "source": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV",
+    "read_at": "2026-10-07T01:33:02.611Z",
+    "names_checked": [
+      "Apple Inc."
+    ],
+    "matches": []
+  },
+  "sources": [
+    {
+      "url": "https://apple.com/",
+      "status": 200,
+      "sha256": "4d2f4d0db40b5457fc19837d6ea430bb6b4aff990c45c5727661e2be7ec88347",
+      "bytes": 253633,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:55.262Z"
+    },
+    {
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "status": 200,
+      "sha256": "e89635068cd46772d1d3859ce2bc839fab781630787943a1874f258fa354e7a9",
+      "bytes": 163743,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:55.757Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+      "status": 200,
+      "sha256": "4495f7a16b4ade43dfa8041ac6477074122cbd5b88033e3e0f68b3f919e7ffbf",
+      "bytes": 18356,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:55.966Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/Revenues.json",
+      "status": 200,
+      "sha256": "ae228f6e452e9dd051b876be882802379f3a8a1569297ba4a8474ee437308c05",
+      "bytes": 2252,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.303Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/SalesRevenueNet.json",
+      "status": 200,
+      "sha256": "8b37365a7f187479d40d872ed51551ca40a3981268248b91ba2643cbfb152591",
+      "bytes": 31766,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.414Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/NetIncomeLoss.json",
+      "status": 200,
+      "sha256": "9b6ac23b024662c95dc7b4088a448bf60a31ff672e2f328161c5ceda6a8b9915",
+      "bytes": 50767,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.532Z"
+    },
+    {
+      "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/Assets.json",
+      "status": 200,
+      "sha256": "4378cc0249e20299870f7471471e05367f5c0faafdcc6addf739cd9f17648145",
+      "bytes": 19972,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.751Z"
+    },
+    {
+      "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+      "status": 200,
+      "sha256": "a79947744d64559989ba8bfc769c450961ee934c1ef670fc45631fe53da65643",
+      "bytes": 263131,
+      "complete": false,
+      "fetched_at": "2026-10-07T01:32:56.924Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Apple%20Inc.&page%5Bsize%5D=100",
+      "status": 200,
+      "sha256": "fb3dd8038f88a44ac95baa9b41404328fb84d3b399a318d3105413cd226ae15a",
+      "bytes": 58761,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:56.982Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394",
+      "status": 200,
+      "sha256": "ea400160e2d0957abbd41101c2a9f004f802c7c200866a65691d1e0a200151c3",
+      "bytes": 3109,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:32:58.276Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394/direct-parent",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T01:32:58.922Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394/ultimate-parent",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-07T01:32:59.826Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=apple.com&type=A&do=1",
+      "status": 200,
+      "sha256": "a6ad3cbab39d8d112a67a3826808305b58bb7e669fb71355e6223f178e5d9680",
+      "bytes": 182,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.699Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=apple.com&type=DS&do=1",
+      "status": 200,
+      "sha256": "0a2fdb9064bceb90582bd97cbd35e3812da06009b7ecd374ee2a754a1034c323",
+      "bytes": 1127,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_mta-sts.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "1956cb2115181c091900918fd28542628f8ac965486567d18cb4514d4f6cef73",
+      "bytes": 224,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_smtp._tls.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "5779e368e14d7b266f0fcb2ae69e59844c1434e10b4445c069c257e682c0cb3b",
+      "bytes": 269,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=default._bimi.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "a93850f2315307454af76ee1b8d2ef88c93979937361696ed3717bf77edbe86e",
+      "bytes": 301,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_dmarc.apple.com&type=TXT&do=1",
+      "status": 200,
+      "sha256": "d8e0ea73a4c103a2f8b5098c15767e191e3f88f56755fea699bbcfd6f10a3b23",
+      "bytes": 280,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.700Z"
+    },
+    {
+      "url": "https://apple.com/.well-known/security.txt",
+      "status": 200,
+      "sha256": "0df882de10a40e2c1d122ebdebf1e0ad2cc3486c1941950b4354e71d47df95ca",
+      "bytes": 337,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.763Z"
+    },
+    {
+      "url": "https://api.certspotter.com/v1/issuances?domain=apple.com&expand=issuer",
+      "status": 200,
+      "sha256": "1726499983cc1fec309798cdeaac761cec9338df8f805fbaf9cd8ec042ed5b40",
+      "bytes": 2968,
+      "complete": true,
+      "fetched_at": "2026-10-07T01:33:00.938Z"
+    }
+  ],
+  "not_read": [
+    {
+      "source": "Investor relations, sustainability and trust-center pages",
+      "reason": "linked from the home page when found (site.links), not read: they are often served behind bot protection, and a page that cannot be read is never guessed at"
+    },
+    {
+      "source": "SAM.gov registrations and exclusions",
+      "reason": "not read: the SAM.gov API needs a key Trooth does not yet hold"
+    },
+    {
+      "source": "Patent and trademark offices",
+      "reason": "not read: the USPTO APIs need a key Trooth does not yet hold"
+    },
+    {
+      "source": "State business registries",
+      "reason": "read only through the registry number the LEI record carries; there is no common API across the states"
+    }
+  ],
+  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. A sanctions entry with the same name is not an identification. Nothing here grades, rates or ranks the company. Trooth signs a statement that names this reading by its SHA-256 and logs it; the signature says what Trooth read and when, not that what the sources say is true.",
+  "declaration": {
+    "url": "https://proofs.example/.well-known/trooth.json",
+    "status": "checked",
+    "reason": "signed by proofs.example#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k, valid until 2027-10-01T00:00:00Z",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "issued_at": "2026-10-01T00:00:00Z",
+    "expires_at": "2027-10-01T00:00:00Z",
+    "keys": [
+      "proofs.example#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+    ],
+    "key_pinned_by_dns": true,
+    "products": [
+      {
+        "id": "widget",
+        "name": "Widget",
+        "url": "https://proofs.example/widget"
+      }
+    ],
+    "apis": [
+      {
+        "base_url": "https://api.proofs.example",
+        "mcp": {
+          "url": "https://api.proofs.example/mcp",
+          "manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      }
+    ],
+    "repositories": [
+      "https://github.com/proofs-example"
+    ]
+  },
+  "proofs": [
+    {
+      "id": "trooth_claim:1",
+      "binds": [
+        "trooth:domain:proofs.example",
+        "trooth:company:proofs-example"
+      ],
+      "proof_method": "identity_provider_sign_in",
+      "status": "confirmed",
+      "detail": "the publisher signed in through the Google Workspace hosted domain proofs.example when the record was claimed",
+      "source": "trooth record",
+      "observed_at": "2026-09-01T10:00:00.000Z"
+    },
+    {
+      "id": "declaration:1",
+      "binds": [
+        "trooth:domain:proofs.example",
+        "trooth:key:proofs.example#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+      ],
+      "proof_method": "domain_signed_declaration",
+      "status": "confirmed",
+      "detail": "the declaration at /.well-known/trooth.json checks and names this key",
+      "source": "https://proofs.example/.well-known/trooth.json",
+      "observed_at": "2026-10-07T01:32:55.261Z"
+    },
+    {
+      "id": "key_pin:1",
+      "binds": [
+        "trooth:domain:proofs.example",
+        "trooth:key:proofs.example#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+      ],
+      "proof_method": "dns_txt",
+      "status": "confirmed",
+      "detail": "_trooth-key.proofs.example names this key",
+      "source": "https://cloudflare-dns.com/dns-query?name=_trooth-key.proofs.example&type=TXT",
+      "observed_at": "2026-10-07T01:32:55.261Z"
+    },
+    {
+      "id": "repository:1",
+      "binds": [
+        "trooth:domain:proofs.example",
+        "trooth:repo:github.com/proofs-example"
+      ],
+      "proof_method": "repository_control",
+      "status": "not_read",
+      "detail": "GitHub answered 403; not read, never absent",
+      "source": "https://api.github.com/orgs/proofs-example",
+      "observed_at": null
+    }
+  ],
+  "subjects": [
+    {
+      "id": "trooth:company:proofs-example",
+      "kind": "company",
+      "basis": "the company record Trooth keeps for the domain"
+    },
+    {
+      "id": "trooth:product:proofs.example/widget",
+      "kind": "product",
+      "basis": "claimed by the domain's owner in its signed declaration"
+    },
+    {
+      "id": "trooth:person:3f9a0c2b7d1e4a65",
+      "kind": "person",
+      "basis": "the representative Trooth recorded at claim time; no personal data in the id"
+    },
+    {
+      "id": "trooth:key:proofs.example#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k",
+      "kind": "signing_authority",
+      "basis": "the company's key, published at its domain in a declaration that checks, and logged in this reading"
+    },
+    {
+      "id": "trooth:api:api.proofs.example",
+      "kind": "api",
+      "basis": "named in the company's signed declaration; MCP manifest sha256 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "evidence_classes": [
+    {
+      "class": "domain_declaration",
+      "sections": [
+        "declaration",
+        "proofs"
+      ],
+      "stale_after_days": 30,
+      "does_not_establish": "A key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it.",
+      "read": true,
+      "observed_at": "2026-10-07T01:32:55.261Z",
+      "stale_after": "2026-11-06T01:32:55.261Z"
+    },
+    {
+      "class": "trooth_claim_record",
+      "sections": [
+        "proofs"
+      ],
+      "stale_after_days": 365,
+      "does_not_establish": "Domain control at claim time; it does not establish that the person may act for the legal entity.",
+      "read": true,
+      "observed_at": "2026-09-01T10:00:00.000Z",
+      "stale_after": "2027-09-01T10:00:00.000Z"
+    }
+  ],
+  "continuity": {
+    "previous": {
+      "read_at": "2026-09-01T00:00:00.000Z",
+      "record_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "events": [
+      {
+        "kind": "declaration_appeared",
+        "detail": "a declaration that checks is published; the previous reading had none"
+      }
+    ]
+  }
+}

@@ -1,18 +1,18 @@
 # Guard results
 
-Written by `node scripts/guard-results.mjs --tlc <tla2tools.jar>` on 2026-10-07T09:49:01.648Z (Node v22.22.0), from an actual run of the files below. Do not edit by hand; run the script again.
+Written by `node scripts/guard-results.mjs --tlc <tla2tools.jar>` on 2026-10-07T20:43:15.088Z (Node v22.22.0), from an actual run of the files below. Do not edit by hand; run the script again.
 
 ## Test files
 
 | File | Tests | Pass | Fail | Skipped | Seconds |
 |---|---|---|---|---|---|
 | tests/guard-policy.test.mjs | 15 | 15 | 0 | 0 | 0.2 |
-| tests/guard.test.mjs | 20 | 20 | 0 | 0 | 1.3 |
-| tests/guard-cli.test.mjs | 9 | 9 | 0 | 0 | 6.8 |
-| tests/guard-adapters.test.mjs | 24 | 24 | 0 | 0 | 0.2 |
-| tests/guard-adversarial.test.mjs | 11 | 11 | 0 | 0 | 0.5 |
-| tests/guard-model.test.mjs | 5 | 5 | 0 | 0 | 8.3 |
-| all | 84 | 84 | 0 | 0 | |
+| tests/guard.test.mjs | 25 | 25 | 0 | 0 | 1.3 |
+| tests/guard-cli.test.mjs | 9 | 9 | 0 | 0 | 6.4 |
+| tests/guard-adapters.test.mjs | 26 | 26 | 0 | 0 | 0.2 |
+| tests/guard-adversarial.test.mjs | 11 | 11 | 0 | 0 | 0.6 |
+| tests/guard-model.test.mjs | 5 | 5 | 0 | 0 | 7.6 |
+| all | 91 | 91 | 0 | 0 | |
 
 ## Adversarial suite (tests/guard-adversarial.test.mjs)
 
@@ -42,11 +42,11 @@ TLA+ (spec/GuardDecision.tla with spec/GuardDecision.cfg): TLC exit status 0. Th
 
 ```
 TLC2 Version 2026.10.06.014338 (rev: 94d0c50)
-Finished computing initial states: 26873856 distinct states generated at 2026-10-07 09:48:12.
+Finished computing initial states: 26873856 distinct states generated at 2026-10-07 20:42:28.
 Model checking completed. No error has been found.
 53747712 states generated, 26873856 distinct states found, 0 states left on queue.
 The depth of the complete state graph search is 1.
-Finished in 02min 20s at (2026-10-07 09:48:59)
+Finished in 02min 13s at (2026-10-07 20:43:13)
 ```
 
 As a check that the invariants can fail, the same run model-checked a mutant of the spec with the absolute-rule branch removed (MaxRules = 1). TLC exit status 12:

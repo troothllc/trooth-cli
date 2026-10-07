@@ -10,7 +10,7 @@ Every adapter follows the same rules:
 - **A failure to decide** (the guard throws, the CLI cannot run, the answer is not a Decision) is a hold with `SOURCE_UNREACHABLE`. No adapter turns a failure into allow.
 - A tool the policy does not cover runs without a decision.
 - No adapter imports a framework package. Framework helpers (`interrupt`, `ToolMessage`, `Command`) are passed in.
-- `GuardHold` and `GuardDeny` errors carry the Decision in `.decision` and its reason codes in `.reasons`.
+- `GuardHold` and `GuardDeny` errors carry the Decision in `.decision` and its reason codes in `.reasons`. A framework may wrap what an adapter throws (LangChain JS `createAgent` and the OpenAI Agents SDK for JavaScript do); `guardDecisionOf(err)` from `trooth/guard/errors` finds the Decision inside such a wrapper, through `.cause` and `.error`.
 
 Each section names the framework documentation the adapter follows and the date it was read. Where an adapter returns a framework object by shape rather than by class, the section says so.
 
@@ -35,7 +35,7 @@ for (const item of result.interruptions) result.state.approve(item); // after a 
 result = await run(agent, result.state);
 ```
 
-`guardTool` sets `needsApproval` (true for a hold, so the run pauses with an interruption) and puts a tool input guardrail first in `inputGuardrails`. The guardrail returns the objects `ToolGuardrailFunctionOutputFactory` returns: `allow`; `throwException` for a deny, which raises `ToolInputGuardrailTripwireTriggered` and stops the run; and for a hold, `allow` when `context.isToolApproved` says a person approved this call, otherwise `rejectContent` with a plain message to the model. The parts are exported on their own: `troothToolInputGuardrail(guard)`, `troothNeedsApproval(guard, toolName)`, and `troothAgentInputGuardrail(guard, { extract })`, an agent input guardrail (`runInParallel: false`) whose tripwire fires on any hold or deny for actions named in the run's input. An input guardrail has no approval path, so there a hold stops the run.
+`guardTool` sets `needsApproval` (true for a hold, so the run pauses with an interruption) and puts a tool input guardrail first in `inputGuardrails`. The guardrail returns the objects `ToolGuardrailFunctionOutputFactory` returns: `allow`; `throwException` for a deny, which raises `ToolInputGuardrailTripwireTriggered` and stops the run; and for a hold, `allow` when `context.isToolApproved` says a person approved this call, otherwise `rejectContent` with a plain message to the model. In @openai/agents 0.19.0 the run rejects with `ToolCallError`, whose `.error` is the `ToolInputGuardrailTripwireTriggered`; `guardDecisionOf(err)` returns the Decision from it. Leave the run option `toolExecution.preApprovalInputGuardrails` off (the default): with it on, the SDK runs the input guardrail before asking for approval, so a held call is rejected with a message to the model and no person is asked. The parts are exported on their own: `troothToolInputGuardrail(guard)`, `troothNeedsApproval(guard, toolName)`, and `troothAgentInputGuardrail(guard, { extract })`, an agent input guardrail (`runInParallel: false`) whose tripwire fires on any hold or deny for actions named in the run's input. An input guardrail has no approval path, so there a hold stops the run.
 
 ## LangChain JS (createAgent middleware)
 
@@ -55,7 +55,7 @@ const agent = createAgent({
 await agent.invoke(new Command({ resume: { type: 'approve' } }), config);
 ```
 
-`troothMiddleware` returns the options for `createMiddleware`: a name and `wrapToolCall(request, handler)`. A hold calls `interrupt` when it is given; a resume of `true`, `'approve'`, `{ type: 'approve' }` or `{ decisions: [{ type: 'approve' }] }` runs the tool, and anything else answers the model with an error `ToolMessage` (or throws `GuardHold` without one). Without `interrupt`, a hold answers with an error `ToolMessage`, or throws. A deny throws `GuardDeny`; with `onDeny: 'message'` it answers with an error `ToolMessage` and the run goes on.
+`troothMiddleware` returns the options for `createMiddleware`: a name and `wrapToolCall(request, handler)`. A hold calls `interrupt` when it is given; a resume of `true`, `'approve'`, `{ type: 'approve' }` or `{ decisions: [{ type: 'approve' }] }` runs the tool, and anything else answers the model with an error `ToolMessage` (or throws `GuardHold` without one). Without `interrupt`, a hold answers with an error `ToolMessage`, or throws. A deny throws `GuardDeny`; with `onDeny: 'message'` it answers with an error `ToolMessage` and the run goes on. `createAgent` (langchain 1.5.15) wraps the `GuardDeny` in a `MiddlewareError` that keeps its `name` and holds it in `.cause`, so test with `guardDecisionOf(err)` rather than `instanceof GuardDeny`.
 
 ## LangGraph JS
 
@@ -76,7 +76,15 @@ const graph = new StateGraph(MessagesAnnotation)
   .compile({ checkpointer });
 ```
 
-The node decides every covered tool call in the last message, in order. A deny throws `GuardDeny` before any interrupt; with `Command` and `denyGoto` it returns `new Command({ goto: denyGoto })` instead (declare that node in `addNode`'s `ends`). Any hold calls `interrupt` once, with every held call and its Decision; resume with `new Command({ resume: { type: 'approve' } })` on the same `thread_id`. Anything other than approval throws `GuardHold`, or routes to `holdGoto`. The node runs again from the top on resume, so the guard decides again: a call that has become a deny is still stopped. `decisionsKey` writes the Decisions to a state key.
+The node decides every covered tool call in the last message, in order. A deny throws `GuardDeny` before any interrupt. Any hold calls `interrupt` once, with every held call and its Decision; resume with `new Command({ resume: { type: 'approve' } })` on the same `thread_id`. Anything other than approval throws `GuardHold`.
+
+To route instead of throwing, pass `Command`, `denyGoto`, `holdGoto` or both, and `toolsGoto` (the tool node), and do not add a static edge from the guard node. LangGraph runs a node's static edges in addition to the `goto` of a `Command` the node returns, so with `.addEdge('trooth_guard', 'tools')` in place the tools would run after a routed deny. With routing, the node returns `new Command({ goto: toolsGoto })` when the calls may run:
+
+```js
+graph.addNode('trooth_guard', createGuardNode(guard, { interrupt, Command, denyGoto: 'denied', toolsGoto: 'tools' }), { ends: ['tools', 'denied'] })
+// no .addEdge('trooth_guard', 'tools')
+```
+ The node runs again from the top on resume, so the guard decides again: a call that has become a deny is still stopped. `decisionsKey` writes the Decisions to a state key.
 
 ## HTTP (fetch)
 
@@ -133,7 +141,7 @@ builder.add_edge("trooth_guard", "tools")
 graph.invoke(Command(resume={"type": "approve"}), config)
 ```
 
-Same behavior as the JavaScript node: a deny raises `GuardDeny` (or `command=Command, deny_goto=`), a hold calls `interrupt` once for all held calls.
+Same behavior as the JavaScript node: a deny raises `GuardDeny`, a hold calls `interrupt` once for all held calls. To route, pass `command=Command`, `deny_goto=`, `hold_goto=` or both, and `tools_goto=`, declare `destinations=` in `add_node`, and add no static edge from the guard node, for the reason given for the JavaScript node.
 
 ### LangChain (Python)
 

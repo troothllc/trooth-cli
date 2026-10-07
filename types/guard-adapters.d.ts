@@ -43,6 +43,8 @@ export declare function describeDecision(decision: GuardDecisionLike): string;
 export declare function reasonCodes(decision: GuardDecisionLike): string[];
 export declare function failClosedDecision(guard: GuardLike | null, input: { tool?: string | null; host?: string | null }, detail: string): GuardDecisionLike;
 export declare function isApproval(resume: unknown): boolean;
+/** The Decision behind an error a framework threw (it walks .cause and .error), or null. */
+export declare function guardDecisionOf(err: unknown): GuardDecisionLike | null;
 
 // ---- trooth/guard/openai-agents -------------------------------------------
 export interface ToolGuardrailFunctionOutputLike {
@@ -83,6 +85,8 @@ export declare function createGuardNode(guard: GuardLike, opts: {
   Command?: new (args: { goto?: string; update?: unknown; resume?: unknown }) => unknown;
   denyGoto?: string;
   holdGoto?: string;
+  /** Required with denyGoto or holdGoto: the tool node. The graph then has no static edge from the guard node. */
+  toolsGoto?: string;
   onDecision?: (d: GuardDecisionLike) => void;
 }): (state: Record<string, unknown>) => Promise<Record<string, unknown> | unknown>;
 

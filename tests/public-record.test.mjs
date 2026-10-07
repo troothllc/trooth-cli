@@ -174,3 +174,23 @@ test('0.12.0 sections: SAM.gov, patents, state registries, merger review, the do
     assert.match(r.out, /subjects\s+trooth:domain:nvidia\.com, trooth:entity:lei:549300S4KLFTLO7GSQ80/);
   } finally { srv.close(); }
 });
+
+test('0.14.0: the declaration line and each proof with its method and status', async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'proofs.example'], port);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /declaration\s+checked https:\/\/proofs\.example\/\.well-known\/trooth\.json \(key proofs\.example#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k; pinned by DNS; valid until 2027-10-01; 1 product, 1 API, 1 repository\)/);
+    assert.match(r.out, /proof\s+identity provider sign in confirmed trooth:domain:proofs\.example to trooth:company:proofs-example: .* \(trooth record, 2026-09-01\)/);
+    assert.match(r.out, /proof\s+domain signed declaration confirmed trooth:domain:proofs\.example to trooth:key:proofs\.example#/);
+    assert.match(r.out, /proof\s+dns txt confirmed /);
+    assert.match(r.out, /proof\s+repository control not read trooth:domain:proofs\.example to trooth:repo:github\.com\/proofs-example: GitHub answered 403/);
+    assert.match(r.out, /continuity\s+declaration appeared/);
+    assert.match(r.out, /subjects\s+.*trooth:company:proofs-example, trooth:product:proofs\.example\/widget, trooth:person:3f9a0c2b7d1e4a65/);
+    const j = JSON.parse((await run(['public-record', 'proofs.example', '--json'], port)).out);
+    assert.equal(j.proofs.length, 4);
+    assert.equal(j.declaration.status, 'checked');
+    const a = await run(['public-record', 'apple.com'], port);
+    assert.doesNotMatch(a.out, /declaration|proof /, 'a reading from before 0.14.0 prints neither');
+  } finally { srv.close(); }
+});

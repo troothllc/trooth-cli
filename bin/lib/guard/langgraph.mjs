@@ -18,6 +18,13 @@
 //   graph.addNode('trooth_guard', guardNode).addNode('tools', toolNode)
 //        .addEdge('trooth_guard', 'tools')   // the model routes tool calls to trooth_guard
 //
+// Routing (denyGoto, holdGoto): LangGraph runs a node's static edges in
+// addition to the goto of a Command it returns, so a static edge from this
+// node to the tool node would run the tools after a deny. With routing, give
+// toolsGoto, add NO static edge from this node, and declare
+// { ends: [toolsGoto, denyGoto, holdGoto] } in addNode; the node then returns
+// new Command({ goto: toolsGoto }) when every covered call may run.
+//
 // The node reads the tool calls of the last message in state.messages
 // (tool_calls: [{ name, args, id }]) and decides each one the policy covers,
 // in order. Any deny -> GuardDeny is thrown, or with Command and denyGoto the
@@ -45,12 +52,15 @@ function toolCallsOf(state, messagesKey) {
  *   Command       the Command class, to route instead of throwing
  *   denyGoto      the node to go to on deny (needs Command)
  *   holdGoto      the node to go to when a person does not approve (needs Command)
+ *   toolsGoto     the tool node to go to when the calls may run (required with denyGoto or holdGoto)
  */
 export function createGuardNode(guard, opts = {}) {
   if (!guard || typeof guard.decideToolCall !== 'function') throw new TypeError('createGuardNode needs a guard from createGuard');
-  const { interrupt, messagesKey = 'messages', decisionsKey, Command, denyGoto, holdGoto, onDecision } = opts;
+  const { interrupt, messagesKey = 'messages', decisionsKey, Command, denyGoto, holdGoto, toolsGoto, onDecision } = opts;
   if (typeof interrupt !== 'function') throw new TypeError('createGuardNode needs the interrupt function from @langchain/langgraph');
   if ((denyGoto || holdGoto) && typeof Command !== 'function') throw new TypeError('denyGoto and holdGoto need the Command class');
+  // A static edge to the tool node would also run after a routed deny, so routing needs toolsGoto and no static edge.
+  if ((denyGoto || holdGoto) && (typeof toolsGoto !== 'string' || !toolsGoto)) throw new TypeError('denyGoto and holdGoto need toolsGoto, and the graph must have no static edge from this node');
 
   const update = (decisions) => (decisionsKey ? { [decisionsKey]: decisions } : {});
   return async function troothGuardNode(state) {
@@ -75,6 +85,7 @@ export function createGuardNode(guard, opts = {}) {
         throw new GuardHold(held[0].decision);
       }
     }
+    if (toolsGoto) return new Command({ goto: toolsGoto, update: update(decisions) });
     return update(decisions);
   };
 }

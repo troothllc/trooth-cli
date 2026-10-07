@@ -57,6 +57,23 @@ export class GuardDeny extends GuardError {
   }
 }
 
+/**
+ * The Decision behind an error a framework threw, or null. Frameworks wrap
+ * what a tool hook throws: LangChain JS createAgent wraps GuardDeny in
+ * MiddlewareError (the original in .cause), and @openai/agents wraps the tool
+ * input tripwire in ToolCallError (the original in .error, the Decision in
+ * .result.output.outputInfo.decision). This walks .cause and .error.
+ */
+export function guardDecisionOf(err) {
+  for (let e = err, i = 0; e && typeof e === 'object' && i < 8; e = e.cause ?? e.error, i++) {
+    // By code as well as by class, so a second copy of this module (a bundler, two installs) still matches.
+    if ((e instanceof GuardError || e.code === 'TROOTH_GUARD_HOLD' || e.code === 'TROOTH_GUARD_DENY') && DECISIONS.has(e.decision?.decision)) return e.decision;
+    const d = e.result?.output?.outputInfo?.decision;
+    if (d && typeof d === 'object' && DECISIONS.has(d.decision)) return d;
+  }
+  return null;
+}
+
 /** The error for a hold or deny Decision; null for allow. */
 export function errorFor(decision) {
   if (decision?.decision === 'deny') return new GuardDeny(decision);

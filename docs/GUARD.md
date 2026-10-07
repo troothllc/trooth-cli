@@ -100,7 +100,7 @@ Every claim comes from a signed artifact that the guard checked locally. A claim
 | `no_sam_exclusion_name_match` | the public record statement | SAM.gov was read and no exclusion has the same name | `procurement_exclusion` (7 days) |
 | `domain_registration_record` | the public record statement | `domain_registration` is present | `domain_registration` (30 days) |
 | `security_txt_published` | the public record statement | `security_txt` is present and not expired | `site_publication` (30 days) |
-| `domain_control_confirmed` | none today | never | |
+| `domain_control_confirmed` | the public record statement (since trooth 0.14.0) | a proof in `proofs` binds `trooth:domain:<domain>` to a `trooth:company:<slug>` record or to `trooth:key:<domain>#<thumbprint>`, by `dns_txt`, `domain_email_code`, `identity_provider_sign_in` or `domain_signed_declaration`, with status `confirmed`; observed at the proof's `observed_at` (never later than the reading) | `trooth_claim_record` (365 days) for the company record, `domain_declaration` (30 days) for the declaration key |
 
 The public record statement is checked the way `trooth public-record` checks it: the record without `signed` is canonicalized with RFC 8785, its SHA-256 must equal `signed.record_sha256` and the statement payload's `record_sha256`; the payload must be RFC 8785 bytes signed with Ed25519, name the envelope key as its signer, and name this reading's domain, `read_at` and `subject_id`; the signature must check against the key list, and the key must have been trusted at `issued_at`; the log receipt (entry kind `public_record`) must check against the pinned log key.
 
@@ -108,7 +108,7 @@ Freshness: a rule's `max_age_days` when it gives one, else the stale-after time 
 
 Each claim carries `fact_id` (`trooth:statement:<sha256>#<claim>`), `statement_sha256`, `log_index`, `observed_at` and `stale_after`, and appears in the decision's `evidence`.
 
-`domain_control_confirmed` is not a signed claim today. The Trust Profile's authority note says domain control is required to publish, but that is not in any signed artifact, so a rule requiring it always finds it missing and holds.
+`domain_control_confirmed` is a signed claim since trooth 0.14.0. It comes from the `proofs` in the signed public record ([EVIDENCE.md](EVIDENCE.md) section 11), checked with the rest of that record, and nowhere else. A proof counts only when it binds the domain to the company record or to the company's own declaration key, its method is one of the four that show control of the domain, and its status is `confirmed`. A proof that is `claimed`, `not_found` or `not_read`, a proof by any other method (`repository_control`, `registry_record` and the rest), and a proof binding anything else (a repository, another domain's key, Trooth's own key) leave the claim missing, and a rule requiring it holds with `EVIDENCE_MISSING`. When several proofs qualify, the one that stays fresh longest counts. What the claim shows is control of the domain: at claim time for Trooth's record, or of the site's content when Trooth read the declaration. It does not establish the legal entity, or that a person may act for it.
 
 ## 5. The decision table
 
@@ -178,7 +178,7 @@ Duck-typed adapters that import no framework package (documented with their code
 - It does not label a company safe or unsafe, and it does not rate, score, rank or certify anyone. An allow says only that the evidence your policy requires was signed, logged, fresh and checked on your machine.
 - It does not grant permission. An allow in the hook leaves Claude Code's own permission flow in place; in a framework, your own controls still apply.
 - It does not read prose, and no model takes part in the decision.
-- `domain_control_confirmed` is not a signed claim today; a rule requiring it holds.
+- `domain_control_confirmed` shows control of the domain, not the legal entity and not a person's authority to act for it; a rule requiring it holds when the signed public record carries no confirmed proof by a qualifying method.
 - A sanctions or SAM.gov name match is not an identification, and no match does not show that a company is not sanctioned or excluded under another name.
 - It does not check what Trooth did not read, and it does not establish anything a claim's evidence class says it does not establish.
 
@@ -196,7 +196,7 @@ Duck-typed adapters that import no framework package (documented with their code
 | all | 2 | usage error (a missing flag, a policy that does not parse) |
 | all | 7 | output not delivered |
 
-20, 21 and 22 are outside the CLI's existing table (0 to 10).
+20, 21 and 22 are outside the CLI's existing table (0 to 11).
 
 ## 13. Phase 4 exit conditions, and where they stand
 

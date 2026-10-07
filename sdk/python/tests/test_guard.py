@@ -147,6 +147,12 @@ class Core(unittest.TestCase):
 class CrewAI(unittest.TestCase):
     def test_task_guardrail(self):
         g = tg_crewai.task_guardrail(POLICY, "pay.out", **KW)
+        # CrewAI's Task validator reads the return annotation with typing.get_origin; it must be the real type, not a string.
+        import inspect
+        import typing
+        ann = inspect.signature(g).return_annotation
+        self.assertIs(typing.get_origin(ann), tuple)
+        self.assertEqual(typing.get_args(ann), (bool, typing.Any))
         out = SimpleNamespace(raw=json.dumps({"url": "https://good.example/pay"}), json_dict=None, pydantic=None)
         self.assertEqual(g(out), (True, out))
         ok, msg = g(SimpleNamespace(raw='{"url": "https://bad.example/x"}', json_dict=None, pydantic=None))
@@ -193,6 +199,11 @@ class LangGraph(unittest.TestCase):
         self.assertEqual(u["trooth"][0]["decision"]["decision"], "allow")
         with self.assertRaises(TypeError):
             tg_langgraph.guard_node(POLICY, interrupt=lambda p: None, deny_goto="x")
+        # Routing without tools_goto is refused: a static edge would also run the tools after a routed deny.
+        with self.assertRaises(TypeError):
+            tg_langgraph.guard_node(POLICY, interrupt=lambda p: None, command=FakeCommand, deny_goto="x")
+        routed = tg_langgraph.guard_node(POLICY, interrupt=lambda p: self.fail("no interrupt"), command=FakeCommand, deny_goto="x", tools_goto="tools", **KW)
+        self.assertEqual(routed(self.state({"name": "pay.out", "args": {"url": "good.example"}, "id": "a"})).goto, "tools")
 
     def test_hold_interrupts_once(self):
         payloads = []
@@ -204,7 +215,7 @@ class LangGraph(unittest.TestCase):
         self.assertEqual([x["tool_call"]["id"] for x in payloads[0]["held"]], ["a", "b"])
         with self.assertRaises(GuardHold):
             node({"type": "reject"})(s)
-        c = node(False, command=FakeCommand, hold_goto="review")(s)
+        c = node(False, command=FakeCommand, hold_goto="review", tools_goto="tools")(s)
         self.assertEqual(c.goto, "review")
 
     def test_deny_before_interrupt(self):
@@ -212,7 +223,7 @@ class LangGraph(unittest.TestCase):
         asked = []
         with self.assertRaises(GuardDeny):
             tg_langgraph.guard_node(POLICY, interrupt=lambda p: asked.append(p), **KW)(s)
-        c = tg_langgraph.guard_node(POLICY, interrupt=lambda p: asked.append(p), command=FakeCommand, deny_goto="blocked", decisions_key="d", **KW)(s)
+        c = tg_langgraph.guard_node(POLICY, interrupt=lambda p: asked.append(p), command=FakeCommand, deny_goto="blocked", tools_goto="tools", decisions_key="d", **KW)(s)
         self.assertEqual((c.goto, len(c.update["d"])), ("blocked", 2))
         self.assertEqual(asked, [])
 
@@ -314,6 +325,11 @@ class OpenAIAgents(unittest.TestCase):
         self.assertFalse(asyncio.run(na(None, {"url": "good.example"}, "c2")))
         self.assertFalse(asyncio.run(na(None, {"url": "bad.example"}, "c3")))
         self.assertTrue(asyncio.run(na(None, {"url": "crash.example"}, "c4")))
+        # A tool the policy does not cover: decide() returns None, so no approval is needed and nothing is decided.
+        seen = []
+        uncovered = tg_openai.needs_approval(POLICY, "uncovered.tool", on_decision=seen.append, **KW)
+        self.assertFalse(asyncio.run(uncovered(None, {"url": "bad.example"}, "c5")))
+        self.assertEqual(seen, [])
 
     def test_duck_output_matches_sdk_names(self):
         self.assertEqual(tg_openai._Output.allow().behavior, {"type": "allow"})
