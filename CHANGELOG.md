@@ -2,6 +2,16 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.16.0 (2026-10-08)
+
+### Mirrors of the witness statement log; IANA considerations for the discovery file
+
+- New `trooth mirror <dir> [--from <url|dir>]` (bin/lib/mirror.mjs, docs/MIRRORS.md): reads the log's signed checkpoint, checks it with the pinned log key, reads every entry bundle, recomputes the root (RFC 9162) and writes nothing unless it is the signed root. Hash tiles are derived from the entries; the checkpoint is written last. A second run accepts only a tree whose first entries hash to the root the mirror already holds, so a mirror never shrinks and never takes a rewritten history (exit 9, mirror untouched). `--from` copies from another mirror with the same checks.
+- New `trooth mirror --check <dir|url>`: a mirror is compatible when its checkpoint is signed by the log key, its entries hash to the checkpoint's root, every hash tile it serves is the one its entries make, and the live log extends it (same root at the same size, or a consistency proof). A live log smaller than a faithful mirror is reported: it is evidence of a split view or a lost tail. Named URLs must be https (loopback http is allowed, for testing).
+- New `tests/mirror.test.mjs` in `npm test`: tile paths, bundles, multi-level tiles, and the command end to end against a loopback log (growth, a forked source, a changed entry, a wrong or missing tile, a mirror ahead of the log, a mirror of a mirror).
+- New `.github/workflows/log-mirror.yml`: a daily mirror on GitHub's runners, checked and kept as an artifact. It runs in Trooth's own organization and is not an independent mirror.
+- docs/DECLARATION.md section 8: the Well-Known URIs registration (RFC 8615) for `trooth.json` and the RFC 8552 registration for `_trooth-key`, and the versioning rule for `trooth.declaration`. Neither registration has been submitted.
+
 ## 0.15.0 (2026-10-07)
 
 ### guard ci reads destinations, not dotted keys; fuzzing, CodeQL and a threat model; the pilots as nightly CI; Phase 4 exit as amended
