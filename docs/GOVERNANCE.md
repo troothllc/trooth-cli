@@ -64,3 +64,38 @@ An exit code or a command of `trooth` is removed only in a major release, after 
 ## 7. Compatibility
 
 An implementation that passes the test vectors for a format version is compatible with it. Every accepted change ships with its vectors.
+
+## 8. Independent advisory panel
+
+Trooth wants input from people who do not work for it, in the three areas where a mistake by Trooth would harm people who rely on its records:
+
+1. **Cryptography and transparency logs:** the log, checkpoints, keys and their ceremonies, witnesses, receipts.
+2. **Identity:** how a domain, a legal entity and a person are tied together (proof methods, the discovery file, sign-in evidence).
+3. **Buyer risk:** whether what Trooth shows a buyer, and what it leaves out, leads to sound decisions.
+
+**Seats.** There are three seats, one for each area. A term is two years. A member may not be employed by Trooth, may not hold equity in it, and is never paid in a way that depends on what they conclude. Each member's name and any conflicts of interest are published here.
+
+**What a member does.**
+
+- Comments on any proposed change to a format or to a key ceremony (section 3) before it is accepted.
+- Writes a yearly note in their own words, published here unedited.
+- At the request of a party, reviews a reopened correction case (trooth.co/corrections, section 9).
+
+Trooth answers each recommendation in writing, here, whether it accepts it or not, and gives its reasons.
+
+**What a member is not.** Members are not auditors or certifiers. Trooth never presents a member's input as an endorsement.
+
+**Joining.** To be considered for a seat, write to security@trooth.co with the area, your background and any conflicts.
+
+**Seats as of October 8, 2026: all three open.**
+
+## 9. Independent input received
+
+Each item of outside input on these formats is listed here, newest first, with where to read it.
+
+| Date | From | On | Where |
+|---|---|---|---|
+| 2026-10-08 | Requested: the IANA designated expert for Well-Known URIs | `trooth.json` (DECLARATION.md) | Registration request sent; review pending |
+| 2026-10-08 | Requested: IANA | `_trooth-key` DNS node name | Ticket #1461299; review pending |
+
+A request is listed when it is made. Its outcome is added when it arrives, whatever it is.

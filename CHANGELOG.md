@@ -2,6 +2,13 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.16.2 (2026-10-08)
+
+### An independent advisory panel
+
+- docs/GOVERNANCE.md section 8: the charter of an independent advisory panel, with three seats (cryptography and transparency logs, identity, buyer risk). It covers who may serve, what members do (comment on format changes, a yearly note published unedited, and review of a reopened correction case at a party's request), how Trooth answers, and how to apply. All three seats are open.
+- Section 9: a public list of outside input on the formats. The IANA requests for `trooth.json` and `_trooth-key`, sent on 2026-10-08, are the first two entries, both pending. No code changed.
+
 ## 0.16.1 (2026-10-08)
 
 ### How the formats change
