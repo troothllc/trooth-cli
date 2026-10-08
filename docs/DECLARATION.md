@@ -110,3 +110,25 @@ Each step is a change Trooth's readings record as `declaration_key_changed`. A k
 | all | 7 | output not delivered |
 
 11 is new in trooth 0.14.0; the others are the CLI's existing codes with their existing meanings.
+
+## 8. IANA considerations
+
+This document is meant to be the specification for two registrations. Neither has been submitted.
+
+**Well-Known URIs registry** ([RFC 8615](https://www.rfc-editor.org/rfc/rfc8615) section 3.1; registration policy: Specification Required):
+
+| Field | Value |
+|---|---|
+| URI suffix | `trooth.json` |
+| Change controller | Trooth, LLC (security@trooth.co) |
+| Specification document | This document, sections 1 and 2 |
+| Status | provisional |
+| Related information | The document is a JSON object signed by a key the domain publishes in it. Its media type is `application/json`. |
+
+**Underscored and Globally Scoped DNS Node Names registry** ([RFC 8552](https://www.rfc-editor.org/rfc/rfc8552) section 4; registration policy: Expert Review):
+
+| RR Type | _NODE NAME | Reference |
+|---|---|---|
+| TXT | `_trooth-key` | This document, section 4 |
+
+**Changes to this format** follow semantic versioning on `format`. A change that existing checkers would read differently gets a new value (`trooth.declaration.v2`), and checkers of this version keep reading v1 documents for at least 12 months after v2 is published. A clarification that changes no result is made in place and dated at the top of this document.
