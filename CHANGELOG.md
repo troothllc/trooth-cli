@@ -2,6 +2,13 @@
 
 Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
 
+## 0.16.1 (2026-10-08)
+
+### How the formats change
+
+- New `docs/GOVERNANCE.md`: the public change process for Trooth's formats. It covers RFCs opened as issues (acknowledged within 5 business days), comment periods of 30 days for a change that alters results and 14 for an addition, written decisions and credit, major and minor versions, migration windows (the old version is produced for at least 6 months and checked for at least 12), and deprecation (at least 90 days' notice). The api.trooth.co contract keeps its own policy at trooth.co/api-versioning.
+- New issue template `.github/ISSUE_TEMPLATE/rfc.yml`. No code changed.
+
 ## 0.16.0 (2026-10-08)
 
 ### Mirrors of the witness statement log; IANA considerations for the discovery file

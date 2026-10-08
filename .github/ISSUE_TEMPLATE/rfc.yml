@@ -1,0 +1,41 @@
+name: RFC (a change to a Trooth format)
+description: Propose a change to a format Trooth publishes or checks. The process is in docs/GOVERNANCE.md.
+title: "RFC: "
+labels: ["rfc:proposed"]
+body:
+  - type: input
+    id: formats
+    attributes:
+      label: Format(s) and version(s)
+      placeholder: trooth.declaration.v1
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What cannot be expressed or checked today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change, written as spec text.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility
+      description: What an existing checker does with a document that uses the change.
+    validations:
+      required: true
+  - type: textarea
+    id: vectors
+    attributes:
+      label: Test vectors
+      description: Cases that should pass and fail.
+  - type: markdown
+    attributes:
+      value: "Security problems go to security@trooth.co, not to a public issue."
