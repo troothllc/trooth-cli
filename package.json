@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "The Trooth Network in your terminal. Read a company's public record with no key and no account: each fact with its provenance, the evidence state and the record version, as the API serves it. Also reads what your repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
