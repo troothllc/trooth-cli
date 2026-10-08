@@ -62,7 +62,7 @@ Not considered: an attacker with code execution on the machine running the guard
 | T16 | Elevation: a malformed facts object or a caller value passes as complete evidence | `decideFrom` reads facts strictly (exactly `true`, a number of witnesses, an own well-formed claim); a value with no String form is decided, not thrown | FUZZ-REG-2, FUZZ-REG-4; fuzz invariant 2; tests/guard-model.test.mjs (exhaustive) and spec/GuardDecision.tla |
 | T17 | Elevation: an adapter lets a held or denied call run (framework wrappers, static graph edges, approval paths) | Adapters fail closed: a deny is never approvable; LangGraph routing needs `toolsGoto` and no static edge; `guardDecisionOf` finds the Decision inside wrapped errors; the hook exits 2 on any failure | tests/guard-adapters.test.mjs; sdk/python/tests; pilots against the real frameworks, nightly |
 | T18 | Elevation: a change adds a new destination for money or data without review | `trooth guard ci` lists every added URL host and every bare host under a host-like key that the policy does not allow, and fails the build (section 7) | tests/guard-cli.test.mjs "guard ci" tests |
-| T19 | Supply chain: a dependency or a workflow action is swapped | The guard imports only `node:` built-ins (the CLI's one pinned dependency, yaml, is not used by the guard); workflow actions are pinned by full commit SHA; CodeQL runs on every push | .github/workflows/codeql.yml; ci.yml dependency check |
+| T19 | Supply chain: a dependency or a workflow action is swapped | The guard imports only `node:` built-ins (the CLI's one pinned dependency, yaml, is not used by the guard); workflow actions are pinned by full commit SHA; CodeQL runs on every push | GitHub code scanning (default setup); ci.yml dependency check |
 
 ## 6. What the decision table guarantees
 
@@ -84,4 +84,4 @@ These are not mitigated today, or only in part. They are stated so a customer ca
 
 ## 8. Review status
 
-Reviewed internally by separate review passes on 2026-10-07 (9 defects fixed); Trooth-run pilots against the real frameworks (4 defects fixed); fuzzing (tests/guard-fuzz.test.mjs, in `npm test`, which found 4 further defects, fixed in 0.15.0) and CodeQL (.github/workflows/codeql.yml) in CI. No outside party has reviewed it. Outside review is planned for the launch phase (GUARD.md section 13).
+Reviewed internally by separate review passes on 2026-10-07 (9 defects fixed); Trooth-run pilots against the real frameworks (4 defects fixed); fuzzing (tests/guard-fuzz.test.mjs, in `npm test`, which found 4 further defects, fixed in 0.15.0) and CodeQL (GitHub's default code scanning setup) on every push. No outside party has reviewed it. Outside review is planned for the launch phase (GUARD.md section 13).
