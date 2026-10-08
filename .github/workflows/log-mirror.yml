@@ -1,0 +1,58 @@
+name: Witness log mirror
+
+# A mirror of Trooth's witness statement log (docs/MIRRORS.md), made once a
+# day on GitHub's runners: every entry is read, rebuilt into leaf hashes and
+# checked against the signed checkpoint; the copy only grows by extension of
+# the one kept from the last run; then the copy is checked against the live
+# log (a consistency proof). The copy is kept in the Actions cache between
+# runs and uploaded as an artifact. This runs on infrastructure Trooth does not
+# operate, in Trooth's own organization: it is not an independent mirror.
+#
+# Anyone can run the same thing: trooth mirror <dir>; trooth mirror --check <dir>.
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: log-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: A full copy that checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install from the lock, scripts off
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: The copy kept from the last run
+        uses: actions/cache/restore@v6
+        with:
+          path: trooth-log
+          key: trooth-log-${{ github.run_id }}
+          restore-keys: trooth-log-
+      - name: Mirror (append-only, every entry checked against the signed root)
+        run: node bin/trooth.mjs mirror trooth-log
+      - name: Check the copy against the live log
+        run: node bin/trooth.mjs mirror --check trooth-log
+      - name: Keep the copy
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: trooth-log
+          key: trooth-log-${{ github.run_id }}
+      - name: Upload the copy
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trooth-log-mirror
+          path: trooth-log
+          retention-days: 30

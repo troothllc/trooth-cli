@@ -134,6 +134,8 @@ import { verifyStatement, bundleInputs, makeBundle, BundleError } from './lib/ve
 import { openCheckpoint, verifyConsistency, verifyNote, fromB64, toB64, parseVkey, checkReceipt, LOG_ORIGIN } from './lib/tlog.mjs';
 import { PINNED_LOG_VKEYS, PINNED_WITNESSES, HARDWARE_LOG_VKEY } from './lib/log-trust.mjs';
 import { checkCosignatures } from './lib/witness.mjs';
+import { entryBundles, parseBundle, hashTiles, tilePath, treeOf } from './lib/mirror.mjs';
+import { rootOf } from './lib/tlog.mjs';
 import { checkCoseReceipt, keysFromKeySet } from './lib/cose.mjs';
 import { canonicalize, canonicalizeRecord, isCanonical } from './lib/jcs.mjs';
 import { keyTrust, keyBytes } from './lib/verify.mjs';
@@ -260,6 +262,7 @@ const FLAGS = {
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
   verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
   log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
+  mirror: { bool: ['--json', '--check'], value: ['--from', '--log-vkey'] },
   'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey'] },
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
   declare: { bool: ['--json', '--no-dns'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
@@ -318,6 +321,8 @@ ${B}Usage${X}
   trooth log checkpoint     Read and check the witness statement log's signed checkpoint
   trooth log monitor --state <file>   Check the log only grew since the checkpoint in <file>
   trooth log receipt <index>  Fetch and check the COSE receipt (RFC 9942) for one log entry
+  trooth mirror <dir> [--from <url>]   Copy the log into <dir> (C2SP tiles), checking every entry against the signed root
+  trooth mirror --check <dir|url>      Check a mirror: its checkpoint, its entries, its tiles, and that the live log extends it
   trooth public-record <domain>  What the company published to regulators and registries, signed
   trooth mcp-tools [endpoint]  The MCP servers whose tool lists Trooth logs, or one server's tool hashes
   trooth guard decide --policy <file> --tool <name> [--host <host>] [--args <json>]
@@ -1956,6 +1961,144 @@ ${cosignLines(cos)}${short ? `\n  ${R}${short}${X}` : ''}
   }
 }
 
+/* -------------------------------------------------------------- mirror ---- */
+
+const MIRROR_MAX_TILE = 32 * 1024 * 1024;
+const isUrl = (s) => /^https?:\/\//.test(s);
+/** A URL a user names must be https, except a loopback address (a mirror being tested locally). */
+function checkSourceUrl(s, flag) {
+  if (/^http:\/\//.test(s) && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(\/|$)/.test(s)) fail(EXIT.USAGE, `${flag}: ${s} is plain http; a mirror is read over https (or from a directory).`);
+}
+
+/** Read one path of a log or mirror: an https base (the live log, or a mirror's host), or a local directory. */
+async function readFromSource(src, path, max) {
+  if (isUrl(src)) return getBytes(`${src.replace(/\/+$/, '')}/${path}`, max);
+  const f = join(src, ...path.split('/'));
+  if (!existsSync(f)) throw new Upstream(`${f} is missing`, {});
+  return readFileSync(f);
+}
+
+/** Open a checkpoint note with the pinned (or --log-vkey) log keys. */
+function openWithKeys(note, flags) {
+  const { vkeys, source } = logVkeys(flags);
+  if (!vkeys.length) fail(EXIT.USAGE, `no log key is pinned in trooth ${VERSION}; give --log-vkey.`);
+  let why = '';
+  for (const k of vkeys) { try { return { cp: openCheckpoint(note, k), source }; } catch (e) { why = e.message; } }
+  return { cp: null, why, source };
+}
+
+/** Read a whole tree from a source and check it against its own signed checkpoint. */
+async function readTree(src, flags) {
+  const note = (await readFromSource(src, 'checkpoint', 64 * 1024)).toString('utf8');
+  const { cp, why, source } = openWithKeys(note, flags);
+  if (!cp) return { ok: false, problem: `the checkpoint at ${src} does not check: ${why}` };
+  const size = Number(cp.size);
+  const bundles = [];
+  const entries = [];
+  for (const b of entryBundles(size)) {
+    const path = tilePath('entries', b.index, b.width);
+    const bytes = await readFromSource(src, path, MIRROR_MAX_TILE);
+    let es;
+    try { es = parseBundle(bytes, b.width); } catch (e) { return { ok: false, problem: `${path}: ${e.message}` }; }
+    bundles.push({ path, bytes });
+    entries.push(...es);
+  }
+  const { leaves, root } = treeOf(entries);
+  if (!root.equals(cp.root)) return { ok: false, problem: `the entries at ${src} hash to ${toB64(root)}, not the signed root ${toB64(cp.root)}` };
+  return { ok: true, note, cp, size, root, leaves, bundles, vkey_source: source };
+}
+
+async function mirrorCmd() {
+  const { flags, positional } = parseArgs('mirror');
+  if (positional.length !== 1) fail(EXIT.USAGE, flags['--check'] ? 'trooth mirror --check takes one mirror: a directory or an https URL.' : 'trooth mirror takes one directory to write the mirror into. Try: trooth mirror ./trooth-log');
+  const target = positional[0];
+  try {
+    if (flags['--check']) return await mirrorCheck(target, flags);
+    if (isUrl(target)) fail(EXIT.USAGE, 'trooth mirror writes to a local directory; to check a mirror at a URL use --check.');
+    const from = flags['--from'] || LOG_BASE;
+    if (flags['--from'] && isUrl(from)) checkSourceUrl(from, '--from');
+    if (flags['--from'] && !isUrl(from) && !existsSync(from)) fail(EXIT.USAGE, `--from: ${from} is neither an https URL nor a directory.`);
+    const t = await readTree(from, flags);
+    if (!t.ok) { if (asJson) emitJson({ log: LOG_ORIGIN, mirrored: false, problem: t.problem }); else out(`${R}Not mirrored.${X} ${t.problem}`); return EXIT.MISMATCH; }
+    // An existing mirror only ever grows, and only by extension of what it holds.
+    let previous = null;
+    const cpFile = join(target, 'checkpoint');
+    if (existsSync(cpFile)) {
+      const old = openWithKeys(readFileSync(cpFile, 'utf8'), flags);
+      if (!old.cp) fail(EXIT.USAGE, `${cpFile} is not a checkpoint this log signed; choose an empty directory.`);
+      const m = Number(old.cp.size);
+      previous = m;
+      let problem = null;
+      if (m > t.size) problem = `the source holds ${t.size} entries, fewer than the ${m} this mirror already holds`;
+      else if (!rootOf(t.leaves.slice(0, m)).equals(old.cp.root)) problem = `the source's first ${m} entries do not hash to the root this mirror holds for size ${m}`;
+      if (problem) {
+        if (asJson) emitJson({ log: LOG_ORIGIN, mirrored: false, previous_size: m, tree_size: t.size, problem });
+        else out(`${R}NOT CONSISTENT${X}: ${problem}. The mirror was left as it was.`);
+        return EXIT.MISMATCH;
+      }
+    }
+    const write = (path, bytes) => { const f = join(target, ...path.split('/')); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, bytes); };
+    for (const b of t.bundles) write(b.path, b.bytes);
+    const tiles = hashTiles(t.leaves);
+    for (const tile of tiles) write(tilePath(tile.level, tile.index, tile.width), tile.bytes);
+    write('mirror.json', Buffer.from(JSON.stringify({ log: LOG_ORIGIN, tree_size: t.size, root_hash: toB64(t.root), mirrored_from: from, mirrored_at: new Date().toISOString(), by: `trooth-cli/${VERSION}`, layout: 'https://c2sp.org/tlog-tiles' }, null, 2) + '\n'));
+    write('checkpoint', Buffer.from(t.note, 'utf8')); // last: a reader never sees a checkpoint ahead of its tiles
+    const doc = { log: LOG_ORIGIN, mirrored: true, directory: target, previous_size: previous, tree_size: t.size, root_hash: toB64(t.root), entry_bundles: t.bundles.length, hash_tiles: tiles.length, mirrored_from: from, vkey_source: t.vkey_source };
+    if (asJson) emitJson(doc);
+    else out(`${B}${LOG_ORIGIN}${X}  ${J}mirrored${X}: ${previous === null ? `${t.size} entries` : `size ${previous} to ${t.size}, append-only`}
+  root hash  ${toB64(t.root)} ${D}(recomputed from every entry; matches the signed checkpoint)${X}
+  written    ${target} ${D}(${t.bundles.length} entry bundle${t.bundles.length === 1 ? '' : 's'}, ${tiles.length} hash tile${tiles.length === 1 ? '' : 's'}, checkpoint, mirror.json)${X}
+  ${D}serve the directory as static files and it is a mirror anyone can check: trooth mirror --check <url>${X}`);
+    return EXIT.OK;
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+}
+
+async function mirrorCheck(target, flags) {
+  if (isUrl(target)) checkSourceUrl(target, '--check');
+  else if (!existsSync(target)) fail(EXIT.USAGE, `${target} is neither an https URL nor a directory.`);
+  const t = await readTree(target, flags);
+  const problems = [];
+  if (!t.ok) problems.push(t.problem);
+  let tilesOk = null, live = null, extends_ = null;
+  if (t.ok) {
+    tilesOk = true;
+    for (const tile of hashTiles(t.leaves)) {
+      const path = tilePath(tile.level, tile.index, tile.width);
+      let got = null;
+      try { got = await readFromSource(target, path, MIRROR_MAX_TILE); } catch { got = null; }
+      if (!got || !got.equals(tile.bytes)) { tilesOk = false; problems.push(`${path} is ${got ? 'not the tile its entries make' : 'missing'}`); }
+    }
+    const l = await readCheckpoint(flags);
+    if (!l.cp) problems.push(`the live checkpoint does not check: ${l.why}`);
+    else {
+      live = { tree_size: Number(l.cp.size), root_hash: toB64(l.cp.root) };
+      if (live.tree_size < t.size) { extends_ = false; problems.push(`the mirror holds ${t.size} entries, more than the live log's ${live.tree_size}`); }
+      else if (live.tree_size === t.size) { extends_ = l.cp.root.equals(t.root); if (!extends_) problems.push(`two different roots at size ${t.size}`); }
+      else {
+        const pr = await getFrom(LOG_BASE, `/proof/consistency?first=${t.size}&second=${live.tree_size}`, MAX_BODY_SMALL);
+        if (pr.status !== 200) throw new Upstream(`the log's consistency proof answered HTTP ${pr.status}`, { http_status: pr.status });
+        const proof = (parseJsonBody(pr).consistency_proof || []).map(fromB64);
+        extends_ = !proof.some((h) => !h) && verifyConsistency(t.size, live.tree_size, t.root, l.cp.root, proof);
+        if (!extends_) problems.push(`the live log of ${live.tree_size} is not an extension of the mirror's ${t.size}`);
+      }
+    }
+  }
+  const ok = problems.length === 0;
+  const doc = { log: LOG_ORIGIN, mirror: target, compatible: ok, tree_size: t.ok ? t.size : null, root_hash: t.ok ? toB64(t.root) : null, entries_match_checkpoint: t.ok, tiles_match_entries: tilesOk, live, live_extends_mirror: extends_, problems };
+  if (asJson) emitJson(doc);
+  else {
+    out(`${B}${LOG_ORIGIN}${X}  mirror ${target}: ${ok ? `${J}compatible${X}` : `${R}NOT COMPATIBLE${X}`}`);
+    if (t.ok) out(`  checkpoint  ${J}signed by the log key${X}; ${t.size} entries hash to its root`);
+    if (tilesOk !== null) out(`  tiles       ${tilesOk ? `${J}every hash tile is the one its entries make${X}` : `${R}wrong or missing tiles${X}`}`);
+    if (live) out(`  live log    size ${live.tree_size}; ${extends_ ? `${J}extends the mirror${X}` : `${R}does not extend the mirror${X}`}`);
+    for (const p of problems) out(`  ${R}${p}${X}`);
+  }
+  return ok ? EXIT.OK : EXIT.MISMATCH;
+}
+
 function printVerify(d, payload) {
   const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
   const when = d.read_at ? `, read ${fmtDate(d.read_at)}` : '';
@@ -2333,6 +2476,7 @@ async function main() {
   if (cmd === 'lint') return lint();
   if (cmd === 'verify') return verifyCmd();
   if (cmd === 'log') return logCmd();
+  if (cmd === 'mirror') return mirrorCmd();
   if (cmd === 'public-record') return publicRecordCmd();
   if (cmd === 'mcp-tools') return mcpToolsCmd();
   if (cmd === 'guard') return guardCmd();
@@ -2342,7 +2486,7 @@ async function main() {
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, public-record, mcp-tools, guard, declare.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only
