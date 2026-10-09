@@ -31,6 +31,7 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 | Command | What it does |
 |---|---|
 | `trooth check <domain>` | Reads a company's record from the live Network and prints its listing and evidence state, the date of the witnessed reading and of first publication, the live-probe and self-attestation counts, the badge id, the id of the signing key, and the three newest events in its ledger, newest first. `--json` adds the signature itself and every event the feed returns. It does not check the signature. |
+| `trooth profile <domain>` | Prints the company's complete Trust Profile, section by section: every section the record carries, each fact with its value, who said it and its date when Trooth recorded one ("date unknown" otherwise, never borrowed), and "not published" for a section the company left empty. `--section security,privacy` picks sections by the MCP tool's names; `--json` and `--markdown` print the same profile as one JSON document or as Markdown. The profile is the company's own declared record and is not signed; `verify` checks the one signed object. New in 0.16.4. |
 | `trooth verify <domain>` | Checks the record's signed witness statement on your machine, trusting no summary from Trooth: the Ed25519 signature over the exact payload bytes, the key's lifecycle on `api.trooth.co/public/keys`, that it was signed for the domain you asked about, the count identities, and for a v2 statement the SHA-256 of the exact check mapping and of the evidence manifest. `--file` reads a saved profile or statement; `--offline --keys <file>` sends nothing at all; `--save-bundle` keeps every input in one file and `--bundle` checks it later with no network. Statements v1, v2 and v3 (RFC 8785 bytes) are checked. The rules are in [docs/VERIFY.md](docs/VERIFY.md), and [tests/vectors](tests/vectors/vectors.json) holds 27 cases plus 7 bundles any other implementation must agree on. New in 0.7.0; bundles and v3 new in 0.8.0; the witness statement log and corrections new in 0.9.0. |
 | `trooth public-record <domain>` | What the company has published outside its own site, read by Trooth from the authorities that hold it: its SEC filer record and filings (10-K, 10-Q, 8-K with item numbers, including material cybersecurity incidents and auditor changes), annual revenue, net income and assets as filed in XBRL, its LEI record and parents, DNS mail authentication beyond SPF and DMARC, certificates for the domain in Certificate Transparency logs, its security.txt, the pages its home page links to, an exact-name check against the OFAC list, SAM.gov registrations and exclusions, patent applications, entries in four state business registries, FTC merger review notices, the domain's registration, the changes those sources record and the subjects the reading names, and the evidence tying each identifier to the domain (its own 10-K's XBRL namespace, or the registry naming the domain). A look-alike site that copies a company's name is reported as a claim, never tied. Each reading is named by its SHA-256 in a statement Trooth signs and logs, and the command checks that statement, its key and its log entry. `--cik`, `--lei` and `--ticker` name the identifier when the site does not. Rules in [docs/EVIDENCE.md](docs/EVIDENCE.md). New in 0.10.0; signed, with the new sources, in 0.11.0; SAM.gov, patents, state registries, merger review, RDAP, changes and subjects in 0.12.0. |
 | `trooth mcp-tools [endpoint]` | The MCP servers whose tool lists Trooth reads and logs, or one server's reading: each tool's description and definition hash, the manifest hash, what changed since the last reading, and the signed statement and its log entry, all checked here. `--live` reads the server's tool list from your machine and says whether it is still the one Trooth logged, tool by tool. Rules in [docs/EVIDENCE.md](docs/EVIDENCE.md) section 9. New in 0.12.0. |
@@ -44,7 +45,7 @@ Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, 
 
 ## Flags
 
-`--json` is the flag every command takes; `lint` also takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, `log monitor` takes `--state`, `log checkpoint` and `log monitor` take `--witnesses`, `log receipt` takes `--out`, every `log` command takes `--log-vkey`, `public-record` takes `--cik`, `--lei`, `--ticker` and `--log-vkey`, `mcp-tools` takes `--live` and `--log-vkey`, `declare` takes `--domain` and `--key`, `declare sign` also `--record`, `--days`, `--out` and the repeatable `--product`, `--api`, `--repo` and `--add-key`, and `declare check` takes `--file`, `--domain` and `--no-dns`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
+`--json` is the flag every command takes; `profile` also takes `--section` and `--markdown`, `lint` takes `--allow-incomplete`, `verify` takes `--file`, `--keys`, `--mapping`, `--manifest`, `--offline`, `--save-bundle`, `--bundle`, `--no-log` and `--log-vkey`, `log monitor` takes `--state`, `log checkpoint` and `log monitor` take `--witnesses`, `log receipt` takes `--out`, every `log` command takes `--log-vkey`, `public-record` takes `--cik`, `--lei`, `--ticker` and `--log-vkey`, `mcp-tools` takes `--live` and `--log-vkey`, `declare` takes `--domain` and `--key`, `declare sign` also `--record`, `--days`, `--out` and the repeatable `--product`, `--api`, `--repo` and `--add-key`, and `declare check` takes `--file`, `--domain` and `--no-dns`. With `--json`, stdout carries exactly one JSON document and nothing else, and every diagnostic goes to stderr. On an error the document is `{"ok": false, "error": "...", "exit": N}`; a non-2xx response adds `http_status`, and `lint` with nothing to read adds `files_opened`. `--help` and `--version` print plain text whether or not `--json` is given.
 
 `public-record` also takes `--timeout <seconds>` (default 45), `mirror` takes `--from` and `--check`, and `guard` takes `--policy`, `--tool`, `--host`, `--args`, `--cache`, `--max-age`, `--offline`, `--base`, `--witness`, `--timeout-ms` and `--log-vkey`. Every command takes `--help` and `-h`.
 
@@ -56,13 +57,13 @@ Every command's own codes are listed by `trooth <command> --help`. The table bel
 
 | Code | Meaning |
 |---|---|
-| 0 | `check`: listed, and the record carries a dated reading Trooth witnessed. `lint`: a complete read of at least one declaration. `verify`: checked. `log checkpoint`, `log monitor`, `log receipt`, `mirror`, `mirror --check`, `mcp-tools`, `declare check`: it checks. `public-record`: the reading names at least one SEC filer (CIK) or LEI for the domain, whatever its status (corroborated, claimed by the site, contradicted). `guard decide`: allow, or the policy does not cover the tool. `guard ci`: no unlisted destination added. `guard cache`: every domain saved. `declare init`, `declare sign`: written. Help and version also exit 0. |
-| 1 | No record, or nothing found, and never a judgment. `check`: no published record for the domain (on the labelled fallback read, also a revoked record). `verify`: no published record for the domain, so no statement to check. `lint`: nothing to read. `public-record`: the reading names no SEC filer and no LEI for the domain. That is common (a private company files nothing with the SEC); the rest of the reading is printed, and it says nothing about the company. `log receipt`: the log has no entry with that index. `mcp-tools`: Trooth has no reading of that endpoint. `guard cache`: a domain has no Trooth record. `declare check`: the site answers 404 or 410. |
+| 0 | `check`: listed, and the record carries a dated reading Trooth witnessed. `profile`: a published record was found and printed. `lint`: a complete read of at least one declaration. `verify`: checked. `log checkpoint`, `log monitor`, `log receipt`, `mirror`, `mirror --check`, `mcp-tools`, `declare check`: it checks. `public-record`: the reading names at least one SEC filer (CIK) or LEI for the domain, whatever its status (corroborated, claimed by the site, contradicted). `guard decide`: allow, or the policy does not cover the tool. `guard ci`: no unlisted destination added. `guard cache`: every domain saved. `declare init`, `declare sign`: written. Help and version also exit 0. |
+| 1 | No record, or nothing found, and never a judgment. `check`: no published record for the domain (on the labelled fallback read, also a revoked record). `profile`: no published record for the domain; the claim link is printed when the API gives one. `verify`: no published record for the domain, so no statement to check. `lint`: nothing to read. `public-record`: the reading names no SEC filer and no LEI for the domain. That is common (a private company files nothing with the SEC); the rest of the reading is printed, and it says nothing about the company. `log receipt`: the log has no entry with that index. `mcp-tools`: Trooth has no reading of that endpoint. `guard cache`: a domain has no Trooth record. `declare check`: the site answers 404 or 410. |
 | 2 | Usage error: a missing argument, an unknown flag or command, input that is neither one domain nor the slug of a Trooth record, a path that does not exist, a file that would be overwritten, or a policy that does not parse. `public-record` also exits 2 when the service refuses the request as malformed (HTTP 400). |
 | 3 | Service or contract error: Trooth unreachable or slower than the deadline (15 seconds; 45 for `public-record`, or `--timeout`; `TROOTH_TIMEOUT_MS` sets every command's), a status other than 2xx or the documented not-listed 404, `public-record` rate limited (HTTP 429), a body over its size limit, a body that is not JSON, or a record for a different domain. `mirror`: the log or the source could not be read, including a file missing from a directory. Never an answer about a company. An unexpected failure inside the CLI also exits 3. |
 | 4 | `verify`: everything checked held, but the mapping or the manifest was not supplied, so the binding is only partially checked. `lint`: the read was incomplete. A selected file was over the size limit, did not parse or could not be read, or the walk stopped at its file limit. `--allow-incomplete` reports the same and exits 0 (or 1 when nothing was read). `mcp-tools --live`: the server could not be read from this machine. New in 0.5.0. |
 | 5 | `check`: the company is listed, but its record carries no reading this CLI can confirm Trooth witnessed. `verify`: the record carries no signed statement to check. New in 0.5.0. |
-| 6 | `check`, `verify`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
+| 6 | `check`, `profile`, `verify`: the record exists and is withheld while a report about it is reviewed. Neither an absence nor a finding. New in 0.6.0. |
 | 7 | Output not delivered: stdout or stderr failed or was closed before everything was written, for example a reader that stopped early (EPIPE) or a full disk. The command's own result was not delivered, whatever it would have been, so this code replaces it. Nothing is retried. Every command but `guard hook`, which exits 2 instead. New in 0.6.1. |
 | 8 | `verify`: the statement is malformed, its signature does not check, or its key is not trusted (compromised, revoked, retired before the statement's time, or not on the list). `public-record` and `mcp-tools`: the same, for the statement naming the reading. `declare check`: the signature does not check, or its `kid` is not one of its keys. New in 0.7.0. |
 | 9 | `verify`: the signature checks and the key is trusted, but the domain, the check mapping, the evidence manifest or the signed counts do not match what was signed, or the log's receipt does not check. `log checkpoint`: the checkpoint does not check. `log monitor`: the log is not an extension of the checkpoint you saved. `log checkpoint` and `log monitor`: fewer pinned witnesses cosigned than `--witnesses` asks (today no witness follows the log, so any `--witnesses` above 0 exits 9). `log receipt`: the COSE receipt does not check, or `/.well-known/scitt-keys` does not list the log key. `mirror`: the source's entries do not hash to its signed checkpoint, or it does not extend the mirror; `mirror --check`: the mirror is not compatible. `public-record`: the reading is not the one its statement names, or its log receipt does not check. `mcp-tools`: a description or the manifest is not the one its hash names, the statement names another reading, its receipt does not check, or with `--live` the server lists other tools now. `declare check`: another rule fails, or the DNS pin names another key. New in 0.7.0. |
@@ -168,6 +169,106 @@ In `probes`, `total` is how many live probes were read at the last reading and `
 A company with no record exits 1 and emits `{"domain": "...", "listed": false, "state": "not_listed", "record_url": "..."}`. That is not a judgment. It means the Network's public feed carries no record for that domain. A company gets a record at [trooth.co/get-started](https://trooth.co/get-started), free.
 
 `receipt_signature` is Trooth's Ed25519 signature over the directory receipt and `authority_key_id` names the key that made it; the public keys are listed at [trooth.co/verify/keys](https://trooth.co/verify/keys). `signature_checked` is always `false`: this CLI does not check any signature, and nothing it prints should be read as a checked signature. The object whose exact signed bytes Trooth publishes is the reading's witness statement, which is not part of this feed; [trooth.co/docs/verifiable-evidence](https://trooth.co/docs/verifiable-evidence) shows how to fetch and check it offline. That signature covers the reading. It does not cover the company's own declarations, which are not signed by anyone.
+
+## `trooth profile`
+
+```bash
+trooth profile trooth.co                          # every section of the Trust Profile
+trooth profile trooth --section security,privacy  # a slug works too; two sections
+trooth profile trooth.co --json > profile.json    # one JSON document
+trooth profile trooth.co --markdown > profile.md  # the same, as Markdown
+```
+
+`profile` prints a company's complete Trust Profile, section by section, from the same single request `check` sends: `GET https://trooth.co/api/network/profile?q=<domain>&contract=2` (`TROOTH_WEB` overrides the base). No key, no account. A bare name with no dot is read as a Trooth slug and resolved to its domain first, as for `check`.
+
+Every section the record carries is printed, in the page's order, with its state and who said it, and then each fact with its value, who said it (the company, Trooth's own observation, a named public source) and its date when Trooth recorded one. A fact the record does not date prints **date unknown**: no date is borrowed from the record's update time, a reading's time or another fact. A section the company left empty prints **not published**, a section shared on request only says so, and a section Trooth could not read on that load says it is unavailable, not empty. Notes the record attaches to a section, group or item are printed with it. A fact two sources disagree about is marked contested and every account is listed; Trooth does not choose between them.
+
+**The profile is the company's own declared record, and it is not signed.** Facts Trooth observed are labeled as such, but nothing in the profile carries a signature. Trooth signs one object, the witness statement for a reading it took of the company's public surface; `trooth verify <domain>` checks it on your machine. The output says this at the top, in every form.
+
+```
+Trooth   trooth.co   slug trooth
+Trust Profile: https://trooth.co/network/company/trooth
+record updated 2026-10-06T01:08:12.526Z · record version 8 · read 2026-10-09T20:56:41.921Z
+
+This profile is the company's own declared record, as Trooth publishes it; facts Trooth observed are labeled as such. It is not signed: Trooth signs one object, the witness statement for a reading it took of the company's public surface, and that statement covers the reading, not these facts.
+Check that statement yourself: trooth verify trooth.co
+
+== Commercial & pricing (pricing) · published · the company (declared)
+   Declared by the company. Trooth publishes it as written and does not certify it. Cite it as the company's own statement.
+  Free plan or trial: Fully free
+    said by the company (declared) · date unknown
+  ...
+  List price
+    List price: USD 0 for every account
+      said by the company (declared) · declared 2026-10-06 · pricing.list-price
+
+== Customer proof (proof) · not published · named customers
+   No customer endorsements have been published. ...
+  not published
+```
+
+### Section names
+
+`--section` takes one or more names, comma-separated or with the flag repeated; the output keeps the page's order. The names are the ones the MCP tool `trooth_public_trust_profile` takes, and they are the record's own section ids (`profile.sections[].id` in the contract 2 body). The record's typed facts (`facts[]`, keyed `<category>.<field>`, the only facts that carry a date) are shown in the section their category belongs to, and each category is also accepted as a section name:
+
+| Section | Record section id | Typed fact categories shown in it (also accepted by `--section`) |
+|---|---|---|
+| `overview` | `overview` | |
+| `identity` | `identity` | `identity`, `registration` |
+| `history` | `history` | |
+| `funding` | `funding` | |
+| `product` | `product` | |
+| `pricing` | `pricing` | `pricing`, `pricing-add-ons` |
+| `stack` | `stack` | |
+| `security` | `security` | `security` |
+| `privacy` | `privacy` | `privacy`, `privacy-roles` |
+| `ai` | `ai` | `ai-practices` |
+| `hosting` | `hosting` | `hosting`, `recovery` |
+| `infrastructure` | `infrastructure` | |
+| `procurement` | `procurement` | |
+| `relationships` | `relationships` | |
+| `proof` | `proof` | |
+| `people` | `people` | |
+| `documents` | `documents` | |
+| `evidence` | `evidence` | |
+| `cards` | `cards` | |
+| `faq` | `faq` | |
+
+A row of the profile is joined to a typed fact only when the two have the same label and the same value in the same section; only then does the row carry the fact's key, origin, source and date (`claim.declaredAt` for a company declaration, else `claim.observedAt`). A typed fact the page does not show is added to its section under "Other recorded facts", so nothing the record carries is dropped; one whose category is in no row above is printed in a final `unsorted` section. A record whose facts run past one page is read to the end from the same record version, or not at all (exit 3).
+
+### `--json` and `--markdown`
+
+`--json` prints one document, described by [schemas/profile-output.v1.schema.json](schemas/profile-output.v1.schema.json) (types `ProfileOutput`, `ProfileSection`, `ProfileFact` in `types/trooth.d.ts`, the Pydantic models and the Go package):
+
+```json
+{
+  "subject": "trooth.co",
+  "query": "trooth",
+  "contract": 2,
+  "read_at": "2026-10-09T20:56:41.921Z",
+  "found": true,
+  "signed": false,
+  "verify_with": "trooth verify trooth.co",
+  "record": { "url": "https://trooth.co/network/company/trooth", "version": 8, "digest": "sha-256=…", "updated_at": "2026-10-06T01:08:12.526Z" },
+  "sections": [
+    {
+      "name": "pricing", "title": "Commercial & pricing", "state": "published",
+      "provenance": "company_declared", "said_by": "the company (declared)",
+      "facts": [
+        { "label": "List price", "value": "USD 0 for every account", "group": "List price", "item": null,
+          "provenance": "company_declared", "said_by": "the company (declared)", "key": "pricing.list-price",
+          "origin": "company-declared", "source": "https://trooth.co/network/company/trooth",
+          "date": "2026-10-06T01:08:12.375Z", "date_kind": "declared", "contested": false, "accounts": [], "signed": false }
+      ],
+      "notes": [{ "group": "List price", "item": null, "text": "Scope not stated" }]
+    }
+  ]
+}
+```
+
+(abridged: the document also carries `withheld`, `name`, `slug`, `claim_url`, `requested_sections`, `profile_present`, and each section its `meaning` and `url`). `date` is `null` where the text says "date unknown". With no published record the document has `"found": false`, empty `sections` and the `claim_url` the API gave, or `null`. `--markdown` prints the same profile as Markdown: a heading per section, a bullet per fact with who said it and its date. `--json` and `--markdown` together are a usage error.
+
+Exit codes: 0, a published record was found and printed; 1, no published record (an honest absence, which says nothing about the company; the claim link is printed when the API gives one); 2, a usage error (not one domain, no record with that slug, an unknown section or flag); 3, Trooth could not be read or answered something that is not the record asked for; 6, the record is withheld while a report about it is reviewed; 7, the output was not delivered.
 
 ## `trooth lint`
 
@@ -278,7 +379,7 @@ That repository's README documents the inputs and outputs.
 | Variable | Effect |
 |---|---|
 | `TROOTH_API` | Base URL of api.trooth.co: the key list, the witness statement log, `public-record`, `mcp-tools`, `guard` and `check`'s labelled fallback. Defaults to `https://api.trooth.co`. `lint` ignores it, because `lint` makes no requests. |
-| `TROOTH_WEB` | Base URL of the record projection (`/api/network/profile`), read by `check`, `verify`, a slug's resolution and `guard`. Defaults to `https://trooth.co`. |
+| `TROOTH_WEB` | Base URL of the record projection (`/api/network/profile`), read by `check`, `profile`, `verify`, a slug's resolution and `guard`. Defaults to `https://trooth.co`. |
 | `TROOTH_TIMEOUT_MS` | The deadline for each request, for every command. When unset: 15000, and 45000 for `public-record` (whose `--timeout <seconds>` takes precedence over this variable). The minimum is 1000. |
 | `TROOTH_PROGRESS` | `1` prints `public-record`'s "reading in progress" note on stderr even when stderr is not a terminal; `0` never prints it. By default it is printed only on a terminal, after 5 seconds. |
 | `TROOTH_LINT_MAX_FILES` | The number of selected files after which `lint` stops walking and reports the read as truncated. Defaults to 5000. |
@@ -399,6 +500,10 @@ https://api.trooth.co/public/mcp  trooth-mcp 1.4.1, read 2026-10-07
 ```
 
 An agent decides what a tool does from the description the server lists, and a server can change it after it was reviewed. Trooth reads the tool lists of MCP servers once a day with no credentials, hashes each tool's description and its whole definition, and signs and logs a statement naming the manifest whenever it changes, so the log is each server's history of tool changes. This command recomputes every hash, checks the statement and its receipt, and with `--live` compares the server's tools now with what Trooth logged: exit 9 when they differ. A hash says what the server listed, not what a tool does.
+
+## Changed in 0.16.4
+
+- New `trooth profile <domain|slug>`: the company's complete Trust Profile, section by section, each fact with its value, who said it and its date when one is recorded ("date unknown" otherwise), and "not published" for a section the company left empty. `--section` takes the MCP tool's section names; `--json` (schema `profile-output.v1`) and `--markdown` print the same profile. It says, in every form, that the profile is the company's own declared record and is not signed, and points at `trooth verify`.
 
 ## Changed in 0.16.3
 

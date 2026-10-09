@@ -138,7 +138,7 @@ function go(x) {
   switch (x.k) {
     case 'ref': return x.name;
     case 'str': return 'string';
-    case 'lit': return x.values.every((v) => typeof v === 'boolean') ? 'bool' : 'string';
+    case 'lit': return x.values.every((v) => typeof v === 'boolean') ? 'bool' : x.values.every((v) => Number.isInteger(v)) ? 'int' : 'string';
     case 'int': return 'int64';
     case 'num': return 'float64';
     case 'nul': case 'union': return 'any';

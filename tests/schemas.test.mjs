@@ -21,7 +21,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 18);
+  assert.equal(Object.keys(schemas).length, 19);
   // The guard decision keeps the $id the brief published for it (docs/GUARD.md).
   const publishedIds = { 'guard-decision.v1.schema.json': 'https://trooth.co/schemas/guard-decision.v1.json' };
   for (const [f, s] of Object.entries(schemas)) {
@@ -249,4 +249,36 @@ test('company, product and person ids, and a company key id (docs/IDS.md 1.5)', 
     'trooth:key:acme.com#short', 'trooth:key:Acme.com#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k', 'trooth:key:acme#kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k']) assert.equal(parseId(bad), null, bad);
   assert.throws(() => formatId('person', 'Jane Doe'));
   assert.throws(() => formatId('product', 'acme.com'));
+});
+
+test('trooth profile --json validates against profile-output.v1, for a record (served from a saved trooth.co response), an absence, and bad values do not', async () => {
+  const http = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const saved = JSON.parse(readFileSync(new URL('./fixtures/profile/trooth.co-2026-10-09.json', import.meta.url), 'utf8'));
+  const srv = http.createServer((req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams.get('q');
+    res.writeHead(200, { 'content-type': 'application/json', 'trooth-record-version': saved.headers['trooth-record-version'], 'trooth-record-digest': saved.headers['trooth-record-digest'] });
+    res.end(JSON.stringify(q === 'trooth.co' ? saved.body : { found: false }));
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const cli = new URL('../bin/trooth.mjs', import.meta.url).pathname;
+  const run = (args) => new Promise((resolve) => {
+    const p = spawn(process.execPath, [cli, ...args], { env: { ...process.env, TROOTH_WEB: `http://127.0.0.1:${srv.address().port}`, TROOTH_API: 'http://127.0.0.1:9' } });
+    let out = ''; p.stdout.on('data', (d) => (out += d)); p.on('close', (code) => resolve({ code, out }));
+  });
+  try {
+    const found = await run(['profile', 'trooth.co', '--json']);
+    assert.equal(found.code, 0);
+    const doc = JSON.parse(found.out);
+    ok('profile-output.v1.schema.json', doc, 'a published record');
+    assert.equal(doc.sections.length, 20);
+    const absent = await run(['profile', 'nobody.example', '--json']);
+    assert.equal(absent.code, 1);
+    ok('profile-output.v1.schema.json', JSON.parse(absent.out), 'no published record');
+    const bad = (v, label) => assert.notDeepEqual(validate('profile-output.v1.schema.json', v), [], label);
+    bad({ ...doc, signed: true }, 'a signed profile');
+    bad({ ...doc, score: 1 }, 'a member outside the schema');
+    bad({ ...doc, sections: [{ ...doc.sections[0], state: 'empty' }] }, 'an unknown state');
+    bad({ ...doc, sections: [{ ...doc.sections[1], facts: [{ ...doc.sections[1].facts[0], date_kind: 'inferred' }] }] }, 'an unknown date kind');
+  } finally { srv.close(); }
 });

@@ -32,7 +32,7 @@ function run(args, env = {}) {
 /* ---------------------------------------------------------------- help ---- */
 
 const COMMANDS = {
-  check: [], lint: [], verify: [], mirror: [], 'public-record': [], 'mcp-tools': [],
+  check: [], profile: [], lint: [], verify: [], mirror: [], 'public-record': [], 'mcp-tools': [],
   log: ['checkpoint', 'monitor', 'receipt'],
   guard: ['decide', 'hook', 'ci', 'cache'],
   declare: ['init', 'sign', 'check'],
