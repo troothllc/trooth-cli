@@ -45,7 +45,7 @@ A mirror is compatible when all of these hold:
 3. Every hash tile it serves is the tile its entries make.
 4. The live log extends it: the live log is the same size with the same root, or larger, with a consistency proof (RFC 9162) from the mirror's tree to the live tree.
 
-Any failure exits 9 and names it. Rule 4 also catches the opposite case: a live log that is smaller than a faithful mirror, or that shows a different root at the same size, is evidence of a split view or a lost tail. A mirror is evidence against the log, not only a copy of it.
+Any check that fails exits 9 and names it. A mirror or a live log that cannot be read at all (an unreachable URL, a checkpoint or entry bundle missing from a directory) exits 3, and a usage error (no mirror named, a path that is neither a directory nor an https URL) exits 2. Rule 4 also catches the opposite case: a live log that is smaller than a faithful mirror, or that shows a different root at the same size, is evidence of a split view or a lost tail. A mirror is evidence against the log, not only a copy of it.
 
 ## 4. Running one on a schedule
 

@@ -104,7 +104,7 @@ function py(x) {
     case 'union': return `Union[${x.of.map(py).join(', ')}]`;
     case 'bool': return 'bool';
     case 'any': return 'Any';
-    case 'lit': return `Literal[${x.values.map((v) => JSON.stringify(v)).join(', ')}]`;
+    case 'lit': return `Literal[${x.values.map((v) => (typeof v === 'boolean' ? (v ? 'True' : 'False') : JSON.stringify(v))).join(', ')}]`;
     case 'arr': return `List[${py(x.of)}]`;
     case 'map': return `Dict[str, ${py(x.of)}]`;
     case 'null': return `Optional[${py(x.of)}]`;
@@ -137,7 +137,8 @@ const goName = (k) => k.split('_').map((w) => (['id', 'url', 'kid'].includes(w) 
 function go(x) {
   switch (x.k) {
     case 'ref': return x.name;
-    case 'str': case 'lit': return 'string';
+    case 'str': return 'string';
+    case 'lit': return x.values.every((v) => typeof v === 'boolean') ? 'bool' : 'string';
     case 'int': return 'int64';
     case 'num': return 'float64';
     case 'nul': case 'union': return 'any';

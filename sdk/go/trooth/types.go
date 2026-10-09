@@ -120,7 +120,10 @@ type ManifestEntry struct {
 	Commitment *string `json:"commitment,omitempty"`
 }
 
-// GuardDecision: One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string.
+// GuardDecideOutput: The one JSON document `trooth guard decide --json` prints on stdout when it decides or declines to: a GuardDecision when the policy covers the tool (exit 0 allow, 20 hold, 21 deny), or a GuardNotCovered when it does not (exit 0). A usage error prints the CLI's error document instead ({"ok": false, "error": "...", "exit": 2}), as every command does.
+type GuardDecideOutput any
+
+// GuardDecision: One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string. `trooth guard decide --json` prints this document when the policy covers the tool, and a GuardNotCovered ($defs/notCovered) when it does not; schemas/guard-decide-output.v1.schema.json accepts either.
 type GuardDecision struct {
 	// allow: every required check held and every rule passed. hold: route the action to a person. deny: a proof failed or a rule the customer marked absolute failed (or the customer's policy chose deny for no record or no source). One of: allow, hold, deny.
 	Decision string `json:"decision"`
@@ -136,6 +139,18 @@ type GuardDecision struct {
 	Action map[string]any `json:"action,omitempty"`
 	// When the decision was made (RFC 3339).
 	DecidedAt string `json:"decided_at"`
+}
+
+// GuardNotCovered: What `trooth guard decide --json` prints when the policy does not cover the tool: nothing was decided, nothing was read, and the command exits 0. It is not an allow and carries no decision; the caller lets the call run as its own controls intend.
+type GuardNotCovered struct {
+	// Always false: the policy's applies_to.tools does not match the tool. One of: false.
+	Covered bool `json:"covered"`
+	// The tool name given with --tool.
+	Tool string `json:"tool"`
+	// The policy that does not cover the tool.
+	Policy GuardPolicyRef `json:"policy"`
+	// A plain sentence saying that nothing was decided.
+	Note string `json:"note"`
 }
 
 // GuardReason: One reason code, with what it is about.

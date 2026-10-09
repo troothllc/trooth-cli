@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/guard-decide-output.v1.schema.json",
+  "title": "GuardDecideOutput",
+  "description": "The one JSON document `trooth guard decide --json` prints on stdout when it decides or declines to: a GuardDecision when the policy covers the tool (exit 0 allow, 20 hold, 21 deny), or a GuardNotCovered when it does not (exit 0). A usage error prints the CLI's error document instead ({\"ok\": false, \"error\": \"...\", \"exit\": 2}), as every command does.",
+  "anyOf": [
+    {
+      "$ref": "guard-decision.v1.schema.json"
+    },
+    {
+      "$ref": "guard-decision.v1.schema.json#/$defs/notCovered"
+    }
+  ]
+}

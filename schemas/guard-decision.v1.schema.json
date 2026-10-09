@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://trooth.co/schemas/guard-decision.v1.json",
   "title": "GuardDecision",
-  "description": "One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string.",
+  "description": "One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string. `trooth guard decide --json` prints this document when the policy covers the tool, and a GuardNotCovered ($defs/notCovered) when it does not; schemas/guard-decide-output.v1.schema.json accepts either.",
   "type": "object",
   "required": ["decision", "reasons", "subject", "policy", "evidence", "decided_at"],
   "properties": {
@@ -15,6 +15,19 @@
     "decided_at": { "description": "When the decision was made (RFC 3339).", "type": "string", "format": "date-time" }
   },
   "$defs": {
+    "notCovered": {
+      "title": "GuardNotCovered",
+      "description": "What `trooth guard decide --json` prints when the policy does not cover the tool: nothing was decided, nothing was read, and the command exits 0. It is not an allow and carries no decision; the caller lets the call run as its own controls intend.",
+      "type": "object",
+      "required": ["covered", "tool", "policy", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "covered": { "description": "Always false: the policy's applies_to.tools does not match the tool.", "const": false },
+        "tool": { "description": "The tool name given with --tool.", "type": "string" },
+        "policy": { "description": "The policy that does not cover the tool.", "$ref": "#/$defs/policyRef" },
+        "note": { "description": "A plain sentence saying that nothing was decided.", "type": "string" }
+      }
+    },
     "reason": {
       "title": "GuardReason",
       "description": "One reason code, with what it is about.",

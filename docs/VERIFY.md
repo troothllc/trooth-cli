@@ -86,6 +86,19 @@ A v1 statement binds no mapping, manifest, evaluator or subject scope.
 | `mismatch` | Signature trusted, but counts disagree, the domain differs, a supplied mapping or manifest does not match, or a log receipt was supplied and does not check | 9 |
 | `superseded` | Everything checked held, and a correction Trooth signed and logged withdraws or replaces the statement (section 10) | 10 |
 
+`trooth verify` also exits without a verdict, when there is nothing to decide on:
+
+| When | Exit code |
+|---|---|
+| The domain has no published record, so there is no statement to check | 1 |
+| Usage error: no domain and no `--file` or `--bundle`, a file that is missing or not JSON, a bundle that is not one, `--offline` without `--file` and `--keys`, `--save-bundle` naming a file that exists, or a name that is neither a domain nor the slug of a Trooth record | 2 |
+| The record, the key list, the mapping or the log key could not be read (unreachable, too slow, an unexpected status or body); also an unexpected failure inside the CLI | 3 |
+| The record is listed but carries no signed witness statement | 5 |
+| The record is withheld while a report about it is reviewed | 6 |
+| Output not delivered: stdout or stderr failed before everything was written | 7 |
+
+A log that cannot be read does not change the exit code: the result says `unavailable` and the verdict stands on the rest.
+
 ## 6. What a `checked` verdict does and does not mean
 
 It means Trooth's key signed these outcome bytes, for this domain, together with the digest of the exact check mapping, the evaluator version, the subject scope and the digest of the evidence manifest. It does not establish the company's identity, that the signed time was independently established, that anything outside the reading is true, or that the company is safe, compliant or authorized for any transaction. What to do with a checked reading is the reader's decision.
