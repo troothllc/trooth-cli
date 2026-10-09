@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.16.3",
+  "version": "0.16.4",
   "description": "The Trooth Network in your terminal. Read a company's public record with no key and no account: each fact with its provenance, the evidence state and the record version, as the API serves it. Also reads what your repo declares, offline. No verdict.",
   "type": "module",
   "bin": {
@@ -70,7 +70,7 @@
   "scripts": {
     "check": "node ./bin/trooth.mjs check",
     "lint": "node ./bin/trooth.mjs lint",
-    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs && node tests/check-projection.test.mjs && node tests/audit-1004.test.mjs && node tests/output-delivery.test.mjs && node tests/verify.test.mjs && node tests/log.test.mjs && node tests/witness-cose.test.mjs && node tests/mirror.test.mjs && node tests/public-record.test.mjs && node tests/cli-0163.test.mjs && node tests/declaration.test.mjs && node tests/mcp-tools.test.mjs && node tests/guard-policy.test.mjs && node tests/guard.test.mjs && node tests/guard-cli.test.mjs && node tests/guard-adapters.test.mjs && node tests/guard-adversarial.test.mjs && node tests/guard-model.test.mjs && node tests/guard-fuzz.test.mjs && node tests/vectors/generate.mjs --check && node tests/schemas.test.mjs",
+    "test": "node ./bin/trooth.mjs lint tests/fixtures/infra --json > /dev/null && node ./bin/trooth.mjs --version && node tests/action.test.mjs && node tests/lint.test.mjs && node tests/audit-fixtures.test.mjs && node tests/audit-0928.test.mjs && node tests/check-projection.test.mjs && node tests/audit-1004.test.mjs && node tests/output-delivery.test.mjs && node tests/verify.test.mjs && node tests/log.test.mjs && node tests/witness-cose.test.mjs && node tests/mirror.test.mjs && node tests/public-record.test.mjs && node tests/cli-0163.test.mjs && node tests/profile.test.mjs && node tests/declaration.test.mjs && node tests/mcp-tools.test.mjs && node tests/guard-policy.test.mjs && node tests/guard.test.mjs && node tests/guard-cli.test.mjs && node tests/guard-adapters.test.mjs && node tests/guard-adversarial.test.mjs && node tests/guard-model.test.mjs && node tests/guard-fuzz.test.mjs && node tests/vectors/generate.mjs --check && node tests/schemas.test.mjs",
     "types": "node scripts/gen-types.mjs",
     "guard:results": "node scripts/guard-results.mjs"
   },

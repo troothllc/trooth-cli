@@ -481,6 +481,126 @@ type McpToolsSigned struct {
 	LoggedAtRead *string `json:"logged_at_read"`
 }
 
+// ProfileOutput: The one JSON document `trooth profile <domain|slug> --json` prints on stdout: a company's Trust Profile, section by section, read from GET https://trooth.co/api/network/profile?q=<domain>&contract=2 (schema https://trooth.co/schemas/network-profile.v2.schema.json). Each fact carries its value, who said it and its date when Trooth recorded one; a fact with no recorded date has date null, never a date borrowed from another field. The profile is the company's own declared record (facts Trooth observed are labeled as such) and is not signed: the one signed object is the witness statement, which `trooth verify` checks. Printed with exit 0 (found), 1 (no published record: found false, sections empty) or 6 (withheld: withheld true, sections empty). A usage, network or contract error prints the CLI's error document instead ({"ok": false, "error": "...", "exit": N}), as every command does.
+type ProfileOutput struct {
+	// The domain the profile was read for: the domain given, or the domain of the record whose slug was given.
+	Subject string `json:"subject"`
+	// The domain, URL or Trooth slug as it was typed.
+	Query string `json:"query"`
+	// The /api/network/profile contract version this CLI read. One of: 2.
+	Contract int `json:"contract"`
+	// When this CLI read the record, by this machine's clock, as an ISO 8601 date-time in UTC. It is not the date of any fact.
+	ReadAt string `json:"read_at"`
+	// True when the Network holds a published record for the subject (including a withheld one). False is an honest absence: it says nothing about the company.
+	Found bool `json:"found"`
+	// True when the record exists and is withheld while a report about it is reviewed; sections is then empty. Neither an absence nor a finding.
+	Withheld bool `json:"withheld"`
+	// Present when withheld: Trooth's own words on why, or null.
+	WithheldReason *string `json:"withheld_reason,omitempty"`
+	// The company name as published, or null when no record was found.
+	Name *string `json:"name"`
+	// The company's slug on the Network, or null when no record was found.
+	Slug *string `json:"slug"`
+	// Which record was read, as the projection states it.
+	Record ProfileRecordRef `json:"record"`
+	// Always false: the profile is not signed. Trooth signs only the witness statement for a reading it took of the company's public surface. One of: false.
+	Signed bool `json:"signed"`
+	// The command that checks the one signed object, the witness statement: trooth verify <domain>.
+	VerifyWith string `json:"verify_with"`
+	// When no record was found and the projection gives one, the address at which the company can claim its record; otherwise null. Never built by the CLI.
+	ClaimURL *string `json:"claim_url"`
+	// The section names --section asked for, in page order, or null for every section.
+	RequestedSections []string `json:"requested_sections"`
+	// True when the response carried the complete profile (the body's profile member). False when only the typed facts were carried: sections they do not cover are then unavailable.
+	ProfilePresent bool `json:"profile_present"`
+	// Every section the record carries, in the page's order, or those --section asked for. Empty when no record was found or it is withheld.
+	Sections []ProfileSection `json:"sections"`
+}
+
+// ProfileRecordRef: Which record was read, as the projection states it: its page, the Trooth-Record-Version and Trooth-Record-Digest headers, and when the company last published a change.
+type ProfileRecordRef struct {
+	// The company's public Trust Profile page, or null.
+	URL *string `json:"url"`
+	// The Trooth-Record-Version response header, or null when the server did not state one.
+	Version *int64 `json:"version"`
+	// The Trooth-Record-Digest response header, or null.
+	Digest *string `json:"digest"`
+	// When the company last published a change to the record (the body's updatedAt), or null. It is the record's time, not a fact's.
+	UpdatedAt *string `json:"updated_at"`
+}
+
+// ProfileSection: One section of the Trust Profile, as the record carries it.
+type ProfileSection struct {
+	// The section name: overview, identity, history, funding, product, pricing, stack, security, privacy, ai, hosting, infrastructure, procurement, relationships, proof, people, documents, evidence, cards or faq, the names the MCP tool trooth_public_trust_profile takes; unsorted for typed facts whose category maps to none of them; or a section id the record adds later.
+	Name string `json:"name"`
+	// The section title as the page shows it.
+	Title string `json:"title"`
+	// published: the company shows content here. not_published: the company left it empty; printed "not published" and never filled in. hidden_by_company: the company chose not to show it; no values are carried. unavailable: Trooth could not read it on this load (or the response carried no profile); it is not empty. request_only: the content exists behind a request and is never carried. One of: published, not_published, hidden_by_company, unavailable, request_only.
+	State string `json:"state"`
+	// Who said what is in this section, as the record labels it, or null when the record carries no label.
+	Provenance *string `json:"provenance"`
+	// provenance in words, as the text output prints it.
+	SaidBy *string `json:"said_by"`
+	// What the record says to say about this section, or null.
+	Meaning *string `json:"meaning"`
+	// The page that shows this section, or null.
+	URL *string `json:"url"`
+	// Every fact in the section, in the page's order: the section's fields, then each group's fields and items, then typed facts the page does not show. Empty for a section that is not published.
+	Facts []ProfileFact `json:"facts"`
+	// The notes the record attaches to the section, its groups and its items.
+	Notes []ProfileNote `json:"notes"`
+}
+
+// ProfileFact: One fact: its value, who said it and its date when one is recorded.
+type ProfileFact struct {
+	// The field name, as words.
+	Label string `json:"label"`
+	// The value as published, as text. A group item published by name only is one fact whose label is the group title and whose value is the item's name.
+	Value string `json:"value"`
+	// The group the fact is in, as the page titles it, or null for a section-level field. Other recorded facts marks a typed fact the page does not show.
+	Group *string `json:"group"`
+	// The item within the group (for example one product or one sub-processor), or null.
+	Item *string `json:"item"`
+	// Who said it: the typed fact's origin when the fact is joined to one, else the label of its group or section. One of: company_declared, trooth_observation, public_sources, named_customers, mixed.
+	Provenance string `json:"provenance"`
+	// Who said it, in words (the company (declared), Trooth (observed), public source: <name>, ...).
+	SaidBy string `json:"said_by"`
+	// The typed fact key (category.field, for example identity.legal-name) when the fact is joined to a typed fact with the same label and value in the same section; otherwise null.
+	Key *string `json:"key"`
+	// The typed fact's origin, or null when the fact is not joined to one.
+	Origin *string `json:"origin"`
+	// Where the value can be read: the typed fact's sourceReference when there is one, else the page that shows the section.
+	Source *string `json:"source"`
+	// The date Trooth recorded for this fact, as an ISO 8601 date-time: the typed fact's claim.declaredAt for a company declaration, else its claim.observedAt. Null when none is recorded (printed "date unknown"); never the record's update time, a reading's time or another fact's date.
+	Date *string `json:"date"`
+	// declared (claim.declaredAt) or observed (claim.observedAt); null when date is null.
+	DateKind *string `json:"date_kind"`
+	// True when another source gave a different account of this fact; the accounts are listed, and Trooth does not choose between them.
+	Contested bool `json:"contested"`
+	// When contested, each account with who gave it, in the record's fixed order, which is not a ranking. Empty otherwise.
+	Accounts []ProfileAccount `json:"accounts"`
+	// Always false: no fact is signed by anyone. One of: false.
+	Signed bool `json:"signed"`
+}
+
+// ProfileAccount: One source's account of a contested fact.
+type ProfileAccount struct {
+	// Who gave this account. One of: company-declared, witnessed, public-source.
+	Origin string `json:"origin"`
+	// The account, as text.
+	Value string `json:"value"`
+}
+
+// ProfileNote: A note the record attaches to a section, a group or an item.
+type ProfileNote struct {
+	// The group the note belongs to, or null for a section note.
+	Group *string `json:"group"`
+	// The item the note belongs to, or null.
+	Item *string `json:"item"`
+	// The note, as the record words it.
+	Text string `json:"text"`
+}
+
 // PublicRecordStatement: The payload Trooth signs for a public record reading: it names the reading by the SHA-256 of its RFC 8785 bytes. Carried as the `payload` of a witness-statement envelope (RFC 8785, Ed25519) under `signed.statement` in a reading, and logged as a public_record entry. The signature says what Trooth read and when, not that what the sources say is true.
 type PublicRecordStatement struct {
 	// The payload type. One of: trooth.public-record.v1.

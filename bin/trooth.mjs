@@ -22,6 +22,13 @@
 //                           and its version. Only when that projection cannot be
 //                           reached does it send a second request, to api.trooth.co's
 //                           directory route, and it labels that answer a fallback.
+//   trooth profile <domain> The company's complete Trust Profile, section by section
+//                           (--section to pick; --json, --markdown): each fact with
+//                           its value, who said it and its date when one is recorded
+//                           ("date unknown" otherwise), and "not published" for a
+//                           section the company left empty. Same single request as
+//                           check. The profile is the company's own declared record
+//                           and is not signed; verify checks the one signed object.
 //   trooth lint [path]      Read the infrastructure THIS repository declares and print
 //                           the declared facts plus an aggregate digest of them.
 //                           Fully local. Offline. Your source never leaves the machine.
@@ -75,7 +82,7 @@
 //   trooth <command> --help Show one command's usage, flags and exit codes (also -h,
 //                           and trooth help <command> [<subcommand>]).
 //
-// check, verify and public-record take a domain, a URL, or a Trooth slug (a bare
+// check, profile, verify and public-record take a domain, a URL, or a Trooth slug (a bare
 // name with no dot, as the MCP connector and the A2A agent accept), which is
 // resolved to its domain on the record projection before anything else is read.
 //
@@ -88,7 +95,8 @@
 // Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0, 10 in 0.9.0):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
-//   1  finding                 (check: not listed, or revoked; lint: nothing to read;
+//   1  finding                 (check: not listed, or revoked; profile: no published
+//                               record; lint: nothing to read;
 //                               verify: not listed, so nothing to check; public-record:
 //                               no SEC filer and no LEI named for the domain; log receipt:
 //                               no such entry; mcp-tools: no reading of the endpoint;
@@ -103,7 +111,7 @@
 //                               walk was truncated; --allow-incomplete exits 0 instead)
 //   5  listed, not witnessed   (check: the record is listed, but it carries no reading
 //                               this CLI can confirm was witnessed)
-//   6  withheld                (check: the record exists and is withheld while a report
+//   6  withheld                (check, profile: the record exists and is withheld while a report
 //                               about it is reviewed; neither an absence nor a finding)
 //   7  output not delivered    (new in 0.6.1: stdout or stderr failed or was closed, for
 //                               example EPIPE from a reader that stopped early, before
@@ -160,6 +168,7 @@ import { loadPolicy as loadGuardPolicy, createGuard, PolicyError } from './lib/g
 import { addedLines, scanLines } from './lib/guard-ci.mjs';
 import { generateDeclarationKey, readPrivateJwk, publicJwkOf, buildDeclaration, checkDeclaration, fetchDeclaration, readKeyPin, pinStatus, pinLine, isSignatureProblem, DeclarationError, DECLARATION_PATH, MAX_VALIDITY_DAYS, DEFAULT_VALIDITY_DAYS, DOH_URL, keyIdFor, jwkThumbprint } from './lib/declaration.mjs';
 import { ID_TYPES } from './lib/ids.mjs';
+import { SECTION_NAMES, SECTION_OF_CATEGORY, parseSectionArgs, buildSections, renderText, renderMarkdown } from './lib/profile.mjs';
 import { homedir } from 'node:os';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -272,6 +281,7 @@ function scrub(value) {
 
 const FLAGS = {
   check: { bool: ['--json', '--no-fallback'], value: [] },
+  profile: { bool: ['--json', '--markdown'], value: [], multi: ['--section'] },
   lint:  { bool: ['--json', '--allow-incomplete'], value: [] },
   verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
   log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
@@ -329,6 +339,7 @@ ${J}${B}trooth${X} ${D}v${VERSION} · the terminal interface to the Trooth Netwo
 
 ${B}Usage${X}
   trooth check <domain>     Read a company's record on the Trooth Network
+  trooth profile <domain> [--section <names>] [--markdown]   A company's Trust Profile, section by section
   trooth lint [path]        Read what your infrastructure declares, locally. Offline.
   trooth verify <domain>    Check the record's signed witness statement yourself
   trooth log checkpoint     Read and check the witness statement log's signed checkpoint
@@ -349,12 +360,13 @@ ${B}Usage${X}
   trooth <command> --help   A command's usage, flags and exit codes (also: trooth help <command>)
   trooth --help | --version
 
-  check, verify and public-record take a domain or a URL; a bare name with no dot is read
+  check, profile, verify and public-record take a domain or a URL; a bare name with no dot is read
   as a Trooth slug and resolved to its domain on the record projection (trooth → trooth.co).
 
 ${B}Examples${X}
   trooth check stripe.com                ${D}# read a company's record${X}
   trooth check trooth.co --json          ${D}# one JSON document on stdout, for scripting${X}
+  trooth profile trooth --section security,privacy   ${D}# the Trust Profile, two sections, each fact with who said it${X}
   trooth lint ./infra                    ${D}# read declared facts, with a coverage report${X}
   trooth lint --json > trooth-lint.json  ${D}# the same facts as one JSON document, for a CI artifact${X}
   trooth verify trooth.co                ${D}# check the signature, key, domain and bindings locally${X}
@@ -368,6 +380,8 @@ ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
   --help, -h                this command's usage, flags and exit codes; exits 0
   --allow-incomplete        lint: exit 0 even when a file was skipped, invalid or unreadable
+  --section <names>         profile: only these sections (comma-separated; trooth profile --help lists them)
+  --markdown                profile: the profile as Markdown
   --no-fallback             check: exit 3 when the record projection cannot be reached,
                             instead of reading the directory feed as a labelled fallback
   --file <path>             verify: a saved profile, statement, or {statement, manifest}
@@ -405,9 +419,9 @@ ${B}Flags${X}
   --file <path>, --no-dns   declare check: check a saved file; do not read the _trooth-key TXT pin
 
 ${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
-  0  ok: check listed and witnessed; lint complete; verify checked; a log, mirror or receipt checks;
+  0  ok: check listed and witnessed; profile found and printed; lint complete; verify checked; a log, mirror or receipt checks;
      public-record names an SEC filer or LEI for the domain; guard decide allow (or the tool is not covered)
-  1  no record or nothing found: check, verify: no published record; lint: nothing to read;
+  1  no record or nothing found: check, profile, verify: no published record; lint: nothing to read;
      public-record: no SEC filer or LEI named for the domain; log receipt: no such entry;
      mcp-tools: no reading of that endpoint; guard cache: a domain has no record; declare check: none published
   2  usage error: a missing argument, an unknown flag or command, not one domain, no record with that slug
@@ -416,7 +430,7 @@ ${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
   4  lint: read incomplete; verify: partially checked (mapping or manifest not supplied);
      mcp-tools --live: the server could not be read
   5  check: listed, but no witnessed reading in the record; verify: the record carries no signed statement
-  6  check, verify: the record is withheld while a report about it is reviewed
+  6  check, profile, verify: the record is withheld while a report about it is reviewed
   7  output not delivered: stdout or stderr failed or closed before everything was written
   8  verify, public-record, mcp-tools: the signature does not check, or the key is not trusted;
      declare check: the signature does not check, or its kid is not one of the keys
@@ -480,6 +494,34 @@ const COMMAND_HELP = {
       SEVEN,
     ],
     examples: ['trooth check stripe.com', 'trooth check trooth --json'],
+  },
+  profile: {
+    usage: ['trooth profile <domain|slug> [--section <name>[,<name>...]] [--json | --markdown]'],
+    about: [
+      "Prints a company's complete Trust Profile, section by section: every section the record carries",
+      '(overview, identity, history, funding, product, pricing, stack, security, privacy, ai, hosting,',
+      'infrastructure, procurement, relationships, proof, people, documents, evidence, cards, faq), each',
+      'fact with its value, who said it and its date when Trooth recorded one ("date unknown" otherwise;',
+      'a date is never borrowed from another field). A section the company left empty prints "not',
+      'published". One request, GET https://trooth.co/api/network/profile?q=<domain>&contract=2, the',
+      'projection check, the REST API and the MCP connector read. Read-only; no key, no account.',
+      "The profile is the company's own declared record and is not signed: Trooth signs only the witness",
+      'statement for a reading it took, and trooth verify <domain> checks that.',
+    ],
+    flags: [
+      ['--section <names>', 'only these sections, comma-separated or repeated: the MCP tool\'s names above; the record\'s fact categories are accepted too (registration -> identity, recovery -> hosting, pricing-add-ons -> pricing, privacy-roles -> privacy, ai-practices -> ai)'],
+      ['--json', 'one JSON document on stdout ({subject, contract, read_at, sections: [{name, state, facts}]}, schemas/profile-output.v1.schema.json); diagnostics on stderr'],
+      ['--markdown', 'the same profile as Markdown'],
+    ],
+    exits: [
+      ['0', 'a published record was found and printed'],
+      ['1', 'no published record for the domain: an honest absence (the claim link is printed when the API gives one)'],
+      ['2', 'usage error: not one domain, no record has that slug, an unknown section or flag, --json with --markdown'],
+      ['3', `network or contract error: unreachable, slower than 15 seconds, an unexpected status or body; ${THREE_INTERNAL}`],
+      ['6', 'the record is withheld while a report about it is reviewed'],
+      SEVEN,
+    ],
+    examples: ['trooth profile trooth.co', 'trooth profile trooth --section security,privacy', 'trooth profile trooth.co --json > trooth.co.profile.json', 'trooth profile trooth.co --markdown > trooth.co.md'],
   },
   lint: {
     usage: ['trooth lint [path] [--allow-incomplete] [--json]'],
@@ -1321,7 +1363,11 @@ async function readProjection(domain) {
   };
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Upstream('the record projection answered with something that is not a record');
   if (body.found === false && body.ambiguous === true) throw new Upstream('the record projection answered a domain as an ambiguous name; a domain names one record, so this is a contract error');
-  if (body.found === false) return { kind: 'absent', source };
+  if (body.found === false) {
+    // A claim link, only when the projection itself gives one; never built here.
+    const claim = [body.claimUrl, body.claim_url].find((v) => typeof v === 'string' && /^https:\/\//.test(v)) || null;
+    return { kind: 'absent', source, claimUrl: claim };
+  }
   if (body.found !== true) throw new Upstream('the record projection answered without saying whether a record was found');
   if (body.withheld === true) {
     return { kind: 'withheld', source, slug: typeof body.slug === 'string' ? body.slug : null, name: typeof body.name === 'string' ? body.name : null, reason: String(body.reason ?? '').slice(0, 400), since: typeof body.since === 'string' ? body.since : null };
@@ -1581,6 +1627,143 @@ async function check() {
   if (asJson) { emitJson(rec); return code; }
   printDirectory(rec);
   return code;
+}
+
+/* ------------------------------------------------------------- profile ---- */
+
+/* trooth profile <domain|slug> [--section <name>[,<name>...]] [--json | --markdown]
+ *
+ * The company's complete Trust Profile, section by section, from the same
+ * record projection `check` reads (GET {TROOTH_WEB}/api/network/profile
+ * ?q=<domain>&contract=2): every section the record carries, each fact with
+ * its value, who said it and its date when Trooth recorded one ("date
+ * unknown" otherwise, never borrowed), and a section the company left empty
+ * printed "not published". How sections and typed facts are joined is in
+ * bin/lib/profile.mjs. The profile is the company's own declared record and is
+ * not signed; the one signed object is the witness statement, which `trooth
+ * verify` checks.
+ *
+ * Exits: 0 found and printed; 1 no published record (an honest absence, with
+ * the claim link when the projection gives one); 2 usage; 3 network or
+ * contract; 6 withheld while a report is reviewed; 7 output not delivered.
+ */
+const MAX_PROFILE_PAGES = 50;
+
+async function profileCmd() {
+  const { flags, positional } = parseArgs('profile');
+  if (positional.length !== 1) fail(EXIT.USAGE, `trooth profile takes one <domain|slug>${positional.length ? `, got: ${positional.join(' ')}` : ''}. Try: trooth profile trooth.co`);
+  if (flags['--json'] && flags['--markdown']) fail(EXIT.USAGE, '--json and --markdown are two forms of the same output; pass one.');
+  let requested = null;
+  if (flags['--section']) {
+    const picked = parseSectionArgs(flags['--section']);
+    if (picked.unknown) fail(EXIT.USAGE, `not a section: ${picked.unknown.map((u) => u.slice(0, 40)).join(', ')}. Sections: ${SECTION_NAMES.join(', ')} (also ${Object.keys(SECTION_OF_CATEGORY).filter((k) => !SECTION_NAMES.includes(k)).join(', ')}, the record's fact categories).`);
+    if (!picked.names.length) fail(EXIT.USAGE, `--section names no section. Sections: ${SECTION_NAMES.join(', ')}.`);
+    requested = picked.names;
+  }
+  const input = positional[0];
+  const domain = await subjectDomain(input, 'profile');
+  const readAt = new Date().toISOString();
+  const base = {
+    subject: domain,
+    query: input,
+    contract: PROJECTION_CONTRACT,
+    read_at: readAt,
+  };
+
+  let read;
+  try {
+    read = await readProjection(domain);
+    if (read.kind === 'found') read.body = await readRemainingPages(read.body, domain);
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+
+  const empty = (extra) => ({ ...base, found: false, withheld: false, name: null, slug: null, record: { url: null, version: read.source.record_version, digest: read.source.record_digest, updated_at: null }, signed: false, verify_with: `trooth verify ${domain}`, claim_url: null, requested_sections: requested, profile_present: false, sections: [], ...extra });
+
+  if (read.kind === 'absent') {
+    const doc = empty({ claim_url: read.claimUrl || null });
+    if (asJson) emitJson(doc);
+    else if (flags['--markdown']) {
+      out(`# ${domain}: no published record\n\nThe Trooth Network holds no published record for ${domain}. That is an honest absence: it says nothing about the company.${doc.claim_url ? ` If you are this company, the record can be claimed at <${doc.claim_url}>.` : ''}\n`);
+    } else {
+      out(`\n${B}${domain}${X} ${D}//${X} ${A}no published record on the Trooth Network${X}`);
+      out(`\n${D}The record projection carries no published Trust Profile for this domain. That says`);
+      out(`nothing about the company: a domain that never listed, a record not yet published and a`);
+      out(`record that was revoked all read this way.${X}`);
+      if (doc.claim_url) out(`${D}If you are this company, the record can be claimed at${X} ${C}${doc.claim_url}${X}`);
+      out('');
+    }
+    return EXIT.FINDING;
+  }
+
+  if (read.kind === 'withheld') {
+    const doc = empty({ found: true, withheld: true, name: read.name, slug: read.slug, withheld_reason: read.reason || null });
+    if (asJson) emitJson(doc);
+    else if (flags['--markdown']) out(`# ${read.name || domain} (${domain}): withheld\n\nThe record exists and is withheld while a report about it is reviewed. That is not an absence and not a finding. Trooth's own words: ${read.reason}\n`);
+    else {
+      out(`\n${B}${read.name || domain}${X}   ${C}${domain}${X}   ${A}withheld${X}`);
+      out(`\n${D}The record exists and is withheld while a report about it is reviewed. That is not`);
+      out(`an absence and not a finding. Trooth's own words:${X} ${read.reason}\n`);
+    }
+    return EXIT.WITHHELD;
+  }
+
+  const body = read.body;
+  const built = buildSections(body);
+  const sections = requested ? built.sections.filter((s) => requested.includes(s.name)) : built.sections;
+  const doc = scrub({
+    ...base,
+    found: true,
+    withheld: false,
+    name: typeof body.name === 'string' && body.name ? body.name : domain,
+    slug: body.slug,
+    record: {
+      url: typeof body.canonicalUrl === 'string' ? body.canonicalUrl : null,
+      version: read.source.record_version,
+      digest: read.source.record_digest,
+      updated_at: typeof body.updatedAt === 'string' ? body.updatedAt : null,
+    },
+    signed: false,
+    verify_with: `trooth verify ${domain}`,
+    claim_url: null,
+    requested_sections: requested,
+    profile_present: built.profilePresent,
+    sections,
+  });
+  if (asJson) emitJson(doc);
+  else if (flags['--markdown']) out(renderMarkdown(doc));
+  else out(renderText(doc, { B, D, A, C, J, X }));
+  return EXIT.OK;
+}
+
+/**
+ * A record whose facts run past one page (selection.truncated) is read to the
+ * end with ?after=<next>, every page from the same record version; a cursor
+ * refused as stale, a page for another record or version, or more than
+ * MAX_PROFILE_PAGES pages is a contract error, never a shorter profile.
+ */
+async function readRemainingPages(body, domain) {
+  const sel = body.selection && typeof body.selection === 'object' ? body.selection : null;
+  if (!sel || sel.truncated !== true) return body;
+  const facts = [...body.facts];
+  const conflicts = Array.isArray(body.conflicts) ? [...body.conflicts] : [];
+  let next = sel.next;
+  for (let page = 2; ; page++) {
+    if (typeof next !== 'string' || !next) throw new Upstream('the record projection said more facts follow and gave no cursor to read them');
+    if (page > MAX_PROFILE_PAGES) throw new Upstream(`the record's facts run past ${MAX_PROFILE_PAGES} pages; this CLI stops there rather than print part of a profile`);
+    const path = `/api/network/profile?q=${encodeURIComponent(domain)}&contract=${PROJECTION_CONTRACT}&after=${encodeURIComponent(next)}`;
+    const r = await getFrom(WEB, path, MAX_BODY_PROJECTION);
+    if (r.status < 200 || r.status > 299) throw new Upstream(`the record projection answered HTTP ${r.status} for page ${page} of the facts (the company may have published a new version while it was read; run the command again)`, { http_status: r.status });
+    const p = parseJsonBody(r);
+    if (!p || p.found !== true || typeof p.domain !== 'string' || !sameDomain(p.domain, domain) || !Array.isArray(p.facts)) throw new Upstream(`page ${page} of the facts is not a page of the record for ${domain}`);
+    if (!p.selection || p.selection.recordVersion !== sel.recordVersion) throw new Upstream(`page ${page} of the facts is from another record version (the company published while it was read; run the command again)`);
+    facts.push(...p.facts);
+    if (Array.isArray(p.conflicts)) conflicts.push(...p.conflicts);
+    if (p.selection.truncated !== true) break;
+    next = p.selection.next;
+  }
+  return { ...body, facts, conflicts, selection: { ...sel, returned: facts.length, truncated: false, next: null } };
 }
 
 /* ---------------------------------------------------------------- lint ---- */
@@ -3125,7 +3308,7 @@ async function main() {
     if (!topic.length) { out(helpText()); return EXIT.OK; }
     const [name, sub] = topic;
     if (!Object.prototype.hasOwnProperty.call(COMMAND_HELP, name)) {
-      fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
+      fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
     }
     out(commandHelpText(sub && (SUBCOMMANDS[name] || []).includes(sub) ? `${name} ${sub}` : name));
     return EXIT.OK;
@@ -3135,6 +3318,7 @@ async function main() {
   const helpKey = helpRequest(cmd, argv.slice(1));
   if (helpKey) { out(commandHelpText(helpKey)); return EXIT.OK; }
   if (cmd === 'check') return check();
+  if (cmd === 'profile') return profileCmd();
   if (cmd === 'lint') return lint();
   if (cmd === 'verify') return verifyCmd();
   if (cmd === 'log') return logCmd();
@@ -3148,7 +3332,7 @@ async function main() {
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only
