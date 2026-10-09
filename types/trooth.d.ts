@@ -118,7 +118,10 @@ export interface ManifestEntry {
   commitment?: string;
 }
 
-/** One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string. */
+/** The one JSON document `trooth guard decide --json` prints on stdout when it decides or declines to: a GuardDecision when the policy covers the tool (exit 0 allow, 20 hold, 21 deny), or a GuardNotCovered when it does not (exit 0). A usage error prints the CLI's error document instead ({"ok": false, "error": "...", "exit": 2}), as every command does. */
+export type GuardDecideOutput = GuardDecision | GuardNotCovered;
+
+/** One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string. `trooth guard decide --json` prints this document when the policy covers the tool, and a GuardNotCovered ($defs/notCovered) when it does not; schemas/guard-decide-output.v1.schema.json accepts either. */
 export interface GuardDecision {
   /** allow: every required check held and every rule passed. hold: route the action to a person. deny: a proof failed or a rule the customer marked absolute failed (or the customer's policy chose deny for no record or no source). */
   decision: "allow" | "hold" | "deny";
@@ -134,6 +137,18 @@ export interface GuardDecision {
   action?: Record<string, unknown>;
   /** When the decision was made (RFC 3339). */
   decided_at: string;
+}
+
+/** What `trooth guard decide --json` prints when the policy does not cover the tool: nothing was decided, nothing was read, and the command exits 0. It is not an allow and carries no decision; the caller lets the call run as its own controls intend. */
+export interface GuardNotCovered {
+  /** Always false: the policy's applies_to.tools does not match the tool. */
+  covered: false;
+  /** The tool name given with --tool. */
+  tool: string;
+  /** The policy that does not cover the tool. */
+  policy: GuardPolicyRef;
+  /** A plain sentence saying that nothing was decided. */
+  note: string;
 }
 
 /** One reason code, with what it is about. */

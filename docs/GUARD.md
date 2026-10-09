@@ -203,7 +203,7 @@ Duck-typed adapters that import no framework package (documented with their code
 
 | Command | Code | Meaning |
 |---|---|---|
-| guard decide | 0 | allow, or the policy does not cover the tool (the JSON says `covered: false` and carries no decision) |
+| guard decide | 0 | allow, or the policy does not cover the tool (the JSON says `covered: false` and carries no decision: a `GuardNotCovered`, `$defs/notCovered` in schemas/guard-decision.v1.schema.json) |
 | guard decide | 20 | hold |
 | guard decide | 21 | deny |
 | guard ci | 0 | no added destination outside `destinations.allowed` |
@@ -213,7 +213,9 @@ Duck-typed adapters that import no framework package (documented with their code
 | all | 2 | usage error (a missing flag, a policy that does not parse) |
 | all | 7 | output not delivered |
 
-20, 21 and 22 are outside the CLI's existing table (0 to 11).
+20, 21 and 22 are outside the range the other commands use (0 to 11); the README's exit code table lists them with the rest, and `trooth guard <subcommand> --help` lists each subcommand's codes.
+
+With `--json`, `guard decide` prints exactly one document on stdout: a `GuardDecision` when the policy covers the tool, a `GuardNotCovered` (`{"covered": false, "tool", "policy", "note"}`) when it does not. schemas/guard-decide-output.v1.schema.json accepts exactly those two, and tests/guard-cli.test.mjs validates every output against it. A usage error prints the CLI's error document (`{"ok": false, "error", "exit": 2}`) instead, as every command does.
 
 ## 13. Phase 4 exit, as amended on 2026-10-07
 

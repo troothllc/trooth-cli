@@ -21,7 +21,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 17);
+  assert.equal(Object.keys(schemas).length, 18);
   // The guard decision keeps the $id the brief published for it (docs/GUARD.md).
   const publishedIds = { 'guard-decision.v1.schema.json': 'https://trooth.co/schemas/guard-decision.v1.json' };
   for (const [f, s] of Object.entries(schemas)) {

@@ -82,5 +82,9 @@ test('human output names each part and ends on the verdict', () => {
 test('help lists verify and its exit codes', () => {
   const r = run(['--help']);
   assert.match(r.out, /trooth verify <domain>/);
-  assert.match(r.out, /8 verify: signature does not check/);
+  assert.match(r.out, /8 {2}verify, public-record, mcp-tools: the signature does not check/);
+  const v = run(['verify', '--help']);
+  assert.equal(v.code, 0);
+  assert.match(v.out, /8 {2}not trusted: the statement is malformed, its signature does not check/);
+  assert.match(v.out, /10 superseded/);
 });

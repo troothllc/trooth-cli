@@ -103,7 +103,7 @@ class ManifestEntry(BaseModel):
     commitment: Optional[str] = Field(None, description="`sha256:` plus the hex SHA-256 of salt, a newline byte and the private reference. Only its holder can open it.")
 
 class GuardDecision(BaseModel):
-    "One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string."
+    "One decision of the Trooth guard (trooth/guard, docs/GUARD.md): allow, hold for a person, or deny an ACTION the customer's agent is about to take, under the customer's policy, with reason codes. It is made on the customer's machine and is never a statement about whether a company is safe. The contract is the one in section 8 of the Trooth Network brief; reasons may also carry a detail string. `trooth guard decide --json` prints this document when the policy covers the tool, and a GuardNotCovered ($defs/notCovered) when it does not; schemas/guard-decide-output.v1.schema.json accepts either."
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -114,6 +114,16 @@ class GuardDecision(BaseModel):
     evidence: List[GuardEvidence] = Field(..., description="The signed, logged facts the rules read.")
     action: Optional[Dict[str, Any]] = Field(None, description="The intercepted tool call: name, target host, amount or data class. Stored locally, never sent to Trooth.")
     decided_at: str = Field(..., description="When the decision was made (RFC 3339).")
+
+class GuardNotCovered(BaseModel):
+    "What `trooth guard decide --json` prints when the policy does not cover the tool: nothing was decided, nothing was read, and the command exits 0. It is not an allow and carries no decision; the caller lets the call run as its own controls intend."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    covered: Literal[False] = Field(..., description="Always false: the policy's applies_to.tools does not match the tool.")
+    tool: str = Field(..., description="The tool name given with --tool.")
+    policy: GuardPolicyRef = Field(..., description="The policy that does not cover the tool.")
+    note: str = Field(..., description="A plain sentence saying that nothing was decided.")
 
 class GuardReason(BaseModel):
     "One reason code, with what it is about."
@@ -1137,6 +1147,9 @@ class WitnessStatement(BaseModel):
 EvidenceManifest = List[ManifestEntry]
 """The evidence manifest a v2 or v3 statement binds by digest, published beside the statement as `witnessEvidenceManifest`. Canonical bytes: entries sorted by check_id, each as {"check_id":..,"source":..} or {"check_id":..,"commitment":..}, no whitespace, UTF-8."""
 
+GuardDecideOutput = Union[GuardDecision, GuardNotCovered]
+"""The one JSON document `trooth guard decide --json` prints on stdout when it decides or declines to: a GuardDecision when the policy covers the tool (exit 0 allow, 20 hold, 21 deny), or a GuardNotCovered when it does not (exit 0). A usage error prints the CLI's error document instead ({"ok": false, "error": "...", "exit": 2}), as every command does."""
+
 
 CorrectionPayload.model_rebuild()
 CorrectionReason.model_rebuild()
@@ -1148,6 +1161,7 @@ DeclaredApi.model_rebuild()
 DeclarationSignature.model_rebuild()
 ManifestEntry.model_rebuild()
 GuardDecision.model_rebuild()
+GuardNotCovered.model_rebuild()
 GuardReason.model_rebuild()
 GuardPolicyRef.model_rebuild()
 GuardEvidence.model_rebuild()

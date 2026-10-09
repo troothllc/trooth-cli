@@ -72,6 +72,12 @@
 //                           with the optional key pin at _trooth-key.<domain> read over
 //                           DNS over HTTPS. Nothing secret is printed.
 //   trooth --help           Show help.   trooth --version  Show version.
+//   trooth <command> --help Show one command's usage, flags and exit codes (also -h,
+//                           and trooth help <command> [<subcommand>]).
+//
+// check, verify and public-record take a domain, a URL, or a Trooth slug (a bare
+// name with no dot, as the MCP connector and the A2A agent accept), which is
+// resolved to its domain on the record projection before anything else is read.
 //
 // WHAT THIS TOOL DOES NOT DO, ON PURPOSE:
 //   It does not grade, rate or rank a company or a repository.
@@ -82,9 +88,13 @@
 // Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0, 10 in 0.9.0):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
-//   1  finding                 (check: not listed, or revoked; lint: nothing to read)
-//   2  usage error             (missing argument, unknown flag or command, bad domain,
-//                               path not found)
+//   1  finding                 (check: not listed, or revoked; lint: nothing to read;
+//                               verify: not listed, so nothing to check; public-record:
+//                               no SEC filer and no LEI named for the domain; log receipt:
+//                               no such entry; mcp-tools: no reading of the endpoint;
+//                               guard cache: a domain has no record)
+//   2  usage error             (missing argument, unknown flag or command, not a domain
+//                               nor the slug of a record, path not found)
 //   3  service or contract error (Trooth unreachable or too slow, a non-2xx other than
 //                               the documented not-listed 404, a body that is not JSON
 //                               or not the record asked for). Never an answer about a
@@ -116,7 +126,10 @@
 //   more than 400 days, oversize, not JSON, a redirect; or the DNS pin names another key).
 //   declare init and sign use 0 and 2 (including a refusal to overwrite a file).
 //   verify also uses 4 (a mapping or manifest was not supplied, so the binding is only
-//   partially checked) and 5 (the record carries no signed statement).
+//   partially checked), 5 (the record carries no signed statement) and 6 (withheld).
+//   mcp-tools uses 4 when --live could not read the server. mirror uses 9 when the source
+//   does not match its checkpoint or extend the mirror, and --check when it is not
+//   compatible; log checkpoint uses 9 when the checkpoint does not check.
 //  20  guard hold              (new with trooth guard, guard decide: route the action to a person)
 //  21  guard deny              (new with trooth guard, guard decide: a proof or an absolute rule failed)
 //  22  guard ci finding        (new with trooth guard, guard ci: the change adds a destination host the
@@ -263,7 +276,7 @@ const FLAGS = {
   verify: { bool: ['--json', '--offline', '--no-log'], value: ['--file', '--keys', '--mapping', '--manifest', '--bundle', '--save-bundle', '--log-vkey'] },
   log: { bool: ['--json'], value: ['--state', '--log-vkey', '--witnesses', '--out'] },
   mirror: { bool: ['--json', '--check'], value: ['--from', '--log-vkey'] },
-  'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey'] },
+  'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey', '--timeout'] },
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
   declare: { bool: ['--json', '--no-dns'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
   guard: { bool: ['--json', '--offline'], value: ['--policy', '--tool', '--host', '--args', '--cache', '--max-age', '--base', '--log-vkey', '--timeout-ms'], multi: ['--witness'] },
@@ -298,9 +311,9 @@ function parseArgs(command) {
       const known = [...spec.bool, ...spec.value, ...(spec.multi || [])];
       fail(EXIT.USAGE, `unknown flag ${name} for \`trooth ${command}\`. ` +
         (known.length ? `Known flags: ${known.join(', ')}.` : `\`trooth ${command}\` takes no flags.`) +
-        ` Run \`trooth --help\`.`);
+        ` Run \`trooth ${command} --help\`.`);
     } else if (a.startsWith('-') && a.length > 1) {
-      fail(EXIT.USAGE, `unknown flag ${a} for \`trooth ${command}\`. Run \`trooth --help\`.`);
+      fail(EXIT.USAGE, `unknown flag ${a} for \`trooth ${command}\`. Run \`trooth ${command} --help\`.`);
     } else {
       positional.push(a);
     }
@@ -320,20 +333,24 @@ ${B}Usage${X}
   trooth verify <domain>    Check the record's signed witness statement yourself
   trooth log checkpoint     Read and check the witness statement log's signed checkpoint
   trooth log monitor --state <file>   Check the log only grew since the checkpoint in <file>
-  trooth log receipt <index>  Fetch and check the COSE receipt (RFC 9942) for one log entry
-  trooth mirror <dir> [--from <url>]   Copy the log into <dir> (C2SP tiles), checking every entry against the signed root
+  trooth log receipt <index>   Fetch and check the COSE receipt (RFC 9942) for one log entry
+  trooth mirror <dir> [--from <url|dir>]   Copy the log into <dir> (C2SP tiles), checking every entry against the signed root
   trooth mirror --check <dir|url>      Check a mirror: its checkpoint, its entries, its tiles, and that the live log extends it
-  trooth public-record <domain>  What the company published to regulators and registries, signed
-  trooth mcp-tools [endpoint]  The MCP servers whose tool lists Trooth logs, or one server's tool hashes
+  trooth public-record <domain>   What the company published to regulators and registries, signed
+  trooth mcp-tools [endpoint]   The MCP servers whose tool lists Trooth logs, or one server's tool hashes
   trooth guard decide --policy <file> --tool <name> [--host <host>] [--args <json>]
                             Allow, hold or deny one action under your policy, checked locally
   trooth guard hook --policy <file>   Claude Code PreToolUse hook (reads the hook JSON on stdin)
   trooth guard ci --policy <file> [--base <ref>] [paths...]   Fail a build that adds an unlisted destination
   trooth guard cache --policy <file> --cache <dir> <domain>...   Save signed bundles for offline decisions
-  trooth declare init --domain <d> [--key <path>]   Make the Ed25519 key for your domain's declaration
-  trooth declare sign --domain <d> --key <path> --out <file>   Sign /.well-known/trooth.json
+  trooth declare init --domain <domain> [--key <path>]   Make the Ed25519 key for your domain's declaration
+  trooth declare sign --domain <domain> --key <path> --out <file>   Sign /.well-known/trooth.json
   trooth declare check <domain> | --file <path>   Check a domain's signed declaration and its DNS pin
+  trooth <command> --help   A command's usage, flags and exit codes (also: trooth help <command>)
   trooth --help | --version
+
+  check, verify and public-record take a domain or a URL; a bare name with no dot is read
+  as a Trooth slug and resolved to its domain on the record projection (trooth → trooth.co).
 
 ${B}Examples${X}
   trooth check stripe.com                ${D}# read a company's record${X}
@@ -344,10 +361,12 @@ ${B}Examples${X}
   trooth verify --file saved.json --offline --keys keys.json --mapping 1.0.1.json
   trooth verify trooth.co --save-bundle trooth.co.bundle.json   ${D}# keep every input in one file${X}
   trooth verify --bundle trooth.co.bundle.json                  ${D}# check it later, with no network${X}
+  trooth public-record apple.com --timeout 90                   ${D}# a cold reading can take 20 to 40 seconds${X}
   trooth mcp-tools https://api.trooth.co/public/mcp --live      ${D}# has the server changed its tools since Trooth logged them?${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
+  --help, -h                this command's usage, flags and exit codes; exits 0
   --allow-incomplete        lint: exit 0 even when a file was skipped, invalid or unreadable
   --no-fallback             check: exit 3 when the record projection cannot be reached,
                             instead of reading the directory feed as a labelled fallback
@@ -360,11 +379,16 @@ ${B}Flags${X}
                             mapping bytes to one file (refuses to overwrite)
   --bundle <path>           verify: check a saved bundle; sends nothing
   --no-log                  verify: do not ask the witness statement log
-  --log-vkey <key>          verify, log, public-record, mcp-tools: check checkpoints against this log key, not the pinned one
+  --log-vkey <key>          verify, log, mirror, public-record, mcp-tools, guard: check checkpoints
+                            against this log key, not the pinned one
   --state <path>            log monitor: the last checkpoint seen; written when the log only grew
-  --witnesses <n>           log checkpoint, log monitor: require cosignatures from n pinned witnesses
+  --witnesses <n>           log checkpoint, log monitor: exit 9 unless n pinned witnesses cosigned.
+                            No witness follows the log yet, so any n above 0 exits 9 today.
   --out <path>              log receipt: write the COSE receipt bytes to a new file
+  --from <url|dir>          mirror: copy from another mirror instead of the live log
+  --check <dir|url>         mirror: check a mirror instead of writing one
   --cik, --lei, --ticker    public-record: name the SEC filer or LEI to read for the domain
+  --timeout <seconds>       public-record: the deadline for each request (default 45)
   --live                    mcp-tools: also read the server's tool list from this machine and compare
   --policy <file>           guard: the policy (YAML subset or JSON; docs/GUARD.md)
   --tool, --host, --args    guard decide: the tool name, the target host, the typed arguments as JSON
@@ -373,30 +397,43 @@ ${B}Flags${X}
   --offline                 guard decide, hook: read only cached bundles; none means hold
   --base <ref>              guard ci: compare HEAD with this ref (default origin/main)
   --witness <vkey>          guard: a witness cosigner key to count, in place of the pinned ones (repeatable)
+  --timeout-ms <ms>         guard: the deadline for each request (default 10000)
   --domain, --key           declare: the domain, and the private JWK (init default ~/.trooth/declaration-key/<domain>.jwk)
   --product id=name=url     declare sign: a product (repeatable); --api base_url[,mcp_url,manifest_sha256],
                             --repo <url>, --add-key <jwk> (a second key, for rotation) repeat too
   --record <url>, --days N  declare sign: the company's Trooth record; validity in days (default 365, at most 400)
   --file <path>, --no-dns   declare check: check a saved file; do not read the _trooth-key TXT pin
 
-${B}Exit codes${X}
-  0 ok   1 not listed, or nothing declared   2 usage error   3 service or contract error
-  4 lint read incomplete; mcp-tools --live: the server could not be read   5 listed, but no witnessed reading in the record   6 withheld
-  7 output not delivered: stdout or stderr failed or closed before everything was written
-  8 verify: signature does not check, or the key is not trusted
-  9 verify: signature checks, but the domain, mapping, manifest, counts or log proof do not match
-    log monitor: the log is not an extension of the checkpoint in --state
-    log: fewer pinned witnesses cosigned than --witnesses asks; a COSE receipt does not check
-    public-record: the record is not the one its statement names, or its log receipt does not check
-    mcp-tools: a hash, the statement or its receipt does not match; with --live, the server lists other tools now
-  8 also: public-record, mcp-tools: the statement's signature or key does not hold
+${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
+  0  ok: check listed and witnessed; lint complete; verify checked; a log, mirror or receipt checks;
+     public-record names an SEC filer or LEI for the domain; guard decide allow (or the tool is not covered)
+  1  no record or nothing found: check, verify: no published record; lint: nothing to read;
+     public-record: no SEC filer or LEI named for the domain; log receipt: no such entry;
+     mcp-tools: no reading of that endpoint; guard cache: a domain has no record; declare check: none published
+  2  usage error: a missing argument, an unknown flag or command, not one domain, no record with that slug
+  3  service or contract error: Trooth unreachable or too slow, an unexpected status or body;
+     also an unexpected failure inside the CLI. Never an answer about a company.
+  4  lint: read incomplete; verify: partially checked (mapping or manifest not supplied);
+     mcp-tools --live: the server could not be read
+  5  check: listed, but no witnessed reading in the record; verify: the record carries no signed statement
+  6  check, verify: the record is withheld while a report about it is reviewed
+  7  output not delivered: stdout or stderr failed or closed before everything was written
+  8  verify, public-record, mcp-tools: the signature does not check, or the key is not trusted;
+     declare check: the signature does not check, or its kid is not one of the keys
+  9  verify: signature checks, but the domain, mapping, manifest, counts or log proof do not match
+     log checkpoint, log monitor: the checkpoint does not check, the log is not an extension of the
+     checkpoint in --state, or fewer pinned witnesses cosigned than --witnesses asks
+     log receipt: the COSE receipt does not check; mirror: not mirrored, or --check: not compatible
+     public-record: the record is not the one its statement names, or its log receipt does not check
+     mcp-tools: a hash, the statement or its receipt does not match; with --live, the server lists other tools now
+     declare check: another rule fails, or the DNS pin names another key
   10 verify: a correction Trooth signed and logged withdraws or replaces the statement
-  11 declare check: the declaration expired; 8 its signature or key does not hold; 9 another rule fails
-     or the DNS pin names another key; 1 the site publishes none; 3 the site or DNS could not be read
-  20 guard decide: hold (route the action to a person)   21 guard decide: deny
+  11 declare check: the declaration expired
+  20 guard decide: hold (route the action to a person)
+  21 guard decide: deny (a proof or an absolute rule failed, or the policy chose deny)
   22 guard ci: the change adds a destination host the policy does not list
      guard hook follows Claude Code instead: 0 allow or ask (the JSON on stdout says which), 2 deny
-     or any failure, with the reason on stderr. guard cache: 0 all saved, 1 a domain has no record, 3 unreachable.
+     or any failure, with the reason on stderr.
 
 ${D}check reads only public, already-published records. No key, no account. It reads
 the one record projection, trooth.co/api/network/profile, the same body the website,
@@ -412,12 +449,545 @@ Trooth signs what it witnessed. It never signs on a company's behalf.${X}
 `;
 }
 
+/**
+ * Each command's own help: `trooth <command> [<subcommand>] --help`, `-h`, or
+ * `trooth help <command> [<subcommand>]`. Every exit code listed here is one
+ * the command's code path returns (tests/cli-0163.test.mjs keeps them honest).
+ */
+const SEVEN = ['7', 'output not delivered: stdout or stderr failed or closed before everything was written'];
+const THREE_INTERNAL = 'also an unexpected failure inside the CLI';
+const COMMAND_HELP = {
+  check: {
+    usage: ['trooth check <domain|slug> [--no-fallback] [--json]'],
+    about: [
+      "Reads a company's record from the public Trooth Network: one request,",
+      'GET https://trooth.co/api/network/profile?q=<domain>&contract=2, the projection the website,',
+      'the REST API and the MCP connector read. Read-only; no key, no account. A domain or a URL is',
+      'accepted; a bare name with no dot is read as a Trooth slug (trooth → trooth.co). It checks no',
+      'signature: trooth verify does.',
+    ],
+    flags: [
+      ['--no-fallback', "exit 3 when the record projection cannot be reached, instead of reading api.trooth.co's directory feed as a labelled fallback"],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'listed, and Trooth witnessed a dated reading'],
+      ['1', 'no published record for the domain (on the fallback read, also a revoked record)'],
+      ['2', 'usage error: not one domain, no record has that slug, an unknown flag'],
+      ['3', `service or contract error: unreachable, slower than 15 seconds, an unexpected status or body; ${THREE_INTERNAL}`],
+      ['5', 'listed, but the record carries no reading this CLI can confirm was witnessed'],
+      ['6', 'the record is withheld while a report about it is reviewed'],
+      SEVEN,
+    ],
+    examples: ['trooth check stripe.com', 'trooth check trooth --json'],
+  },
+  lint: {
+    usage: ['trooth lint [path] [--allow-incomplete] [--json]'],
+    about: [
+      'Reads the infrastructure a directory (default .) declares: Terraform (.tf, .tf.json, plan JSON),',
+      'Kubernetes YAML and Dockerfiles. Prints the declared facts, a coverage report and an aggregate',
+      'digest of the counts. Local and offline: it opens files and opens no sockets.',
+    ],
+    flags: [
+      ['--allow-incomplete', 'exit 0 (or 1 when nothing was read) even when a file was skipped, invalid or unreadable'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'a complete read of at least one declaration'],
+      ['1', 'nothing to read: no file held a declaration'],
+      ['2', 'usage error: the path does not exist, an unknown flag'],
+      ['3', 'an unexpected failure inside the CLI'],
+      ['4', 'incomplete read: a file was skipped, invalid or unreadable, or the walk stopped at its file limit'],
+      SEVEN,
+    ],
+    examples: ['trooth lint ./infra', 'trooth lint --json > trooth-lint.json'],
+  },
+  verify: {
+    usage: [
+      'trooth verify <domain|slug> [--mapping <path>] [--manifest <path>] [--keys <path>] [--no-log]',
+      '                            [--save-bundle <path>] [--log-vkey <key>] [--json]',
+      'trooth verify --file <path> [--offline --keys <path>] [<domain>]',
+      'trooth verify --bundle <path> [<domain>]',
+    ],
+    about: [
+      "Checks the record's signed witness statement on this machine, trusting no summary from Trooth:",
+      "the Ed25519 signature over the exact payload bytes, the key's lifecycle on api.trooth.co/public/keys,",
+      'the domain it was signed for, the counts, for v2 and v3 the SHA-256 of the check mapping and of',
+      'the evidence manifest, and its entry in the witness statement log with any correction.',
+      'A bare name with no dot is read as a Trooth slug. Rules: docs/VERIFY.md.',
+    ],
+    flags: [
+      ['--file <path>', 'a saved profile, statement, or {statement, manifest}'],
+      ['--keys <path>', 'a saved copy of api.trooth.co/public/keys'],
+      ['--mapping <path>', 'the exact check mapping document the statement names'],
+      ['--manifest <path>', 'the evidence manifest (a JSON list)'],
+      ['--offline', 'send nothing; needs --file and --keys'],
+      ['--save-bundle <path>', 'also write every input to one file (refuses to overwrite)'],
+      ['--bundle <path>', 'check a saved bundle; sends nothing'],
+      ['--no-log', 'do not ask the witness statement log'],
+      ['--log-vkey <key>', 'check log checkpoints against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'checked (v1, v2 or v3): the signature, the key, the domain, the counts and every binding hold'],
+      ['1', 'no published record for the domain: there is no statement to check'],
+      ['2', 'usage error: missing <domain>, a file not found or not JSON, a bad bundle, --offline without --file and --keys'],
+      ['3', `service or contract error: the record, the key list or the mapping could not be read; ${THREE_INTERNAL}`],
+      ['4', 'partially checked: everything checked held, but the mapping or the manifest was not supplied'],
+      ['5', 'the record is listed but carries no signed witness statement'],
+      ['6', 'the record is withheld while a report about it is reviewed'],
+      ['8', 'not trusted: the statement is malformed, its signature does not check, or its key is not trusted'],
+      ['9', 'mismatch: the signature checks, but the domain, mapping, manifest, counts or log receipt do not match what was signed'],
+      ['10', 'superseded: everything held, and a correction Trooth signed and logged withdraws or replaces it'],
+      SEVEN,
+    ],
+    examples: ['trooth verify trooth.co', 'trooth verify trooth.co --save-bundle trooth.co.bundle.json', 'trooth verify --bundle trooth.co.bundle.json'],
+  },
+  log: {
+    usage: [
+      'trooth log checkpoint [--witnesses <n>] [--log-vkey <key>] [--json]',
+      'trooth log monitor --state <file> [--witnesses <n>] [--log-vkey <key>] [--json]',
+      'trooth log receipt <index> [--out <path>] [--log-vkey <key>] [--json]',
+    ],
+    about: [
+      "Trooth's witness statement log (docs/LOG.md): checkpoint reads and checks its signed checkpoint,",
+      'monitor checks it only grew since the checkpoint saved in a file, receipt checks the RFC 9942',
+      "COSE receipt for one entry. Run trooth log <subcommand> --help for each one's exit codes.",
+    ],
+    flags: [],
+    exits: [
+      ['0', 'the checkpoint, the growth or the receipt checks'],
+      ['1', 'log receipt: the log has no such entry'],
+      ['2', 'usage error'],
+      ['3', `the log could not be read; ${THREE_INTERNAL}`],
+      ['9', 'it does not check (see each subcommand)'],
+      SEVEN,
+    ],
+  },
+  'log checkpoint': {
+    usage: ['trooth log checkpoint [--witnesses <n>] [--log-vkey <key>] [--json]'],
+    about: [
+      "Reads the signed checkpoint of Trooth's witness statement log and checks it against the log key",
+      'pinned in this release. Says whether the hardware key also signed it, and which of the pinned',
+      'witnesses cosigned it.',
+    ],
+    flags: [
+      ['--witnesses <n>', 'exit 9 unless at least n of the pinned witnesses cosigned. No witness follows the log yet, so today any n above 0 exits 9 (docs/LOG.md section 7)'],
+      ['--log-vkey <key>', 'check the checkpoint against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'the checkpoint checks (and at least --witnesses pinned witnesses cosigned it)'],
+      ['2', 'usage error: --witnesses is not a whole number, or more than the witnesses pinned'],
+      ['3', `the log could not be read; ${THREE_INTERNAL}`],
+      ['9', 'the checkpoint does not check, or fewer pinned witnesses cosigned than --witnesses asks'],
+      SEVEN,
+    ],
+    examples: ['trooth log checkpoint', 'trooth log checkpoint --json'],
+  },
+  'log monitor': {
+    usage: ['trooth log monitor --state <file> [--witnesses <n>] [--log-vkey <key>] [--json]'],
+    about: [
+      'Checks the log only grew since the checkpoint saved in <file>: the new checkpoint checks, and a',
+      'consistency proof shows the new tree extends the saved one. The first run records the checkpoint.',
+      'The file is written only when the log only grew. Anyone can run a monitor.',
+    ],
+    flags: [
+      ['--state <file>', 'where the last checkpoint seen is kept (required)'],
+      ['--witnesses <n>', 'exit 9 unless at least n of the pinned witnesses cosigned. No witness follows the log yet, so today any n above 0 exits 9'],
+      ['--log-vkey <key>', 'check checkpoints against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'consistent: the log only grew (or the first checkpoint was recorded)'],
+      ['2', 'usage error: no --state, a state file this command did not write, a bad --witnesses'],
+      ['3', `the log or its consistency proof could not be read; ${THREE_INTERNAL}`],
+      ['9', 'the log shrank, shows two roots for one size, or is not an extension of the saved checkpoint; the checkpoint does not check; or fewer pinned witnesses cosigned than --witnesses asks'],
+      SEVEN,
+    ],
+    examples: ['trooth log monitor --state trooth-log-state.json'],
+  },
+  'log receipt': {
+    usage: ['trooth log receipt <index> [--out <path>] [--log-vkey <key>] [--json]'],
+    about: [
+      'Fetches the RFC 9942 COSE receipt of inclusion for log entry <index>, checks it against the',
+      "entry's bytes and the pinned log key, and checks that api.trooth.co/.well-known/scitt-keys lists that key.",
+    ],
+    flags: [
+      ['--out <path>', 'write the receipt bytes to a new file, only when it checks (never overwrites)'],
+      ['--log-vkey <key>', 'check the receipt against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'the receipt checks, and scitt-keys lists the log key (or could not be read)'],
+      ['1', 'the log has no entry <index>'],
+      ['2', 'usage error: not one entry index, --out names a file that exists'],
+      ['3', `the log could not be read; ${THREE_INTERNAL}`],
+      ['9', 'the receipt does not check, or scitt-keys does not list the log key'],
+      SEVEN,
+    ],
+    examples: ['trooth log receipt 0 --out entry-0.cose'],
+  },
+  mirror: {
+    usage: [
+      'trooth mirror <dir> [--from <url|dir>] [--log-vkey <key>] [--json]',
+      'trooth mirror --check <dir|url> [--log-vkey <key>] [--json]',
+    ],
+    about: [
+      'Copies the witness statement log into <dir> in the C2SP tiles layout: every entry is rebuilt',
+      'into its leaf hash and checked against the signed root before anything is written, and a mirror',
+      'only grows by extension of what it holds. --check says whether a mirror is compatible: a signed',
+      'checkpoint, entries that hash to it, the tiles its entries make, and a live log that extends it.',
+      'Rules: docs/MIRRORS.md.',
+    ],
+    flags: [
+      ['--from <url|dir>', 'copy from another mirror (https, or a directory) instead of the live log'],
+      ['--check', 'check the mirror named instead of writing one'],
+      ['--log-vkey <key>', 'check checkpoints against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'mirrored; with --check, compatible'],
+      ['2', 'usage error: no target, a URL to write to, a source that is neither https nor a directory, a directory holding a checkpoint this log did not sign'],
+      ['3', `the log or the source could not be read (an unreachable URL, a file missing from a directory); ${THREE_INTERNAL}`],
+      ['9', 'not mirrored: the entries do not hash to the signed checkpoint, or the source does not extend the mirror; with --check, not compatible'],
+      SEVEN,
+    ],
+    examples: ['trooth mirror ./trooth-log', 'trooth mirror --check ./trooth-log'],
+  },
+  'public-record': {
+    usage: [
+      'trooth public-record <domain|slug> [--cik <n>] [--lei <lei>] [--ticker <t>]',
+      '                     [--timeout <seconds>] [--log-vkey <key>] [--json]',
+    ],
+    about: [
+      'What the company has published outside its own site, read by Trooth from the authorities that',
+      'hold it (SEC EDGAR, GLEIF, DNS, Certificate Transparency, security.txt, OFAC, SAM.gov and more),',
+      'and the evidence tying each identifier to the domain. The statement naming the reading is checked',
+      'here: its SHA-256, its signature, its key and its log entry. A first reading of a domain is taken',
+      'live and can take 20 to 40 seconds (a note says so after 5 seconds on a terminal); a reading is',
+      'cached for a day. A bare name with no dot is read as a Trooth slug. Rules: docs/EVIDENCE.md.',
+    ],
+    flags: [
+      ['--cik <n>', 'the SEC Central Index Key to read, when the site does not name it'],
+      ['--lei <lei>', 'the Legal Entity Identifier to read'],
+      ['--ticker <t>', 'the ticker to find the SEC filer by'],
+      ['--timeout <seconds>', 'the deadline for each request, 1 to 600 (default 45; TROOTH_TIMEOUT_MS sets it in milliseconds when --timeout is not given)'],
+      ['--log-vkey <key>', 'check the log receipt against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'the reading names at least one SEC filer (CIK) or LEI for the domain, each with its status (corroborated, claimed by the site, contradicted)'],
+      ['1', 'the reading names no SEC filer and no LEI for the domain. Common (a private company files nothing with the SEC) and not a finding about the company; the rest of the reading is printed'],
+      ['2', 'usage error: not one domain, no record has that slug, a bad --cik, --lei, --ticker or --timeout, or the service refused the request (HTTP 400)'],
+      ['3', `service error: unreachable, no answer within the deadline, rate limited (HTTP 429), or an answer that is not a reading of this domain; ${THREE_INTERNAL}`],
+      ['8', "the statement's signature does not check, or its key is not trusted"],
+      ['9', 'the reading is not the one its statement names, or its log receipt does not check'],
+      SEVEN,
+    ],
+    note: 'A reading that carries no signature (the signature line says why) does not change the exit code.',
+    examples: ['trooth public-record apple.com', 'trooth public-record trooth.co --json', 'trooth public-record example.com --cik 320193 --timeout 90'],
+  },
+  'mcp-tools': {
+    usage: ['trooth mcp-tools [<endpoint> [--live]] [--log-vkey <key>] [--json]'],
+    about: [
+      'With no endpoint, the MCP servers whose tool lists Trooth reads and logs. With one, its reading:',
+      "each tool's description and definition hash, the manifest hash, the signed statement and its log",
+      'entry, all checked here. --live reads the tool list from this machine and compares. Rules:',
+      'docs/EVIDENCE.md section 9.',
+    ],
+    flags: [
+      ['--live', "also read the server's tool list from this machine and compare, tool by tool"],
+      ['--log-vkey <key>', 'check the log receipt against this key, not the pinned one'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'listed; or the reading checks (and with --live the server lists the same tools now)'],
+      ['1', 'Trooth has no reading of <endpoint>'],
+      ['2', 'usage error: not an https URL (or http on this machine), --live without an endpoint'],
+      ['3', `service error: Trooth could not be read; ${THREE_INTERNAL}`],
+      ['4', '--live: the server could not be read from this machine'],
+      ['8', "the statement's signature does not check, or its key is not trusted"],
+      ['9', 'a hash, the statement or its receipt does not match; with --live, the server lists other tools now'],
+      SEVEN,
+    ],
+    examples: ['trooth mcp-tools', 'trooth mcp-tools https://api.trooth.co/public/mcp --live'],
+  },
+  guard: {
+    usage: [
+      'trooth guard decide --policy <file> --tool <name> [--host <host>] [--args <json>]',
+      'trooth guard hook --policy <file>',
+      'trooth guard ci --policy <file> [--base <ref>] [paths...]',
+      'trooth guard cache --policy <file> --cache <dir> <domain>...',
+    ],
+    about: [
+      'The pre-execution guardrail (docs/GUARD.md): allow, hold or deny one action an agent is about to',
+      "take, under your written policy, from Trooth's signed and logged records checked on this machine.",
+      "Only the domain is sent to Trooth; the action never is. Run trooth guard <subcommand> --help for each one.",
+    ],
+    flags: [],
+    exits: [
+      ['0', 'decide: allow, or the tool is not covered; ci: no unlisted destination; cache: all saved; hook: allow or ask'],
+      ['1', 'cache: a domain has no Trooth record'],
+      ['2', 'usage error; hook: deny, or any failure'],
+      ['3', `cache: a source could not be reached; ${THREE_INTERNAL}`],
+      ['20', 'decide: hold'], ['21', 'decide: deny'], ['22', 'ci: the change adds a destination the policy does not list'],
+      SEVEN,
+    ],
+  },
+  'guard decide': {
+    usage: [
+      'trooth guard decide --policy <file> --tool <name> [--host <host>] [--args <json>]',
+      '                    [--cache <dir> [--max-age <seconds>] [--offline]] [--witness <vkey>]...',
+      '                    [--log-vkey <key>] [--timeout-ms <ms>] [--json]',
+    ],
+    about: [
+      'Allows, holds or denies one action under your policy. A tool the policy does not cover is not',
+      'decided: it exits 0 and --json prints {"covered": false, ...}, not a decision. Both shapes are in',
+      'schemas/guard-decide-output.v1.schema.json (a GuardDecision, or a GuardNotCovered).',
+    ],
+    flags: [
+      ['--policy <file>', 'the policy (YAML subset or JSON; docs/GUARD.md section 3)'],
+      ['--tool <name>', 'the tool name the agent is about to call'],
+      ['--host <host>', 'the target host; without it, the host is read from --args by the policy'],
+      ['--args <json>', "the tool call's typed arguments, as JSON"],
+      ['--cache <dir>', 'read and save signed bundles here; --max-age <seconds> is their freshness (default 900)'],
+      ['--offline', 'read only cached bundles; none means hold'],
+      ['--witness <vkey>', 'a witness cosigner key to count, in place of the pinned ones (repeatable)'],
+      ['--log-vkey <key>', 'the log key, in place of the pinned one'],
+      ['--timeout-ms <ms>', 'the deadline for each request (default 10000)'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'allow, or the policy does not cover the tool'],
+      ['2', 'usage error: no --policy, a policy that does not parse or allows on failure, no --tool, --args not JSON'],
+      ['3', 'an unexpected failure inside the CLI'],
+      ['20', 'hold: route the action to a person'],
+      ['21', 'deny: a proof or an absolute rule failed'],
+      SEVEN,
+    ],
+    examples: ['trooth guard decide --policy policy.yaml --tool stripe.create_payout --host api.stripe.com --json'],
+  },
+  'guard hook': {
+    usage: [
+      'trooth guard hook --policy <file> [--cache <dir> [--max-age <seconds>] [--offline]]',
+      '                  [--witness <vkey>]... [--log-vkey <key>] [--timeout-ms <ms>]',
+    ],
+    about: [
+      "A Claude Code PreToolUse hook: reads the hook's JSON on stdin (tool_name, tool_input) and decides",
+      'a covered tool call under the policy. It never fails open. docs/GUARD.md section 8.',
+    ],
+    flags: [
+      ['--policy <file>', 'the policy'],
+      ['--cache <dir>, --max-age, --offline', 'as for guard decide'],
+      ['--witness, --log-vkey, --timeout-ms', 'as for guard decide'],
+    ],
+    exits: [
+      ['0', "the tool is not covered, or allow (no output), or hold (prints Claude Code's ask JSON on stdout)"],
+      ['2', 'deny, with the reason codes on stderr; or any failure (no policy, input that is not JSON, an answer not delivered)'],
+    ],
+    note: 'Claude Code lets a tool run on any other code, so the hook uses only 0 and 2.',
+  },
+  'guard ci': {
+    usage: ['trooth guard ci --policy <file> [--base <ref>] [paths...] [--json]'],
+    about: [
+      'Reads the lines a change adds (git diff <base>...HEAD) or the files given, and lists every',
+      "destination host they name that the policy's destinations.allowed does not list. Reads no network.",
+    ],
+    flags: [
+      ['--policy <file>', 'the policy'],
+      ['--base <ref>', 'compare HEAD with this ref (default origin/main)'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'no added destination outside destinations.allowed'],
+      ['2', 'usage error: no --policy, a path that is not a file, git diff did not run'],
+      ['3', 'an unexpected failure inside the CLI'],
+      ['22', 'the change adds a destination host the policy does not list'],
+      SEVEN,
+    ],
+    examples: ['trooth guard ci --policy .trooth/guard-policy.yaml --base origin/main'],
+  },
+  'guard cache': {
+    usage: [
+      'trooth guard cache --policy <file> --cache <dir> <domain>...',
+      '                   [--log-vkey <key>] [--witness <vkey>]... [--timeout-ms <ms>] [--json]',
+    ],
+    about: ['Reads and checks the signed records for each domain and saves them as bundles in <dir>, for guard decide --offline.'],
+    flags: [
+      ['--policy <file>', 'the policy'],
+      ['--cache <dir>', 'where the bundles are saved (required)'],
+      ['--log-vkey, --witness, --timeout-ms', 'as for guard decide'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'every domain was saved'],
+      ['1', 'a domain has no Trooth record'],
+      ['2', 'usage error: no --policy or --cache, no <domain>, not a domain'],
+      ['3', `a source could not be reached; ${THREE_INTERNAL}`],
+      SEVEN,
+    ],
+    examples: ['trooth guard cache --policy policy.yaml --cache .trooth-cache stripe.com'],
+  },
+  declare: {
+    usage: [
+      'trooth declare init --domain <domain> [--key <path>] [--json]',
+      'trooth declare sign --domain <domain> --key <path> --out <file> [...]',
+      'trooth declare check <domain> | --file <path> [--domain <domain>] [--no-dns] [--json]',
+    ],
+    about: [
+      'The domain-signed declaration (docs/DECLARATION.md): init makes an Ed25519 key kept on this',
+      'machine, sign writes the document a company publishes at https://<domain>/.well-known/trooth.json,',
+      "check reads one and checks every rule. Run trooth declare <subcommand> --help for each one.",
+    ],
+    flags: [],
+    exits: [
+      ['0', 'the key or the document was written; the declaration checks'],
+      ['1', 'check: the site publishes none'], ['2', 'usage error'], ['3', 'check: the site or DNS could not be read'],
+      ['8', 'check: the signature does not check'], ['9', 'check: another rule fails'], ['11', 'check: expired'],
+      SEVEN,
+    ],
+  },
+  'declare init': {
+    usage: ['trooth declare init --domain <domain> [--key <path>] [--json]'],
+    about: ["Makes the Ed25519 key for your domain's declaration and keeps it on this machine (mode 0600, never overwritten, never printed)."],
+    flags: [
+      ['--domain <domain>', 'the domain the key is for (required)'],
+      ['--key <path>', 'where to write the private JWK (default ~/.trooth/declaration-key/<domain>.jwk)'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [['0', 'the key was written'], ['2', 'usage error, including a refusal to overwrite a key'], SEVEN],
+    examples: ['trooth declare init --domain acme.com'],
+  },
+  'declare sign': {
+    usage: [
+      'trooth declare sign --domain <domain> --key <path> --out <file> [--record <url>] [--days <n>]',
+      '                    [--product id=name=url]... [--api base_url[,mcp_url,manifest_sha256]]...',
+      '                    [--repo <url>]... [--add-key <jwk>]... [--json]',
+    ],
+    about: ['Writes the signed declaration you publish at https://<domain>/.well-known/trooth.json, checked against every rule before it is written, and prints the optional _trooth-key TXT pin.'],
+    flags: [
+      ['--domain <domain>', 'the domain (required)'],
+      ['--key <path>', 'the private JWK trooth declare init wrote (required)'],
+      ['--out <file>', 'where to write the declaration (required; never overwrites)'],
+      ['--record <url>', "the company's Trooth record"],
+      ['--days <n>', 'validity in days (default 365, at most 400)'],
+      ['--product id=name=url', 'a product (repeatable)'],
+      ['--api <spec>', 'an API: base_url, or base_url,mcp_url,manifest_sha256 (repeatable)'],
+      ['--repo <url>', 'a code repository (repeatable)'],
+      ['--add-key <jwk>', 'a second public key, for rotation (repeatable)'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [['0', 'the declaration was written'], ['2', 'usage error, including a refusal to overwrite and a document that would not check'], SEVEN],
+    examples: ['trooth declare sign --domain acme.com --key ~/.trooth/declaration-key/acme.com.jwk --out trooth.json'],
+  },
+  'declare check': {
+    usage: [
+      'trooth declare check <domain> [--no-dns] [--json]',
+      'trooth declare check --file <path> [--domain <domain>] [--no-dns] [--json]',
+    ],
+    about: [
+      "Reads a domain's declaration from https://<domain>/.well-known/trooth.json (no redirects, 64 KB at",
+      'most) or a file, checks every rule, and reads the optional key pin at _trooth-key.<domain> over',
+      'DNS over HTTPS. It takes a domain, not a Trooth slug: the document is read from the site itself.',
+    ],
+    flags: [
+      ['--file <path>', 'check a saved file instead of reading the site'],
+      ['--domain <domain>', 'with --file: require the domain the document names'],
+      ['--no-dns', 'do not read the _trooth-key TXT pin'],
+      ['--json', 'one JSON document on stdout; diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'the declaration checks (and the DNS pin, when present, names one of its keys)'],
+      ['1', 'the site answers 404 or 410: it publishes no declaration'],
+      ['2', 'usage error: not a domain, both or neither of <domain> and --file, a file not found'],
+      ['3', `the site could not be read (no answer, the deadline, another status); ${THREE_INTERNAL}`],
+      ['8', 'the signature does not check, or its kid is not one of the keys'],
+      ['9', 'another rule fails (the domain, a URL on another host, more than 400 days, oversize, not JSON, a redirect), or the DNS pin names another key'],
+      ['11', 'the declaration checks in every other way, and has expired'],
+      SEVEN,
+    ],
+    examples: ['trooth declare check trooth.co', 'trooth declare check --file trooth.json --domain acme.com'],
+  },
+};
+
+/** The help for `trooth <key>`: usage, what it does, flags, exit codes, examples. */
+function commandHelpText(key) {
+  const h = COMMAND_HELP[key];
+  // Wrap a description at 100 columns, continuing under its own first column.
+  const wrap = (lead, text) => {
+    const pad = ' '.repeat(lead.length);
+    const rows = [];
+    let row = null;
+    for (const word of text.split(' ')) {
+      if (row === null) row = lead + word;
+      else if (row.length + 1 + word.length > 100) { rows.push(row); row = pad + word; }
+      else row = `${row} ${word}`;
+    }
+    rows.push(row);
+    return rows.join('\n');
+  };
+  const lines = ['', `${J}${B}trooth ${key}${X} ${D}v${VERSION}${X}`, '', `${B}Usage${X}`];
+  for (const u of h.usage) lines.push(`  ${u}`);
+  lines.push('');
+  for (const a of h.about) lines.push(a.length > 100 ? wrap('', a) : a);
+  if (h.flags.length) {
+    lines.push('', `${B}Flags${X}`);
+    const w = Math.min(24, Math.max(...h.flags.map(([f]) => f.length)));
+    for (const [f, d] of h.flags) {
+      if (f.length > w) lines.push(`  ${f}`, wrap(`  ${' '.repeat(w)}  `, d));
+      else lines.push(wrap(`  ${f.padEnd(w)}  `, d));
+    }
+  }
+  lines.push('', `${B}Exit codes${X}`);
+  for (const [code, d] of [...h.exits].sort((a, b) => Number(a[0]) - Number(b[0]))) lines.push(wrap(`  ${code.padEnd(3)}`, d));
+  if (h.note) lines.push(`  ${D}${h.note}${X}`);
+  if (h.examples && h.examples.length) {
+    lines.push('', `${B}Examples${X}`);
+    for (const e of h.examples) lines.push(`  ${e}`);
+  }
+  lines.push('', `${D}trooth --help lists every command. --help and -h print plain text, with or without --json.${X}`, '');
+  return lines.join('\n');
+}
+
+/** The commands that take a subcommand, and how each finds it in argv. */
+const SUBCOMMANDS = { log: ['checkpoint', 'monitor', 'receipt'], guard: ['decide', 'hook', 'ci', 'cache'], declare: ['init', 'sign', 'check'] };
+
+/**
+ * Whether argv asks for a command's help (--help or -h anywhere before `--`,
+ * and not as the value of a flag that takes one), and which help: the
+ * subcommand's when one is named, else the command's.
+ */
+function helpRequest(command, args) {
+  const spec = FLAGS[command];
+  if (!spec) return null;
+  const takesValue = new Set([...spec.value, ...(spec.multi || [])]);
+  let asked = false, sub = null;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--') break;
+    if (a === '--help' || a === '-h') { asked = true; continue; }
+    if (a.startsWith('--')) { if (!a.includes('=') && takesValue.has(a)) i++; continue; }
+    if (sub === null && !a.startsWith('-')) sub = a;
+  }
+  if (!asked) return null;
+  return sub !== null && (SUBCOMMANDS[command] || []).includes(sub) ? `${command} ${sub}` : command;
+}
+
 /* -------------------------------------------------------------- fetch ---- */
 
 // Every request is bounded: a deadline, a maximum body size, a JSON content
 // type, and at most one retry, only for a connection failure or a 502, 503 or
 // 504. Nothing here turns a failure into an answer about a company.
-const TIMEOUT_MS = Math.max(1000, Number(process.env.TROOTH_TIMEOUT_MS) || 15000);
+// TROOTH_TIMEOUT_MS, when set, is every command's per-request deadline.
+// Otherwise it is 15 seconds, except for public-record, whose first reading
+// of a domain is taken live from a dozen authorities and takes 20 to 40
+// seconds: 45 seconds there, and --timeout <seconds> sets it.
+const TIMEOUT_ENV = Number(process.env.TROOTH_TIMEOUT_MS) > 0 ? Math.max(1000, Number(process.env.TROOTH_TIMEOUT_MS)) : null;
+const TIMEOUT_MS = TIMEOUT_ENV ?? 15000;
+const PUBLIC_RECORD_TIMEOUT_MS = 45000;
+/** The deadline each request of this run uses; public-record raises it. */
+let requestTimeoutMs = TIMEOUT_MS;
 // The record projection is bounded at 2 MiB by the server before it is sent
 // (PROFILE_RESPONSE_MAX_BYTES in the web route's output guard), so the CLI
 // accepts exactly that much from it. The directory route keeps 1 MiB.
@@ -459,7 +1029,7 @@ async function getFrom(base, path, maxBody) {
       const res = await fetch(`${base}${path}`, {
         method: 'GET',
         redirect: 'error',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(requestTimeoutMs),
         headers: { accept: 'application/json', 'user-agent': `trooth-cli/${VERSION}` },
       });
       if (RETRYABLE.has(res.status) && attempt === 1) { try { await res.body?.cancel(); } catch {} await new Promise((r) => setTimeout(r, 500)); continue; }
@@ -469,7 +1039,7 @@ async function getFrom(base, path, maxBody) {
       if (e instanceof Upstream) throw e;
       lastErr = e;
       const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
-      if (timedOut) throw new Upstream(`the Trooth Network at ${base} did not answer within ${TIMEOUT_MS} ms`, {}, true);
+      if (timedOut) throw new Upstream(`the Trooth Network at ${base} did not answer within ${requestTimeoutMs} ms`, { timeout_ms: requestTimeoutMs }, true);
       if (attempt === 1) { await new Promise((r) => setTimeout(r, 500)); continue; }
     }
   }
@@ -511,6 +1081,59 @@ function normalizeDomain(input) {
   return { domain: host };
 }
 const sameDomain = (a, b) => { const x = normalizeDomain(a); return !!x.domain && x.domain === b; };
+
+/**
+ * A TROOTH SLUG, as the MCP connector and the A2A agent accept ("domain or
+ * Trooth slug"): a bare name with no dot, such as `trooth`. Only input that is
+ * not a domain is read this way, so a domain never changes meaning.
+ */
+const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/;
+/** Single labels that name a machine or a reserved zone, never a company. */
+const NOT_SLUGS = new Set(['localhost', 'localdomain', 'local', 'internal', 'invalid', 'test', 'example', 'lan', 'home']);
+function slugOf(input) {
+  const s = String(input || '').trim().toLowerCase();
+  return SLUG.test(s) && !NOT_SLUGS.has(s) ? s : null;
+}
+
+/**
+ * The domain a user typed, or the domain of the record whose slug they typed.
+ * A slug is resolved on the record projection the server API reads,
+ * GET {TROOTH_WEB}/api/network/profile?q=<slug>&contract=2, and is accepted
+ * only when the record found carries exactly that slug: a record the
+ * projection matched by name is offered as a suggestion, never used. Exits 2
+ * when the input is neither a domain nor a slug a record carries, 3 when the
+ * projection cannot be read.
+ */
+async function subjectDomain(input, command) {
+  const norm = normalizeDomain(input);
+  if (!norm.error) return norm.domain;
+  const slug = slugOf(input);
+  if (!slug) fail(EXIT.USAGE, norm.error.replace('trooth check', `trooth ${command}`));
+  const pass = `Pass the company's domain, for example: trooth ${command} stripe.com`;
+  let r;
+  try {
+    r = await getFrom(WEB, `/api/network/profile?q=${encodeURIComponent(slug)}&contract=${PROJECTION_CONTRACT}`, MAX_BODY_PROJECTION);
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, `${slug} is not a domain, so it was read as a Trooth slug, and the record projection could not be read to resolve it: ${e.message}`, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+  if (r.status < 200 || r.status > 299) fail(EXIT.UPSTREAM, `${slug} is not a domain, so it was read as a Trooth slug, and the record projection answered HTTP ${r.status}`, { state: 'service_error', http_status: r.status });
+  let body;
+  try { body = parseJsonBody(r); } catch (e) { fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra }); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) fail(EXIT.UPSTREAM, 'the record projection answered with something that is not a record', { state: 'service_error' });
+  if (body.found === false && body.ambiguous === true) {
+    const c = Array.isArray(body.candidates) ? body.candidates.map((x) => x && typeof x.domain === 'string' ? x.domain : null).filter(Boolean).slice(0, 5) : [];
+    fail(EXIT.USAGE, `${slug} matches more than one Trooth record${c.length ? ` (${c.join(', ')})` : ''}. ${pass}`);
+  }
+  if (body.found !== true) fail(EXIT.USAGE, `${slug} is not a domain, and no Trooth record has the slug ${slug}. ${pass}`);
+  const found = normalizeDomain(typeof body.domain === 'string' ? body.domain : '');
+  if (found.error) fail(EXIT.USAGE, `the Trooth record with the slug ${slug} does not name its domain on this read${body.withheld === true ? ' (it is withheld while a report about it is reviewed)' : ''}. ${pass}`);
+  if (typeof body.slug !== 'string' || body.slug.toLowerCase() !== slug) {
+    fail(EXIT.USAGE, `${slug} is not a domain, and no Trooth record has the slug ${slug}. The closest record is ${typeof body.name === 'string' ? `${body.name.slice(0, 80)}, ` : ''}${found.domain}: trooth ${command} ${found.domain}`);
+  }
+  diag(`${D}${slug} is a Trooth slug: the record for ${found.domain}${X}`);
+  return found.domain;
+}
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -897,9 +1520,7 @@ function printDirectory(rec) {
 async function check() {
   const { flags, positional } = parseArgs('check');
   if (positional.length > 1) fail(EXIT.USAGE, `check takes one <domain>, got: ${positional.join(' ')}`);
-  const norm = normalizeDomain(positional[0]);
-  if (norm.error) fail(EXIT.USAGE, norm.error);
-  const domain = norm.domain;
+  const domain = await subjectDomain(positional[0], 'check');
 
   let read;
   try {
@@ -1317,7 +1938,7 @@ function lint() {
 async function getBytes(url, maxBody) {
   let res;
   try {
-    res = await fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'user-agent': `trooth-cli/${VERSION}` } });
+    res = await fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(requestTimeoutMs), headers: { 'user-agent': `trooth-cli/${VERSION}` } });
   } catch (e) {
     throw new Upstream(`could not read ${url}: ${e && e.message ? e.message : e}`, {}, true);
   }
@@ -1360,12 +1981,15 @@ async function verifyCmd() {
   if (offline && !flags['--file'] && !flags['--bundle']) fail(EXIT.USAGE, '--offline needs --file: with no network there is no record to read.');
   if (offline && !flags['--bundle'] && !flags['--keys']) fail(EXIT.USAGE, '--offline needs --keys: a saved copy of https://api.trooth.co/public/keys.');
   let domain;
+  if (!positional[0] && !flags['--file'] && !flags['--bundle']) fail(EXIT.USAGE, 'missing <domain>. Try: trooth verify trooth.co');
   if (positional[0]) {
-    const norm = normalizeDomain(positional[0]);
-    if (norm.error) fail(EXIT.USAGE, norm.error.replace('trooth check', 'trooth verify'));
-    domain = norm.domain;
+    // Offline, a slug cannot be resolved: only a domain is accepted.
+    if (offline) {
+      const norm = normalizeDomain(positional[0]);
+      if (norm.error) fail(EXIT.USAGE, `${norm.error.replace('trooth check', 'trooth verify')}${slugOf(positional[0]) ? ' (a Trooth slug is resolved over the network; offline, pass the domain)' : ''}`);
+      domain = norm.domain;
+    } else domain = await subjectDomain(positional[0], 'verify');
   }
-  if (!domain && !flags['--file'] && !flags['--bundle']) fail(EXIT.USAGE, 'missing <domain>. Try: trooth verify trooth.co');
 
   if (flags['--bundle']) {
     let i;
@@ -1470,16 +2094,24 @@ const PUBLIC_RECORD_STATEMENT = 'trooth.public-record.v1';
 async function publicRecordCmd() {
   const { flags, positional } = parseArgs('public-record');
   if (positional.length !== 1) fail(EXIT.USAGE, 'trooth public-record takes one <domain>. Try: trooth public-record apple.com');
-  const norm = normalizeDomain(positional[0]);
-  if (norm.error) fail(EXIT.USAGE, norm.error.replace('trooth check', 'trooth public-record'));
-  const domain = norm.domain;
+  // A first reading of a domain is taken live and takes 20 to 40 seconds, so
+  // this command waits longer than the others: --timeout, else
+  // TROOTH_TIMEOUT_MS, else 45 seconds.
+  if (flags['--timeout'] !== undefined) {
+    if (!/^[1-9][0-9]{0,2}$/.test(flags['--timeout']) || Number(flags['--timeout']) > 600) fail(EXIT.USAGE, '--timeout is a whole number of seconds, from 1 to 600.');
+    requestTimeoutMs = Number(flags['--timeout']) * 1000;
+  } else requestTimeoutMs = TIMEOUT_ENV ?? PUBLIC_RECORD_TIMEOUT_MS;
   const q = new URLSearchParams();
   if (flags['--cik'] !== undefined) { if (!/^\d{1,10}$/.test(flags['--cik'])) fail(EXIT.USAGE, '--cik is the SEC Central Index Key, 1 to 10 digits.'); q.set('cik', flags['--cik']); }
   if (flags['--lei'] !== undefined) { if (!/^[A-Za-z0-9]{20}$/.test(flags['--lei'])) fail(EXIT.USAGE, '--lei is a 20-character Legal Entity Identifier.'); q.set('lei', flags['--lei'].toUpperCase()); }
   if (flags['--ticker'] !== undefined) { if (!/^[A-Za-z][A-Za-z0-9.-]{0,9}$/.test(flags['--ticker'])) fail(EXIT.USAGE, '--ticker is 1 to 10 letters, digits, dots or dashes.'); q.set('ticker', flags['--ticker'].toUpperCase()); }
+  const domain = await subjectDomain(positional[0], 'public-record');
   try {
     const qs = q.toString();
-    const r = await getFrom(API, `/scan/public-record/${encodeURIComponent(domain)}${qs ? `?${qs}` : ''}`, MAX_BODY_SMALL);
+    const done = progressNote(`reading in progress: a first reading of ${domain} is taken live from the SEC, GLEIF, DNS, Certificate Transparency and the registries, and takes 20 to 40 seconds. Waiting up to ${Math.round(requestTimeoutMs / 1000)} seconds (--timeout <seconds> to change).`);
+    let r;
+    try { r = await getFrom(API, `/scan/public-record/${encodeURIComponent(domain)}${qs ? `?${qs}` : ''}`, MAX_BODY_SMALL); }
+    finally { done(); }
     if (r.status === 429 || r.status === 400) {
       let why = `HTTP ${r.status}`; try { why = JSON.parse(r.text).error || why; } catch {}
       fail(r.status === 400 ? EXIT.USAGE : EXIT.UPSTREAM, why, { http_status: r.status });
@@ -1493,9 +2125,25 @@ async function publicRecordCmd() {
     if (sig.status === 'mismatch') return EXIT.MISMATCH;
     return d.bindings.length ? EXIT.OK : EXIT.FINDING;
   } catch (e) {
-    if (e instanceof Upstream) fail(EXIT.UPSTREAM, e.message, { state: 'service_error', ...e.extra });
+    if (e instanceof Upstream) {
+      const slow = e.extra && e.extra.timeout_ms ? '. A first reading can take longer than that; a reading that finishes is cached for a day, so running the command again in a minute usually answers at once. --timeout <seconds> waits longer.' : '';
+      fail(EXIT.UPSTREAM, `${e.message}${slow}`, { state: 'service_error', ...e.extra });
+    }
     throw e;
   }
+}
+
+/**
+ * A note on stderr after `afterMs` while a slow request is still open, so a
+ * person at a terminal knows the command is working. Only on a terminal
+ * (TROOTH_PROGRESS=1 shows it anywhere, TROOTH_PROGRESS=0 never). Returns the
+ * function that cancels it.
+ */
+function progressNote(text, afterMs = 5000) {
+  const mode = process.env.TROOTH_PROGRESS;
+  if (mode === '0' || (mode !== '1' && !process.stderr.isTTY)) return () => {};
+  const t = setTimeout(() => diag(`${A}note${X} ${text}`), afterMs);
+  return () => clearTimeout(t);
 }
 
 /**
@@ -1899,7 +2547,7 @@ async function logReceiptCmd(flags, positional) {
 async function logCmd() {
   const sub = argv[1];
   const { flags, positional } = parseArgs('log');
-  if (sub !== 'checkpoint' && sub !== 'monitor' && sub !== 'receipt') fail(EXIT.USAGE, 'trooth log takes checkpoint, monitor or receipt. Try: trooth log checkpoint');
+  if (sub !== 'checkpoint' && sub !== 'monitor' && sub !== 'receipt') fail(EXIT.USAGE, 'trooth log takes checkpoint, monitor or receipt. Try: trooth log checkpoint, or trooth log --help');
   try {
     if (sub === 'receipt') return await logReceiptCmd(flags, positional);
     if (positional.length > 1) fail(EXIT.USAGE, `unexpected argument: ${positional.slice(1).join(' ')}`);
@@ -2222,7 +2870,7 @@ async function guardCmd() {
     if (rest.length) return guardHookUsage(`unexpected argument: ${rest.join(' ')}`);
     return guardHook(flags);
   }
-  if (!['decide', 'ci', 'cache'].includes(sub)) fail(EXIT.USAGE, 'trooth guard takes decide, hook, ci or cache. Try: trooth guard decide --policy policy.yaml --tool stripe.create_payout --host api.stripe.com');
+  if (!['decide', 'ci', 'cache'].includes(sub)) fail(EXIT.USAGE, 'trooth guard takes decide, hook, ci or cache. Try: trooth guard decide --policy policy.yaml --tool stripe.create_payout --host api.stripe.com, or trooth guard --help');
   let guard;
   try { guard = await guardFromFlags(flags, { needCache: sub === 'cache' }); }
   catch (e) { fail(EXIT.USAGE, e.message); }
@@ -2332,9 +2980,9 @@ async function declareCmd() {
   const { flags, positional } = parseArgs('declare');
   const sub = positional[0];
   const rest = positional.slice(1);
-  if (!['init', 'sign', 'check'].includes(sub)) fail(EXIT.USAGE, 'trooth declare takes init, sign or check. Try: trooth declare init --domain acme.com');
+  if (!['init', 'sign', 'check'].includes(sub)) fail(EXIT.USAGE, 'trooth declare takes init, sign or check. Try: trooth declare init --domain acme.com, or trooth declare --help');
   const allowed = { init: ['--json', '--domain', '--key'], sign: ['--json', '--domain', '--key', '--record', '--days', '--out', '--product', '--api', '--repo', '--add-key'], check: ['--json', '--domain', '--file', '--no-dns'] }[sub];
-  for (const f of Object.keys(flags)) if (!allowed.includes(f)) fail(EXIT.USAGE, `${f} is not a flag of \`trooth declare ${sub}\`. Its flags: ${allowed.join(', ')}.`);
+  for (const f of Object.keys(flags)) if (!allowed.includes(f)) fail(EXIT.USAGE, `${f} is not a flag of \`trooth declare ${sub}\`. Its flags: ${allowed.join(', ')}. Run \`trooth declare ${sub} --help\`.`);
 
   if (sub === 'init') {
     if (rest.length) fail(EXIT.USAGE, `unexpected argument: ${rest.join(' ')}`);
@@ -2471,7 +3119,21 @@ let hookMode = false;
 
 async function main() {
   if (cmd === '--version' || cmd === '-v' || cmd === 'version') { out(VERSION); return EXIT.OK; }
-  if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') { out(helpText()); return EXIT.OK; }
+  if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') {
+    // `trooth help <command> [<subcommand>]` and `trooth --help <command>`.
+    const topic = argv.slice(1).filter((a) => !a.startsWith('-'));
+    if (!topic.length) { out(helpText()); return EXIT.OK; }
+    const [name, sub] = topic;
+    if (!Object.prototype.hasOwnProperty.call(COMMAND_HELP, name)) {
+      fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
+    }
+    out(commandHelpText(sub && (SUBCOMMANDS[name] || []).includes(sub) ? `${name} ${sub}` : name));
+    return EXIT.OK;
+  }
+  // `trooth <command> [<subcommand>] --help` (or -h) prints that command's
+  // usage and exits 0, before any flag or argument is checked.
+  const helpKey = helpRequest(cmd, argv.slice(1));
+  if (helpKey) { out(commandHelpText(helpKey)); return EXIT.OK; }
   if (cmd === 'check') return check();
   if (cmd === 'lint') return lint();
   if (cmd === 'verify') return verifyCmd();

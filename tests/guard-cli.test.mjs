@@ -284,3 +284,51 @@ test('guard ci (0.15.0): i18n keys and dotted identifiers are not hosts; URLs al
   const r = scanLines([{ file: 'docs/x.md', line: 1, text: 'See https://evil-new-host.com/collect' }, { file: 'NOTES.txt', line: 1, text: 'host: api.vendor.io' }, { file: 'src/a.js', line: 7, text: 'fetch("https://evil-new-host.com/collect")' }], p);
   assert.deepEqual(r.findings, [{ file: 'src/a.js', line: 7, host: 'evil-new-host.com' }]);
 });
+
+test('0.16.3: every guard decide --json output validates against schemas/guard-decide-output.v1.schema.json, uncovered tools included', async () => {
+  const outputs = [];
+  const decide = async (args, port, expectCode) => {
+    const r = await run(['guard', 'decide', ...args, '--json'], { port });
+    assert.equal(r.code, expectCode, `${args.join(' ')}: ${r.err}${r.out}`);
+    const d = JSON.parse(r.out);
+    outputs.push([args.join(' '), d, r.code]);
+    return d;
+  };
+  const pol = policyFile();
+  const w = makeWorld({ cosignAt: Date.now() - 600000, domains: ACME() });
+  const srv = await serve(w); const port = srv.address().port;
+  const dir = tmp();
+  try {
+    await decide(['--policy', pol, '--tool', 'stripe.create_payout', '--host', 'pay.acme.com', ...keyFlags(w)], port, 0);
+    await decide(['--policy', pol, '--tool', 'stripe.create_payout', '--args', JSON.stringify({ url: 'https://acme.com/pay' }), '--cache', dir, ...keyFlags(w)], port, 0);
+    await decide(['--policy', pol, '--tool', 'stripe.create_payout', '--host', 'unknown.example.org', ...keyFlags(w)], port, 20);
+    await decide(['--policy', pol, '--tool', 'stripe.create_payout', ...keyFlags(w)], port, 20);
+    await decide(['--policy', pol, '--tool', 'calendar.create_event', '--host', 'acme.com'], port, 0);
+    await decide(['--policy', pol, '--tool', 'Read'], port, 0);
+  } finally { srv.close(); }
+  await decide(['--policy', pol, '--tool', 'stripe.create_payout', '--host', 'acme.com', '--offline', '--cache', dir, ...keyFlags(w)], 9, 0);
+  await decide(['--policy', pol, '--tool', 'stripe.create_payout', '--host', 'acme.com', ...keyFlags(w)], 9, 20);
+  const comp = makeWorld({ cosignAt: Date.now() - 600000, domains: ACME(), keys: [keyEntry('test-guard-a', K.a, { status: 'compromised', compromised_at: new Date(NOW - 30 * 86400000).toISOString() }), DEFAULT_KEYS()[1]] });
+  const s2 = await serve(comp);
+  try { await decide(['--policy', pol, '--tool', 'stripe.create_payout', '--host', 'acme.com', ...keyFlags(comp)], s2.address().port, 21); }
+  finally { s2.close(); }
+
+  const seen = new Set();
+  for (const [label, d, code] of outputs) {
+    assert.deepEqual(validate('guard-decide-output.v1.schema.json', d), [], label);
+    if (d.covered === false) {
+      assert.notDeepEqual(validate('guard-decision.v1.schema.json', d), [], 'an uncovered output is not a GuardDecision');
+      assert.equal(code, 0);
+      seen.add('not_covered');
+    } else {
+      assert.deepEqual(validate('guard-decision.v1.schema.json', d), [], label);
+      assert.equal(code, { allow: 0, hold: 20, deny: 21 }[d.decision], label);
+      seen.add(d.decision);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['allow', 'deny', 'hold', 'not_covered']);
+  // The output schema accepts exactly those two shapes: not an error document, not a half decision.
+  assert.notDeepEqual(validate('guard-decide-output.v1.schema.json', { ok: false, error: 'x', exit: 2 }), []);
+  assert.notDeepEqual(validate('guard-decide-output.v1.schema.json', { covered: false, tool: 'x' }), []);
+  assert.notDeepEqual(validate('guard-decide-output.v1.schema.json', { covered: true, tool: 'x', policy: outputs[0][1].policy, note: 'n' }), []);
+});
