@@ -14,7 +14,7 @@ Keeping them apart means a compromised log key cannot sign a statement, and a co
 
 ## 1. Making the log key (ceremony v1)
 
-Performed by the founder on the founder's own computer, by `~/dev/.trooth-publish-phase2.sh`:
+Performed by Trooth's security owner on the security owner's own computer, by `~/dev/.trooth-publish-phase2.sh`:
 
 1. An Ed25519 key pair is generated with Node.js `crypto.generateKeyPairSync('ed25519')`, from the operating system's random source.
 2. The private key, as a JWK, is written to `~/.trooth/log-key/private.jwk` with mode 0600 in a directory with mode 0700. Nobody else, and no AI assistant, reads it.
@@ -22,12 +22,12 @@ Performed by the founder on the founder's own computer, by `~/dev/.trooth-publis
 4. The verifier key is derived locally and compared with the one the deployed log serves. The release stops if they differ.
 5. The verifier key is written into `bin/lib/log-trust.mjs` and released in `trooth` 0.9.0.
 
-The founder SHOULD keep one offline copy of `private.jwk` (an encrypted removable drive kept apart from the computer), so the log can keep its key if the computer is lost. Losing every copy does not lose the log: a new key is made (section 3) and the old checkpoints stay checkable with the old public key.
+The security owner SHOULD keep one offline copy of `private.jwk` (an encrypted removable drive kept apart from the computer), so the log can keep its key if the computer is lost. Losing every copy does not lose the log: a new key is made (section 3) and the old checkpoints stay checkable with the old public key.
 
 ## 2. Custody
 
 - **Use.** Only the log's Durable Object reads `TROOTH_LOG_SIGNING_KEY`, to sign a checkpoint after each append. No route returns it, logs it or signs anything chosen by a caller: a checkpoint's text is the log's own size and root.
-- **Access.** Cloudflare account access is the founder's, with two-factor authentication. Worker secrets cannot be read back through Cloudflare's dashboard or API once set.
+- **Access.** Cloudflare account access is the security owner's, with two-factor authentication. Worker secrets cannot be read back through Cloudflare's dashboard or API once set.
 - **The statement key** is held the same way, as the Worker secret `TROOTH_MASTER_SIGNING_KEY`, and its lifecycle is published on the key list.
 
 ## 3. Rotation
@@ -56,7 +56,7 @@ If the statement key is compromised, it is marked compromised on the key list wi
 
 ## 5. The hardware key (ceremony v2)
 
-Performed by the founder's release publisher (`~/dev/.trooth-publish-phase23b.sh`) on the founder's computer, signed in to Trooth's AWS account through `aws login` in the founder's own browser:
+Performed by the security owner's release publisher (`~/dev/.trooth-publish-phase23b.sh`) on the security owner's computer, signed in to Trooth's AWS account through `aws login` in the security owner's own browser:
 
 1. An Ed25519 key is generated inside AWS Key Management Service (key spec `ECC_NIST_EDWARDS25519`, usage `SIGN_VERIFY`, origin `AWS_KMS`), in its FIPS 140-3 validated hardware security modules. The private half never leaves them; no person, no Worker and no AI assistant ever holds it. It carries the alias `alias/trooth-witness-log-v1-hardware` and the tag `purpose=trooth-witness-log`.
 2. An IAM user, `trooth-log-signer`, is created with one inline policy: `kms:Sign` and `kms:GetPublicKey` on that one key, and nothing else. Its access key is created by the AWS CLI and passed straight to `wrangler secret put` over standard input (`TROOTH_LOG_KMS_ACCESS_KEY_ID`, `TROOTH_LOG_KMS_SECRET_ACCESS_KEY`, with the key's ARN as `TROOTH_LOG_KMS_KEY_ARN`). It is never printed, written to a file, or read by anyone. That credential can sign with the key and read its public half; it cannot change, disable, delete or export it.
@@ -70,7 +70,7 @@ Performed by the founder's release publisher (`~/dev/.trooth-publish-phase23b.sh
 
 ## 6. Two-person control: not adopted
 
-Trooth has one person, the founder, who can use or change every key, and no second person with their own AWS and Cloudflare credentials. Two-person control (a second approver for changing or deleting the hardware key, and for the log Worker's secrets and deploys) is therefore not adopted, and Trooth does not describe it as done or planned. If a second person joins, this section says who and from when.
+Every key can be used or changed only by Trooth's security owner, through individual AWS and Cloudflare accounts with two-factor authentication. Two-person control (a second approver for changing or deleting the hardware key, and for the log Worker's secrets and deploys) is not adopted, and Trooth does not describe it as done or planned. When it is adopted, this section says who holds each approval and from when.
 
 What stands in its place, so that one operator cannot quietly rewrite what the log has said:
 
@@ -81,7 +81,7 @@ What stands in its place, so that one operator cannot quietly rewrite what the l
 
 ## 7. Drills
 
-The drills run on Trooth's own log code, in memory, with keys generated for the run and discarded, so production is never touched (`npm run drill:log-key` in trooth-scan-worker, `scripts/drill-log-key.mjs`). The founder's publisher runs them before each release that changes the log, and the result is recorded below.
+The drills run on Trooth's own log code, in memory, with keys generated for the run and discarded, so production is never touched (`npm run drill:log-key` in trooth-scan-worker, `scripts/drill-log-key.mjs`). The security owner's publisher runs them before each release that changes the log, and the result is recorded below.
 
 1. **Key loss.** With the key gone, the log refuses to append (nothing is written that it cannot sign). A new key signs the same tree with the same root; the old checkpoint still checks with the old public half; every receipt's inclusion proof reaches the new root; the log grows again.
 2. **Key compromise.** The tree is signed again with the new key at once. A checkpoint the stolen key signs still checks with the old public half, which is why the old key is unpinned at once; a monitor that kept a checkpoint sees two roots for one size signed by the old key, which is evidence of misuse; the new key does not open the forged checkpoint.
@@ -96,6 +96,6 @@ The runbook steps a drill does not exercise, because they need the real accounts
 |---|---|---|
 | 2026-09-28 | Statement key `trooth-master-2026-09` | First listed on the key list |
 | 2026-10-06 | Log key `trooth.co/witness-log/v1` | Generated (ceremony v1); verifier key `trooth.co/witness-log/v1+06471ca9+AY9UdmLMbCX5Ib3ksDeoE8x3CburcWGJE9eJiPiYP5sZ` |
-| 2026-10-07 | Log key `trooth.co/witness-log/v1` | Drills 1 to 3 (section 7) run on the log code with throwaway keys: 12 of 12 steps held. Run again by the release publisher on the founder's computer before the release that added witnesses |
+| 2026-10-07 | Log key `trooth.co/witness-log/v1` | Drills 1 to 3 (section 7) run on the log code with throwaway keys: 12 of 12 steps held. Run again by the release publisher on the security owner's computer before the release that added witnesses |
 | 2026-10-07 | Log key `trooth.co/witness-log/v1` | Published as a COSE key at `https://api.trooth.co/.well-known/scitt-keys`; RFC 9679 thumbprint is its kid |
 | 2026-10-07 | Log hardware key (ceremony v2) | Generated in AWS KMS, region us-east-1, key id 4eb7b11a-d9c1-4a12-9273-576efe11bfa1; verifier key `trooth.co/witness-log/v1+f4b81466+AcjcIpgAKstxGk9aocMnXweRMG//0mCqvyJXQwc1K+cW`. Co-signs every checkpoint of `trooth.co/witness-log/v1` from this date |

@@ -219,7 +219,7 @@ With `--json`, `guard decide` prints exactly one document on stdout: a `GuardDec
 
 ## 13. Phase 4 exit, as amended on 2026-10-07
 
-The brief set three exit conditions for Phase 4: open source under a permissive license, an outside security review, and use in production by at least three teams outside Trooth. On 2026-10-07 the founder decided to keep the guard confidential to Trooth until launch, and so amended the two conditions that need people outside Trooth. The amended conditions, and where they stand:
+The brief set three exit conditions for Phase 4: open source under a permissive license, an outside security review, and use in production by at least three teams outside Trooth. On 2026-10-07 Trooth decided to keep the guard confidential to Trooth until launch, and so amended the two conditions that need people outside Trooth. The amended conditions, and where they stand:
 
 | Condition | Status |
 |---|---|
@@ -229,4 +229,4 @@ The brief set three exit conditions for Phase 4: open source under a permissive 
 | An outside security review | Moved to the launch phase. No outside party has reviewed the guard. |
 | Use in production by teams outside Trooth | Moved to the launch phase. No team outside Trooth uses the guard in production. |
 
-The internal gate and Trooth's own use are not an outside review and not outside adoption, and nothing here says they are. They are what stands before launch, by the founder's decision for confidentiality; the outside review and outside production use are launch-phase work.
+The internal gate and Trooth's own use are not an outside review and not outside adoption, and nothing here says they are. They are what stands before launch, by Trooth's decision for confidentiality; the outside review and outside production use are launch-phase work.
