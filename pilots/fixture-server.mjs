@@ -13,11 +13,26 @@ import { makeWorld, keyEntry, K, DEFAULT_KEYS } from '../tests/lib/guard-fixture
 
 // One fixed signing key for the log and the witnesses is shared by all worlds
 // (K is module state), so one --log-vkey and one witness list serve every world.
+//
+// THE READINGS ARE DATED FROM THE RUN, NOT FROM THE DAY THE PILOTS WERE WRITTEN.
+// The unit tests pin the clock (tests/lib/guard-fixtures.mjs NOW, READ_AT =
+// 2026-10-06T12:00Z) and pass it to the guard. The pilots cannot: they drive
+// the real frameworks and the real CLI on the real clock. With the fixed
+// READ_AT, the sanctions reading the policies require to be at most 7 days old
+// went stale at 2026-10-13T12:00Z, and the nightly run turned every allow case
+// into a hold (Guard pilots #7). So every reading served here is one hour old
+// at server start, whatever the date.
+const READ_NOW = new Date(Date.now() - 3600000).toISOString();
+const fresh = (cfg) => Object.fromEntries(Object.entries(cfg).map(([d, c]) => [d, {
+  ...c,
+  ...(c.witness ? { witness: { readAt: READ_NOW, ...c.witness } } : {}),
+  ...(c.public && typeof c.public === 'object' ? { public: { readAt: READ_NOW, ...c.public } } : {}),
+}]));
 const worlds = {
   main: makeWorld({
     cosignAt: Date.now() - 600000,
     keys: [...DEFAULT_KEYS(), keyEntry('test-guard-z', K.b, { status: 'revoked' })],
-    domains: {
+    domains: fresh({
       // allow: every rule's claim is signed, logged, fresh
       'acme-payments.com': { witness: {}, public: {} },
       // deny SUBJECT_MISMATCH: the record served for this host is another domain's
@@ -28,12 +43,12 @@ const worlds = {
       'name-match-vendor.com': { witness: {}, public: { sanctionsMatches: [{ name: 'Acme Test Inc.', programs: 'SDGT' }] } },
       // allow for the data-export pilot
       'export-partner.com': { witness: {}, public: {} },
-    },
+    }),
   }),
   // deny NOT_IN_LOG: a forged inclusion proof (a wrong index)
   forged: makeWorld({
     cosignAt: Date.now() - 600000,
-    domains: { 'forged-log-vendor.com': { witness: {}, public: {} } },
+    domains: fresh({ 'forged-log-vendor.com': { witness: {}, public: {} } }),
     forgeProof: (r) => ({ ...r, index: r.index === 0 ? 1 : 0 }),
   }),
 };
