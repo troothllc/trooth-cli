@@ -85,7 +85,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: node tests/check-metadata.mjs
 
-      # The action tests and the lint tests. Run once, on one Node, because
+      # The lint tests and the rest. Run once, on one Node, because
       # they read fixtures by path and assert exact counts.
       - name: The test suite
         run: npm test

@@ -362,17 +362,14 @@ trooth lint --json > trooth-lint.json
 
 ## In GitHub Actions
 
-The same `lint`, as a step, is [`troothllc/trooth-action`](https://github.com/troothllc/trooth-action). It is advisory by default: it writes what your infrastructure declares to the job summary and does not fail your workflow over anything it read unless you opt in to one of two gates. It does fail the step when it could not read at all: a path that does not exist, or a CLI it could not install or start.
+Run `lint` as an ordinary step. Pin one exact version, so a new release never changes a run you did not review:
 
 ```yaml
-- uses: troothllc/trooth-action@<full commit SHA>  # v1
-  with:
-    path: ./infra
+- uses: actions/checkout@v4
+- run: npx --yes trooth@0.16.4 lint ./infra
 ```
 
-Pin the action by its full commit SHA. A tag can be moved; a commit cannot. The action installs one exact `trooth` version with install scripts disabled and refuses a version input that is a range, a tag or a URL.
-
-That repository's README documents the inputs and outputs.
+`lint` makes no requests, so the step needs no token, no secret and no permission beyond `contents: read` for the checkout. The step's result follows the exit codes above: `--json` writes the fact document for a later step or an artifact, and `--allow-incomplete` keeps a run passing when a file cannot be read.
 
 ## Environment
 
