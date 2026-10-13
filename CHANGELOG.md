@@ -1,6 +1,16 @@
 # Changelog
 
-Each release of `trooth` on npm. The README's "Changed in" sections summarise the same entries.
+Each release of `trooth` on npm, newest first.
+
+## 0.16.5 (2026-10-13)
+
+### The package page reads like the Network it serves
+
+- The README, which npm shows as the package page, opens the way the leading developer CLIs do: the mark, one line on what the CLI does, badges (version, provenance, licence, docs), a quick start of three commands, and a short section on putting your own company on the Network with the link to claim its record free.
+- Every example reads trooth.co, a company on the Trooth Network. `trooth check stripe.com` in the README, in `trooth --help`, in `trooth check --help` and in the usage errors named a company that has no record, so the first command a reader ran answered "no published record". The guard examples name a generic `payments.create_payout` tool and `api.payments.example`.
+- The per-release "Changed in" sections moved from the README to this file, which already held them from 0.6.0 on; 0.5.0, 0.4.4, 0.4.3 and the 0.4.0 removals are now here too.
+- The package description says what the CLI reads and where to claim a record, and the keywords name what people search for (trust profile, company profile, vendor due diligence, security questionnaire, MCP).
+- No command, flag, output or exit code changed.
 
 ## 0.16.4 (2026-10-09)
 
@@ -238,3 +248,33 @@ Fixes from the audit of 2026-10-04 (O04, N01, N02, N03, N04). Not yet published 
 
 - `lint` is unchanged. `digest`, the 0.4 name of `facts_digest`, was to be removed in 0.6. It stays until 0.7, because the GitHub Action still exposes it as an output, and its `digest_scope` text now says 0.7.
 - The GitHub Action's default `version` stays `0.5.1` until 0.6.0 is on the registry, because the action installs the version it names from npm.
+
+## 0.5.0
+
+Breaking where the old behavior overstated what was read.
+
+- `lint` parses every format instead of matching patterns. `encrypted = false` on one line, `false` followed by a comment, a commented-out setting and a setting that depends on a variable no longer count as declaring encryption; each store is counted in one of five encryption states. Comments count for nothing, indentation no longer changes a count, and a minified JSON file counts the same as a pretty one.
+- `lint` reports coverage and exits 4 on an incomplete read: a malformed file, a file over the size limit, an unreadable file or a truncated walk. 0.4.4 read a malformed file as a success and an oversized one as "nothing to read".
+- The digest is renamed `facts_digest` and described as what it is, an aggregate of the counts. `digest` carries the same value until 0.6.
+- `check` decides the evidence state from the record's fields: a listed record is no longer printed as witnessed unless it carries a witnessed reading, and exit 5 means listed but not witnessed. The full-list fallback is gone, so an unexpected answer is a service error, never "not listed". Requests have a deadline, a body limit, a content-type check and one bounded retry. Input is normalized with the URL parser.
+- `check` says that it did not check the signature, and the help and this README say that `check` sends the domain you ask about.
+
+## 0.4.4
+
+- `check` asked the Trooth Network for the one record it needs (`/directory/api/vendors/<domain>`) instead of downloading the whole directory list, and fell back to the list when the API did not serve that path. 0.5.0 removes the fallback.
+
+## 0.4.3
+
+- `check` labels the listing state `Listing state:` and prints the two counts in the record page's form (`65 read; 64 as expected`, `35 asked; 27 attested`). It prints the three newest ledger events, newest first, with plain labels and without the detail text. 0.4.2 printed the ledger's three oldest events under a heading that called them recent. `check --json` is unchanged.
+- `lint` no longer counts a storage setting (a bucket's encryption configuration, a bucket policy, a volume attachment) as a second store, and a setting that declares encryption credits the store it refers to. It no longer counts `encrypted = false`, or an empty encryption setting in a plan, as declaring encryption. It classifies by resource type or Kubernetes `kind` only, parses `.tf.json` and plan JSON and counts their resource types, and reads Kubernetes YAML one document at a time. The same tree can therefore produce different counts, and a different digest, than under 0.4.2. The `lint --json` field names are unchanged.
+- The human `lint` output states how each source was read.
+
+## 0.4.0 (removals)
+
+Breaking, and deliberately so.
+
+- The `scan` and `eu` commands are gone. Trooth does not check infrastructure against a standard and does not issue a verdict. Running either exits 2 with a sentence saying what happened, rather than "unknown command", so an old CI job or an old bookmark gets an explanation.
+- `lint` is real. In 0.3.0 it shelled out to a package that was never published, so the command failed for everyone who ran it. It is implemented in this binary now, entirely locally.
+- `scan_id` is gone from `check --json`. Every other field is unchanged.
+- `--strict` is gone, along with the only command that took it.
+- The package description and keywords no longer name any certification, standard or regulation, because Trooth does not offer one.

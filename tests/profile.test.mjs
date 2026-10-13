@@ -213,7 +213,7 @@ test('a slug is resolved on the projection, then read by its domain; an unknown 
     assert.equal(doc.subject, 'trooth.co'); assert.equal(doc.query, 'trooth');
     const bad = await run(['profile', 'nosuchco'], env);
     assert.equal(bad.code, 2);
-    assert.match(bad.err, /no Trooth record has the slug nosuchco\. Pass the company's domain, for example: trooth profile stripe\.com/);
+    assert.match(bad.err, /no Trooth record has the slug nosuchco\. Pass the company's domain, for example: trooth profile trooth\.co/);
   });
 });
 

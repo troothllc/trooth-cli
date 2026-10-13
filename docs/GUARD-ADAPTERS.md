@@ -25,7 +25,7 @@ import { guardTool } from 'trooth/guard/openai-agents';
 
 const guard = createGuard({ policy: await loadPolicy('policy.yaml') });
 const payout = tool(guardTool(guard, {
-  name: 'stripe.create_payout',
+  name: 'payments.create_payout',
   description: 'Pay a vendor',
   parameters: PayoutArgs,
   execute: createPayout,
@@ -111,7 +111,7 @@ A request whose method and host match the policy's `applies_to.http` is decided 
 
 ```python
 from trooth_guard import decide
-d = decide("policy.yaml", "stripe.create_payout", host="api.example.com", cache=".trooth-cache")
+d = decide("policy.yaml", "payments.create_payout", host="api.example.com", cache=".trooth-cache")
 ```
 
 ### CrewAI
@@ -122,8 +122,8 @@ d = decide("policy.yaml", "stripe.create_payout", host="api.example.com", cache=
 from crewai.hooks import before_tool_call
 from trooth_guard.crewai import before_tool_call_hook, task_guardrail
 
-before_tool_call(before_tool_call_hook("policy.yaml", tools=["stripe.*"], ask=ask_a_person))
-task = Task(..., guardrail=task_guardrail("policy.yaml", "stripe.create_payout"))
+before_tool_call(before_tool_call_hook("policy.yaml", tools=["payments.*"], ask=ask_a_person))
+task = Task(..., guardrail=task_guardrail("policy.yaml", "payments.create_payout"))
 ```
 
 The hook returns `False` to block a held or denied call; `ask(decision)` returning True lets a held call run. The task guardrail returns `(True, output)` on allow and `(False, message)` otherwise; CrewAI sends the message back to the agent and retries up to `guardrail_max_retries`.
@@ -136,7 +136,7 @@ The hook returns `False` to block a held or denied call; `ask(decision)` returni
 from langgraph.types import interrupt, Command
 from trooth_guard.langgraph import guard_node
 
-builder.add_node("trooth_guard", guard_node("policy.yaml", interrupt=interrupt, tools=["stripe.*"]))
+builder.add_node("trooth_guard", guard_node("policy.yaml", interrupt=interrupt, tools=["payments.*"]))
 builder.add_edge("trooth_guard", "tools")
 graph.invoke(Command(resume={"type": "approve"}), config)
 ```

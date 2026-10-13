@@ -364,7 +364,7 @@ ${B}Usage${X}
   as a Trooth slug and resolved to its domain on the record projection (trooth → trooth.co).
 
 ${B}Examples${X}
-  trooth check stripe.com                ${D}# read a company's record${X}
+  trooth check trooth.co                 ${D}# read a company's record${X}
   trooth check trooth.co --json          ${D}# one JSON document on stdout, for scripting${X}
   trooth profile trooth --section security,privacy   ${D}# the Trust Profile, two sections, each fact with who said it${X}
   trooth lint ./infra                    ${D}# read declared facts, with a coverage report${X}
@@ -493,7 +493,7 @@ const COMMAND_HELP = {
       ['6', 'the record is withheld while a report about it is reviewed'],
       SEVEN,
     ],
-    examples: ['trooth check stripe.com', 'trooth check trooth --json'],
+    examples: ['trooth check trooth.co', 'trooth check trooth --json'],
   },
   profile: {
     usage: ['trooth profile <domain|slug> [--section <name>[,<name>...]] [--json | --markdown]'],
@@ -808,7 +808,7 @@ const COMMAND_HELP = {
       ['21', 'deny: a proof or an absolute rule failed'],
       SEVEN,
     ],
-    examples: ['trooth guard decide --policy policy.yaml --tool stripe.create_payout --host api.stripe.com --json'],
+    examples: ['trooth guard decide --policy policy.yaml --tool payments.create_payout --host api.payments.example --json'],
   },
   'guard hook': {
     usage: [
@@ -869,7 +869,7 @@ const COMMAND_HELP = {
       ['3', `a source could not be reached; ${THREE_INTERNAL}`],
       SEVEN,
     ],
-    examples: ['trooth guard cache --policy policy.yaml --cache .trooth-cache stripe.com'],
+    examples: ['trooth guard cache --policy policy.yaml --cache .trooth-cache trooth.co'],
   },
   declare: {
     usage: [
@@ -1107,7 +1107,7 @@ function parseJsonBody(r) {
  */
 function normalizeDomain(input) {
   const s = String(input || '').trim();
-  if (!s) return { error: 'missing <domain>. Try: trooth check stripe.com' };
+  if (!s) return { error: 'missing <domain>. Try: trooth check trooth.co' };
   let u;
   try { u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`); }
   catch { return { error: `not a domain or URL: ${s}` }; }
@@ -1151,7 +1151,7 @@ async function subjectDomain(input, command) {
   if (!norm.error) return norm.domain;
   const slug = slugOf(input);
   if (!slug) fail(EXIT.USAGE, norm.error.replace('trooth check', `trooth ${command}`));
-  const pass = `Pass the company's domain, for example: trooth ${command} stripe.com`;
+  const pass = `Pass the company's domain, for example: trooth ${command} trooth.co`;
   let r;
   try {
     r = await getFrom(WEB, `/api/network/profile?q=${encodeURIComponent(slug)}&contract=${PROJECTION_CONTRACT}`, MAX_BODY_PROJECTION);
@@ -3053,7 +3053,7 @@ async function guardCmd() {
     if (rest.length) return guardHookUsage(`unexpected argument: ${rest.join(' ')}`);
     return guardHook(flags);
   }
-  if (!['decide', 'ci', 'cache'].includes(sub)) fail(EXIT.USAGE, 'trooth guard takes decide, hook, ci or cache. Try: trooth guard decide --policy policy.yaml --tool stripe.create_payout --host api.stripe.com, or trooth guard --help');
+  if (!['decide', 'ci', 'cache'].includes(sub)) fail(EXIT.USAGE, 'trooth guard takes decide, hook, ci or cache. Try: trooth guard decide --policy policy.yaml --tool payments.create_payout --host api.payments.example, or trooth guard --help');
   let guard;
   try { guard = await guardFromFlags(flags, { needCache: sub === 'cache' }); }
   catch (e) { fail(EXIT.USAGE, e.message); }

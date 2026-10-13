@@ -23,7 +23,7 @@ const guard = createGuard({
   failMode: 'hold',                       // 'allow' is refused
 });
 
-const d = await guard.decideToolCall({ name: 'stripe.create_payout', arguments: { url: 'https://api.acme.com/pay' } });
+const d = await guard.decideToolCall({ name: 'payments.create_payout', arguments: { url: 'https://api.acme.com/pay' } });
 // d is null when the policy does not cover the tool; otherwise a decision
 // that validates against schemas/guard-decision.v1.schema.json.
 ```
@@ -53,7 +53,7 @@ A policy is YAML (a strict subset, bin/lib/yaml-lite.mjs) or JSON, described by 
 policy: vendor-payments
 version: 3
 applies_to:
-  tools: ["stripe.create_payout", "mcp__bank__*"]
+  tools: ["payments.create_payout", "mcp__bank__*"]
   http: [{ method: "POST", host: "*.example-bank.com" }]   # for the http adapter
 host_from: ["url", "endpoint", "host", "domain", "base_url", "webhook_url", "email", "to"]
 log: { required: true, min_witnesses: 1 }
@@ -68,7 +68,7 @@ rules:
     require: { signature: valid, key_status: [active, retired_before_use] }
     on_fail: deny
     absolute: true
-destinations: { allowed: ["api.stripe.com"] }
+destinations: { allowed: ["api.payments.example"] }
 unknown_counterparty: hold     # hold | deny
 source_unreachable: hold       # hold | deny
 ```

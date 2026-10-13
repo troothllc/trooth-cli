@@ -1,34 +1,58 @@
-# trooth
+<p align="center">
+  <a href="https://trooth.co"><img src="https://trooth.co/brand/trooth-badge-light-512.png" width="88" height="88" alt="Trooth"></a>
+</p>
 
-The Trooth Network from your terminal. Published on npm as **`trooth`**.
+<h1 align="center">trooth</h1>
 
-[![npm](https://img.shields.io/npm/v/trooth?label=npm%20trooth&color=0B0B0B)](https://www.npmjs.com/package/trooth) [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-0B0B0B)](LICENSE) [![Docs](https://img.shields.io/badge/docs-trooth.co%2Fdocs%2Fcli-0B0B0B)](https://trooth.co/docs/cli)
+<p align="center"><b>Read any company's record on the Trooth Network from your terminal.</b><br>No key. No account. Every fact shows who said it and when.</p>
 
-Trooth operates the Trooth Network: one public, machine-readable record per company, carrying its identity, products and demos, commercial terms, domain and marketing links, people, documents, security and privacy posture, AI practices, procurement terms and relationships. It is Trooth's only product and it is free. Trooth signs one object in that record, the witness statement for a reading Trooth took of the company's public surface. The rest of the profile, including what the company declares about itself, is not signed.
+<p align="center">
+  <a href="https://www.npmjs.com/package/trooth"><img src="https://img.shields.io/npm/v/trooth?label=npm&color=0B0B0B" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/trooth"><img src="https://img.shields.io/badge/provenance-signed-0B0B0B" alt="npm provenance"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0B0B0B" alt="License: Apache 2.0"></a>
+  <a href="https://trooth.co/docs/cli"><img src="https://img.shields.io/badge/docs-trooth.co%2Fdocs%2Fcli-1A73E8" alt="Docs"></a>
+</p>
 
-DNS says where a company is. A TLS certificate says the connection is authentic. The Trooth Network says who the company is and what it does with your data.
+<p align="center">
+  <a href="https://trooth.co/signup"><b>Claim your company's record</b></a> ·
+  <a href="https://trooth.co/network/company/trooth">See an example</a> ·
+  <a href="https://trooth.co/docs/cli">Docs</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-> **Is your company on the Trooth Network?** Any company can publish one free, public record that buyers, and the AI assistants they use, read directly. **[Claim your company's record](https://trooth.co/signup)** · [See an example](https://trooth.co/network/company/trooth)
+---
 
-This CLI is the terminal interface to that record. It does two things:
+## Quick start
 
-- `trooth check <domain>` reads a company's published record from the public Network. No key and no account. It sends one request to `api.trooth.co` with **the domain you ask about in the request URL**, plus what every web request carries: your IP address and a `trooth-cli/<version>` user agent. Trooth's servers can therefore see which domain you looked up; [trooth.co/privacy](https://trooth.co/privacy) and the [retention schedule](https://trooth.co/retention) say what is kept and for how long. Nothing else about you or your machine is sent.
+```bash
+npx trooth check trooth.co      # the record, its evidence state and its newest events
+npx trooth profile trooth.co    # the complete Trust Profile, section by section
+npx trooth verify trooth.co     # check Trooth's signed witness statement on your machine
+```
+
+Node 18 or newer. Nothing to configure.
+
+## Put your company on the Network
+
+Trooth operates the Trooth Network: one free, public, machine-readable record per company, carrying its identity, products, commercial terms, people, documents, security and privacy posture, AI practices, procurement terms and relationships. Buyers read it instead of sending another questionnaire, and so do the AI assistants they ask.
+
+**[Claim your company's record](https://trooth.co/signup)**. It is free. Once it is published, `npx trooth check yourcompany.com` reads it, and so does every assistant connected to the [Trooth MCP connector](https://github.com/troothllc/trooth-mcp).
+
+**Trooth witnesses and dates facts. It does not grade, rate or rank anyone.** Trooth signs one object in a record, the witness statement for a reading it took of the company's public surface. What a company declares about itself is labeled declared and is not signed. The CLI prints counts, reported apart, and never adds them into one number.
+
+## What this CLI sends
+
+- `trooth check <domain>` sends one request to `api.trooth.co` with **the domain you ask about in the request URL**, plus what every web request carries: your IP address and a `trooth-cli/<version>` user agent. Trooth's servers can therefore see which domain you looked up; [trooth.co/privacy](https://trooth.co/privacy) and the [retention schedule](https://trooth.co/retention) say what is kept and for how long. Nothing else about you or your machine is sent.
 - `trooth lint [path]` reads what your own infrastructure declares and prints those declarations as facts. Entirely local: it opens files and opens no sockets.
-
-**Trooth witnesses and dates facts. It does not grade, rate or rank anyone.** The CLI prints counts, reported apart, and never adds them into one number.
 
 ## Install
 
 ```bash
-# No install:
-npx trooth check stripe.com
-
-# Or install it:
 npm install -g trooth
 trooth --version
 ```
 
-Node 18 or newer, because the binary uses the built-in `fetch`. One dependency, pinned to an exact version and locked in `npm-shrinkwrap.json`: [`yaml`](https://www.npmjs.com/package/yaml), the maintained YAML parser, which itself has none. It is there so Kubernetes files are parsed rather than pattern-matched. Install with `--ignore-scripts` if you like; neither package has an install script.
+One dependency, pinned to an exact version and locked in `npm-shrinkwrap.json`: [`yaml`](https://www.npmjs.com/package/yaml), the maintained YAML parser, which itself has none. It is there so Kubernetes files are parsed rather than pattern-matched. Install with `--ignore-scripts` if you like; neither package has an install script. Every release is published from GitHub Actions with an [npm provenance statement](https://docs.npmjs.com/generating-provenance-statements) tying the tarball to its tagged commit.
 
 ## Commands
 
@@ -370,7 +394,7 @@ Run `lint` as an ordinary step. Pin one exact version, so a new release never ch
 
 ```yaml
 - uses: actions/checkout@v4
-- run: npx --yes trooth@0.16.4 lint ./infra
+- run: npx --yes trooth@0.16.5 lint ./infra
 ```
 
 `lint` makes no requests, so the step needs no token, no secret and no permission beyond `contents: read` for the checkout. The step's result follows the exit codes above: `--json` writes the fact document for a later step or an artifact, and `--allow-incomplete` keeps a run passing when a file cannot be read.
@@ -502,124 +526,9 @@ https://api.trooth.co/public/mcp  trooth-mcp 1.4.1, read 2026-10-07
 
 An agent decides what a tool does from the description the server lists, and a server can change it after it was reviewed. Trooth reads the tool lists of MCP servers once a day with no credentials, hashes each tool's description and its whole definition, and signs and logs a statement naming the manifest whenever it changes, so the log is each server's history of tool changes. This command recomputes every hash, checks the statement and its receipt, and with `--live` compares the server's tools now with what Trooth logged: exit 9 when they differ. A hash says what the server listed, not what a tool does.
 
-## Changed in 0.16.4
+## Release notes
 
-- New `trooth profile <domain|slug>`: the company's complete Trust Profile, section by section, each fact with its value, who said it and its date when one is recorded ("date unknown" otherwise), and "not published" for a section the company left empty. `--section` takes the MCP tool's section names; `--json` (schema `profile-output.v1`) and `--markdown` print the same profile. It says, in every form, that the profile is the company's own declared record and is not signed, and points at `trooth verify`.
-
-## Changed in 0.16.3
-
-- `trooth <command> --help` and `-h` work for every command and subcommand (`trooth log monitor --help`, `trooth guard decide -h`, `trooth declare check --help`), and so does `trooth help <command> [<subcommand>]`: each prints that command's usage, flags, exit codes and examples, and exits 0. Up to 0.16.2 every one of them exited 2 with "unknown flag --help".
-- `public-record` waits up to 45 seconds for each request (a first reading takes 20 to 40), `--timeout <seconds>` changes it, and on a terminal a note after 5 seconds says a reading is in progress. A reading that runs out of time says what to do next. Other commands keep 15 seconds.
-- `check`, `verify` and `public-record` accept a Trooth slug (`trooth check trooth`), as the MCP connector and the A2A agent do, resolved on the record projection to its domain. A name that is not a slug any record carries is a usage error that names the domain to pass when the projection suggests one.
-- `trooth guard decide --json` for a tool the policy does not cover is now described by a schema: `GuardNotCovered` in `schemas/guard-decision.v1.schema.json`, and `schemas/guard-decide-output.v1.schema.json` accepts either a decision or that document. The output itself is unchanged.
-- The exit codes are documented in full: 20, 21 and 22 in the table above, exit 1 for `verify`, `public-record` and `log receipt`, and every code each command uses in its own `--help`. The `--witnesses` examples say plainly that no witness follows the log yet, so any value above 0 exits 9 today.
-
-## Changed in 0.16.0
-
-- New `trooth mirror <dir>` and `trooth mirror --check <dir|url>`: a full, append-only copy of the witness statement log that anyone can serve and anyone can check ([docs/MIRRORS.md](docs/MIRRORS.md)). The trooth-cli repository runs one every day on GitHub's runners (`.github/workflows/log-mirror.yml`).
-- [docs/DECLARATION.md](docs/DECLARATION.md) section 8: IANA considerations for `/.well-known/trooth.json` and the `_trooth-key` DNS node name, and how the format changes. Neither registration has been submitted.
-
-## Changed in 0.15.0
-
-- `trooth guard ci` reads destinations, not dotted keys: the host of an http(s) or ws(s) URL, always, and a bare host name only as the whole value of a host-like key or argument (`host`, `domain`, `endpoint`, `url`, `baseURL`, `to` and the rest), in lowercase with a top-level domain from a curated list. i18n keys and dotted identifiers such as `"page.docs.cli.guardTitle"` are no longer reported ([docs/GUARD.md](docs/GUARD.md) section 7).
-- The guard's internal review gate: property-based fuzzing of the policy parser and the decision path in `npm test` (`tests/guard-fuzz.test.mjs`; four defects it found are fixed), GitHub CodeQL in CI, and a threat model with its residual risks ([docs/GUARD-THREAT-MODEL.md](docs/GUARD-THREAT-MODEL.md)).
-- The Trooth-run pilots are in `pilots/` and run every night against the latest releases of the agent frameworks ([docs/GUARD-PILOTS.md](docs/GUARD-PILOTS.md)).
-- Phase 4 exit, as amended on 2026-10-07: an internal review gate and Trooth as the first production user stand before launch; an outside security review and outside production use move to the launch phase. Neither has happened ([docs/GUARD.md](docs/GUARD.md) section 13).
-
-## Changed in 0.14.0
-
-- New `trooth declare init|sign|check` and the `trooth/declaration` library: a company signs, with its own Ed25519 key, a declaration it publishes at `/.well-known/trooth.json` naming that key, its products, its APIs and its repositories, with an optional DNS pin of the key ([docs/DECLARATION.md](docs/DECLARATION.md)). Exit 11 is new: the declaration expired.
-- `trooth public-record` prints the reading's proofs (method and status: the domain bound to the company record, to the company's own key, to a repository) and its declaration line ([docs/EVIDENCE.md](docs/EVIDENCE.md) 1.4, section 11). New ids `company`, `product`, `person`, and a company key id ([docs/IDS.md](docs/IDS.md) 1.5).
-- The guard reads `domain_control_confirmed` from the signed public record: a confirmed proof by `dns_txt`, `domain_email_code`, `identity_provider_sign_in` or `domain_signed_declaration` binding the domain to the company record or its declaration key ([docs/GUARD.md](docs/GUARD.md) section 4).
-
-## Changed in 0.13.0
-
-- New `trooth guard` and the `trooth/guard` library: a pre-execution check for consequential agent actions under your own policy, with adapters for the OpenAI Agents SDK, LangChain, LangGraph, plain HTTP and Claude Code, and a Python package for CrewAI and the Python frameworks ([docs/GUARD.md](docs/GUARD.md), [docs/GUARD-ADAPTERS.md](docs/GUARD-ADAPTERS.md)).
-- `trooth public-record` readings carry the proof method of each binding, evidence classes with their freshness and what each does not establish, continuity with the previous reading, and representative and signing-authority subjects ([docs/EVIDENCE.md](docs/EVIDENCE.md) 1.3, [docs/IDS.md](docs/IDS.md) 1.4).
-
-## Changed in 0.12.0
-
-- New `trooth mcp-tools [endpoint] [--live]`: the MCP servers whose tool lists Trooth logs, and one server's description and definition hashes, checked, and compared with what the server lists now ([docs/EVIDENCE.md](docs/EVIDENCE.md) section 9). Log entries gain the kind `mcp_tools`; the Python and Go packages accept it.
-- `trooth public-record` shows SAM.gov registrations and exclusions, patent applications, exact-name entries in the New York, Colorado, Connecticut and Oregon business registries, FTC merger review notices, the domain's registration from RDAP, the changes those sources record, and every subject the reading names ([docs/EVIDENCE.md](docs/EVIDENCE.md) 1.2, [docs/IDS.md](docs/IDS.md) 1.3).
-- `trooth log checkpoint` reports whether the log's hardware key, made inside AWS KMS in ceremony v2 and pinned here as `HARDWARE_LOG_VKEY`, also signed the checkpoint ([docs/KEY-CEREMONY.md](docs/KEY-CEREMONY.md) 1.2, [docs/LOG.md](docs/LOG.md) 1.2).
-
-## Changed in 0.11.0
-
-- `trooth log checkpoint` and `trooth log monitor` report which of the witnesses pinned in this release cosigned the checkpoint (c2sp.org/tlog-cosignature), and `--witnesses <n>` requires n of them. New `trooth log receipt <index>` fetches and checks an entry's RFC 9942 COSE receipt and confirms the key set at `/.well-known/scitt-keys` lists the log key ([docs/LOG.md](docs/LOG.md) 1.1).
-- `trooth public-record` checks the signed statement each reading now carries, shows the legal entity's id (`trooth:entity:lei:` or `trooth:entity:cik:`, [docs/IDS.md](docs/IDS.md) 1.2), certificates in CT logs, security.txt, the pages the home page links to, and an exact-name OFAC check ([docs/EVIDENCE.md](docs/EVIDENCE.md) 1.1).
-- [docs/KEY-CEREMONY.md](docs/KEY-CEREMONY.md) 1.1 records the first key drills and the rule that a witnessed log changes key by changing origin. Vectors in `tests/vectors/witness-cose.json`.
-
-## Changed in 0.10.0
-
-- New `trooth public-record <domain>`: the company's SEC filer record and filings, annual XBRL values, LEI record and parents, and DNS mail authentication, each with its source, and each identifier tied to the domain only by evidence ([docs/EVIDENCE.md](docs/EVIDENCE.md), which also lists everything a company publishes and what Trooth reads of it).
-- Schema `public-record.v1` with generated types; stable ids `trooth:cik:` and `trooth:lei:` ([docs/IDS.md](docs/IDS.md) 1.1).
-
-## Changed in 0.9.0
-
-- `trooth verify` checks the statement against Trooth's witness statement log: a receipt that checks against a checkpoint signed by the pinned log key, and any logged correction. New verdict `superseded`, exit 10. `--no-log` skips the log; `--log-vkey` checks against another key. Bundles carry the log's answer, so the log part is checked offline too.
-- New `trooth log checkpoint` and `trooth log monitor --state <file>`.
-- [docs/LOG.md](docs/LOG.md) (the log, receipts, corrections, monitoring) and [docs/KEY-CEREMONY.md](docs/KEY-CEREMONY.md); [docs/VERIFY.md](docs/VERIFY.md) is version 1.2.
-- Two new schemas (log receipt, correction), the package exports `trooth/tlog`, and the Python (0.2.0) and Go verifiers check receipts and corrections too. 20 new log vectors, checked by Go's `golang.org/x/mod/sumdb` as well.
-
-## Changed in 0.8.0
-
-- `trooth verify --save-bundle <file>` writes every input to one portable file; `trooth verify --bundle <file>` checks it with no network. Every result now carries `statement_id`.
-- Statement v3 is checked: RFC 8785 canonical bytes, the subject named by `trooth:domain:<domain>` and the signing key named inside the signed bytes. Trooth still signs v2; v1 and v2 check exactly as before. [docs/VERIFY.md](docs/VERIFY.md) is now version 1.1, and [docs/IDS.md](docs/IDS.md) defines stable ids.
-- JSON Schemas in [schemas/](schemas), generated types, and the package exports `trooth/verify`, `trooth/jcs`, `trooth/ids` and `trooth/schemas/*` for use as a library. Python and Go verifiers in [sdk/](sdk) run the same vectors.
-- 9 new vectors (27 in all) and 7 bundles, one of them a real bundle saved from trooth.co.
-
-## Changed in 0.7.0
-
-- New command `trooth verify <domain>`, with the normative rules in [docs/VERIFY.md](docs/VERIFY.md) and 18 test vectors in [tests/vectors](tests/vectors/vectors.json), reproducible byte for byte with `node tests/vectors/generate.mjs --check`. Exit codes 8 and 9 are new.
-- `check` still checks no signature and still prints `signature_checked: false`; its closing line now names `trooth verify` as the way to check.
-
-## Changed in 0.6.1
-
-See [CHANGELOG.md](CHANGELOG.md) for the full entry.
-
-- `--json` output is no longer cut short when stdout is a pipe. The CLI waits for its output to be written before it ends, and a reader that stops early gets exit 7, never a success code.
-- `lint` reads four more cases correctly: malformed nested shapes and repeated attributes are invalid (exit 4), plan values unknown until apply are unresolved, HCL string escapes are decoded, and Dockerfile continuations are joined as the build joins them.
-- The GitHub Action installs the CLI into a fresh directory on every run and never reuses one left by an earlier step or runner.
-
-## Changed in 0.6.0
-
-See [CHANGELOG.md](CHANGELOG.md) for the full entry.
-
-- `check` reads the one record projection, `GET https://trooth.co/api/network/profile?q=<domain>&contract=2`, instead of the directory feed. Its output carries the same facts, the same per-fact provenance and the same record version as the website, the REST API, the MCP server and the llms.txt twin. `--json` carries the projection body whole under `record`, and `source` says where the answer was read and at which record version.
-- The directory feed is read only when the projection cannot be reached, and that answer is labelled a fallback everywhere it appears. `--no-fallback` turns it off.
-- Exit 6 is new: the record is withheld while a report about it is reviewed.
-- `check --json` no longer emits `badge_id`, `attested`, `events`, `receipt_signature` or `first_published_at` from a projection read, because the projection does not carry them; a fallback read still does. It adds `slug`, `first_witnessed_at`, `coverage`, `facts_published`, `facts_contested`, `source` and `record`.
-- Releases are published from GitHub Actions with npm trusted publishing and a provenance statement (`.github/workflows/publish.yml`).
-
-## Changed in 0.5.0
-
-Breaking where the old behavior overstated what was read.
-
-- `lint` parses every format instead of matching patterns. `encrypted = false` on one line, `false` followed by a comment, a commented-out setting and a setting that depends on a variable no longer count as declaring encryption; each store is counted in one of five encryption states. Comments count for nothing, indentation no longer changes a count, and a minified JSON file counts the same as a pretty one.
-- `lint` reports coverage and exits 4 on an incomplete read: a malformed file, a file over the size limit, an unreadable file or a truncated walk. 0.4.4 read a malformed file as a success and an oversized one as "nothing to read".
-- The digest is renamed `facts_digest` and described as what it is, an aggregate of the counts. `digest` carries the same value until 0.6.
-- `check` decides the evidence state from the record's fields: a listed record is no longer printed as witnessed unless it carries a witnessed reading, and exit 5 means listed but not witnessed. The full-list fallback is gone, so an unexpected answer is a service error, never "not listed". Requests have a deadline, a body limit, a content-type check and one bounded retry. Input is normalized with the URL parser.
-- `check` says that it did not check the signature, and the help and this README say that `check` sends the domain you ask about.
-
-## Changed in 0.4.4
-
-- `check` asked the Trooth Network for the one record it needs (`/directory/api/vendors/<domain>`) instead of downloading the whole directory list, and fell back to the list when the API did not serve that path. 0.5.0 removes the fallback.
-
-## Changed in 0.4.3
-
-- `check` labels the listing state `Listing state:` and prints the two counts in the record page's form (`65 read; 64 as expected`, `35 asked; 27 attested`). It prints the three newest ledger events, newest first, with plain labels and without the detail text. 0.4.2 printed the ledger's three oldest events under a heading that called them recent. `check --json` is unchanged.
-- `lint` no longer counts a storage setting (a bucket's encryption configuration, a bucket policy, a volume attachment) as a second store, and a setting that declares encryption credits the store it refers to. It no longer counts `encrypted = false`, or an empty encryption setting in a plan, as declaring encryption. It classifies by resource type or Kubernetes `kind` only, parses `.tf.json` and plan JSON and counts their resource types, and reads Kubernetes YAML one document at a time. The same tree can therefore produce different counts, and a different digest, than under 0.4.2. The `lint --json` field names are unchanged.
-- The human `lint` output states how each source was read.
-
-## Removed in 0.4.0
-
-Breaking, and deliberately so.
-
-- The `scan` and `eu` commands are gone. Trooth does not check infrastructure against a standard and does not issue a verdict. Running either exits 2 with a sentence saying what happened, rather than "unknown command", so an old CI job or an old bookmark gets an explanation.
-- `lint` is real. In 0.3.0 it shelled out to a package that was never published, so the command failed for everyone who ran it. It is implemented in this binary now, entirely locally.
-- `scan_id` is gone from `check --json`. Every other field is unchanged.
-- `--strict` is gone, along with the only command that took it.
-- The package description and keywords no longer name any certification, standard or regulation, because Trooth does not offer one.
+Every release is in [CHANGELOG.md](CHANGELOG.md) and on [GitHub Releases](https://github.com/troothllc/trooth-cli/releases).
 
 The Trooth Network is Trooth's only product. This CLI, the public API and the MCP server are interfaces to that one record, not separate products.
 
@@ -633,7 +542,7 @@ Report a vulnerability through the [Vulnerability Disclosure Policy](https://tro
 - This CLI on the site: [trooth.co/cli](https://trooth.co/cli)
 - API reference: [trooth.co/docs/api](https://trooth.co/docs/api)
 - Developers: [trooth.co/developers](https://trooth.co/developers)
-- Publish your own record, free: [trooth.co/get-started](https://trooth.co/get-started)
+- Claim your company's record, free: [trooth.co/signup](https://trooth.co/signup)
 - Contact: [trooth.co/contact](https://trooth.co/contact)
 
 ## License

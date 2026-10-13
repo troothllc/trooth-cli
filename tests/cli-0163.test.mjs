@@ -198,7 +198,7 @@ test('a name that is not a slug a record carries is a usage error that says what
   const env = { TROOTH_WEB: base(web) };
   try {
     let r = await run(['check', 'nosuchco'], env);
-    assert.equal(r.code, 2); assert.match(r.err, /no Trooth record has the slug nosuchco\. Pass the company's domain, for example: trooth check stripe\.com/);
+    assert.equal(r.code, 2); assert.match(r.err, /no Trooth record has the slug nosuchco\. Pass the company's domain, for example: trooth check trooth\.co/);
     r = await run(['verify', 'acme', '--json'], env);
     assert.equal(r.code, 2);
     assert.match(r.err, /no Trooth record has the slug acme\. The closest record is Acme Cloud, acme\.example: trooth verify acme\.example/);
