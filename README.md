@@ -2,9 +2,13 @@
 
 The Trooth Network from your terminal. Published on npm as **`trooth`**.
 
+[![npm](https://img.shields.io/npm/v/trooth?label=npm%20trooth&color=0B0B0B)](https://www.npmjs.com/package/trooth) [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-0B0B0B)](LICENSE) [![Docs](https://img.shields.io/badge/docs-trooth.co%2Fdocs%2Fcli-0B0B0B)](https://trooth.co/docs/cli)
+
 Trooth operates the Trooth Network: one public, machine-readable record per company, carrying its identity, products and demos, commercial terms, domain and marketing links, people, documents, security and privacy posture, AI practices, procurement terms and relationships. It is Trooth's only product and it is free. Trooth signs one object in that record, the witness statement for a reading Trooth took of the company's public surface. The rest of the profile, including what the company declares about itself, is not signed.
 
 DNS says where a company is. A TLS certificate says the connection is authentic. The Trooth Network says who the company is and what it does with your data.
+
+> **Is your company on the Trooth Network?** Any company can publish one free, public record that buyers, and the AI assistants they use, read directly. **[Claim your company's record](https://trooth.co/signup)** · [See an example](https://trooth.co/network/company/trooth)
 
 This CLI is the terminal interface to that record. It does two things:
 
