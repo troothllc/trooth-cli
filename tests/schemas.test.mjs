@@ -120,7 +120,7 @@ test('trooth verify --json with a log answer validates against verify-result', a
 });
 
 test('public-record readings built by the scan worker validate (docs/EVIDENCE.md)', () => {
-  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com', 'nvidia.com', 'eu-match.example', 'sbom.example']) {
+  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com', 'nvidia.com', 'eu-match.example', 'sbom.example', 'sbom-scoped.example']) {
     ok('public-record.v1.schema.json', JSON.parse(readFileSync(new URL(`./fixtures/public-record/${n}.json`, import.meta.url), 'utf8')), n);
   }
   // A signed answer, as a local run of the scan worker served it on 2026-10-07

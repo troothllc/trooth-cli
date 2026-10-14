@@ -957,8 +957,9 @@ class Sbom(BaseModel):
     describes: Optional[str] = Field(None, description="What the SBOM says it describes, as written.")
     created: Optional[str] = Field(None, description="When the SBOM says it was made, as written; null when it does not say.")
     components: int = Field(..., description="Components the SBOM lists.")
+    excluded: Optional[int] = Field(None, description="Of those, components a CycloneDX SBOM marks scope \"excluded\": used to build or test, not delivered. Absent for SPDX, and on readings taken before 2026-10-14 (golive45). Added in trooth 0.20.0.")
     with_versioned_purl: int = Field(..., description="Components with a package URL that carries a version: the ones OSV can be asked about.")
-    checked: int = Field(..., description="Distinct package versions asked of OSV, at most 1000.")
+    checked: int = Field(..., description="Distinct package versions asked of OSV, at most 1000. Since 0.20.0, for a CycloneDX SBOM, only the delivered ones (scope not \"excluded\"); the build and test ones are counted in osv.excluded.")
     truncated: bool = Field(..., description="True when more package versions were listed than were asked about.")
     osv: Optional[SbomOsv] = Field(..., description="OSV's answer, or null when OSV was not read (not_read says why).")
 
@@ -969,10 +970,11 @@ class SbomOsv(BaseModel):
 
     source: str = Field(..., description="The OSV endpoint asked (https://api.osv.dev/v1/querybatch).")
     read_at: str = Field(..., description="When OSV answered.")
-    advisories: int = Field(..., description="Distinct advisory ids across every package version asked about.")
+    advisories: int = Field(..., description="Distinct advisory ids across the package versions in `checked` (since 0.20.0, the delivered ones for a CycloneDX SBOM).")
     components_affected: int = Field(..., description="Package versions with at least one advisory.")
     affected: List[SbomAffected] = Field(..., description="Affected package versions, most advisories first, at most 100.")
     more_pages: bool = Field(..., description="True when OSV had more advisories for a package version than it returned in one page.")
+    excluded: Optional[SbomOsvExcluded] = Field(None, description="OSV's answer for the package versions a CycloneDX SBOM lists only as scope \"excluded\" (build and test, not delivered). Absent for SPDX and on readings taken before 2026-10-14. Added in trooth 0.20.0.")
 
 class SbomAffected(BaseModel):
     "One package version OSV lists advisories for."
@@ -981,6 +983,16 @@ class SbomAffected(BaseModel):
 
     purl: str = Field(..., description="The package URL, without qualifiers or subpath.")
     ids: List[str] = Field(..., description="OSV advisory ids (GHSA, CVE, PYSEC and the like).")
+
+class SbomOsvExcluded(BaseModel):
+    "OSV's advisories for build and test package versions, kept apart from the delivered ones."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    checked: int = Field(..., description="Build and test package versions asked of OSV, filling what is left of the 1000.")
+    advisories: int = Field(..., description="Distinct advisory ids across them.")
+    components_affected: int = Field(..., description="Build and test package versions with at least one advisory.")
+    affected: List[SbomAffected] = Field(..., description="Affected build and test package versions, most advisories first, at most 100.")
 
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
@@ -1357,6 +1369,7 @@ DeclarationReading.model_rebuild()
 Sbom.model_rebuild()
 SbomOsv.model_rebuild()
 SbomAffected.model_rebuild()
+SbomOsvExcluded.model_rebuild()
 VerificationBundle.model_rebuild()
 BundleLog.model_rebuild()
 LoggedCorrection.model_rebuild()

@@ -1247,9 +1247,11 @@ export interface Sbom {
   created?: string | null;
   /** Components the SBOM lists. */
   components: number;
+  /** Of those, components a CycloneDX SBOM marks scope "excluded": used to build or test, not delivered. Absent for SPDX, and on readings taken before 2026-10-14 (golive45). Added in trooth 0.20.0. */
+  excluded?: number;
   /** Components with a package URL that carries a version: the ones OSV can be asked about. */
   with_versioned_purl: number;
-  /** Distinct package versions asked of OSV, at most 1000. */
+  /** Distinct package versions asked of OSV, at most 1000. Since 0.20.0, for a CycloneDX SBOM, only the delivered ones (scope not "excluded"); the build and test ones are counted in osv.excluded. */
   checked: number;
   /** True when more package versions were listed than were asked about. */
   truncated: boolean;
@@ -1263,7 +1265,7 @@ export interface SbomOsv {
   source: string;
   /** When OSV answered. */
   read_at: string;
-  /** Distinct advisory ids across every package version asked about. */
+  /** Distinct advisory ids across the package versions in `checked` (since 0.20.0, the delivered ones for a CycloneDX SBOM). */
   advisories: number;
   /** Package versions with at least one advisory. */
   components_affected: number;
@@ -1271,6 +1273,8 @@ export interface SbomOsv {
   affected: SbomAffected[];
   /** True when OSV had more advisories for a package version than it returned in one page. */
   more_pages: boolean;
+  /** OSV's answer for the package versions a CycloneDX SBOM lists only as scope "excluded" (build and test, not delivered). Absent for SPDX and on readings taken before 2026-10-14. Added in trooth 0.20.0. */
+  excluded?: SbomOsvExcluded;
 }
 
 /** One package version OSV lists advisories for. */
@@ -1279,6 +1283,18 @@ export interface SbomAffected {
   purl: string;
   /** OSV advisory ids (GHSA, CVE, PYSEC and the like). */
   ids: string[];
+}
+
+/** OSV's advisories for build and test package versions, kept apart from the delivered ones. */
+export interface SbomOsvExcluded {
+  /** Build and test package versions asked of OSV, filling what is left of the 1000. */
+  checked: number;
+  /** Distinct advisory ids across them. */
+  advisories: number;
+  /** Build and test package versions with at least one advisory. */
+  components_affected: number;
+  /** Affected build and test package versions, most advisories first, at most 100. */
+  affected: SbomAffected[];
 }
 
 /** Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list. */

@@ -2065,13 +2065,17 @@
           "type": "integer",
           "description": "Components the SBOM lists."
         },
+        "excluded": {
+          "type": "integer",
+          "description": "Of those, components a CycloneDX SBOM marks scope \"excluded\": used to build or test, not delivered. Absent for SPDX, and on readings taken before 2026-10-14 (golive45). Added in trooth 0.20.0."
+        },
         "with_versioned_purl": {
           "type": "integer",
           "description": "Components with a package URL that carries a version: the ones OSV can be asked about."
         },
         "checked": {
           "type": "integer",
-          "description": "Distinct package versions asked of OSV, at most 1000."
+          "description": "Distinct package versions asked of OSV, at most 1000. Since 0.20.0, for a CycloneDX SBOM, only the delivered ones (scope not \"excluded\"); the build and test ones are counted in osv.excluded."
         },
         "truncated": {
           "type": "boolean",
@@ -2113,7 +2117,7 @@
         },
         "advisories": {
           "type": "integer",
-          "description": "Distinct advisory ids across every package version asked about."
+          "description": "Distinct advisory ids across the package versions in `checked` (since 0.20.0, the delivered ones for a CycloneDX SBOM)."
         },
         "components_affected": {
           "type": "integer",
@@ -2129,6 +2133,10 @@
         "more_pages": {
           "type": "boolean",
           "description": "True when OSV had more advisories for a package version than it returned in one page."
+        },
+        "excluded": {
+          "$ref": "#/$defs/SbomOsvExcluded",
+          "description": "OSV's answer for the package versions a CycloneDX SBOM lists only as scope \"excluded\" (build and test, not delivered). Absent for SPDX and on readings taken before 2026-10-14. Added in trooth 0.20.0."
         }
       }
     },
@@ -2151,6 +2159,38 @@
             "type": "string"
           },
           "description": "OSV advisory ids (GHSA, CVE, PYSEC and the like)."
+        }
+      }
+    },
+    "SbomOsvExcluded": {
+      "title": "SbomOsvExcluded",
+      "type": "object",
+      "description": "OSV's advisories for build and test package versions, kept apart from the delivered ones.",
+      "required": [
+        "checked",
+        "advisories",
+        "components_affected",
+        "affected"
+      ],
+      "properties": {
+        "checked": {
+          "type": "integer",
+          "description": "Build and test package versions asked of OSV, filling what is left of the 1000."
+        },
+        "advisories": {
+          "type": "integer",
+          "description": "Distinct advisory ids across them."
+        },
+        "components_affected": {
+          "type": "integer",
+          "description": "Build and test package versions with at least one advisory."
+        },
+        "affected": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SbomAffected"
+          },
+          "description": "Affected build and test package versions, most advisories first, at most 100."
         }
       }
     }

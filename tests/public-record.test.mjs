@@ -51,6 +51,17 @@ test('apple.com: the filer and the LEI, each with its status and evidence, the f
   } finally { srv.close(); }
 });
 
+test('build and test components an SBOM marks excluded are printed apart from the delivered ones (0.20.0)', async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'sbom-scoped.example'], port);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /865 components \(483 used to build or test, not delivered\) published by the site/);
+    assert.match(r.out, /OSV lists no advisory for the 382 delivered package versions asked/);
+    assert.match(r.out, /build and test, not delivered: OSV lists 1 advisory across 1 of 483 package versions \(pkg:npm\/braces@3\.0\.3 GHSA-vfj7-8cjw-p6xm\)/);
+  } finally { srv.close(); }
+});
+
 test('the SBOM the site publishes: format, size, OSV advisories, and that an advisory is not a finding (0.19.0)', async () => {
   const srv = await server(); const port = srv.address().port;
   try {

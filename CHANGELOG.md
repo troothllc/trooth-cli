@@ -2,6 +2,13 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.20.0 (2026-10-14)
+
+### Build and test components kept apart from what is delivered
+
+- A CycloneDX SBOM marks a component scope `excluded` when it is used to build or test and is not delivered. The reading now asks OSV about those separately: `sbom.excluded` counts them, `sbom.checked` and `sbom.osv` cover the delivered package versions, and `sbom.osv.excluded` holds OSV's answer for the build and test ones. `trooth public-record` prints the delivered line first and the build and test line after it, so an advisory in a build tool is never shown as one in the product. SPDX SBOMs and readings taken before this release carry no such fields and print as before.
+- `schemas/public-record.v1.schema.json` adds `Sbom.excluded` and `SbomOsvExcluded`; the generated types carry them. A new fixture and test cover it.
+
 ## 0.19.0 (2026-10-14)
 
 ### The SBOM a company publishes, in the public record
