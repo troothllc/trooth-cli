@@ -520,6 +520,7 @@ class PublicRecordReading(BaseModel):
     certificates: Optional[Certificates] = Field(None, description="Unexpired certificates for the exact domain name in Certificate Transparency logs, as a CT monitor returned them; null when it did not answer. Added in trooth 0.11.0.")
     security_txt: Optional[SecurityTxt] = Field(None, description="The site's /.well-known/security.txt (RFC 9116), or null when there is none or the site opted out of being read. Added in trooth 0.11.0.")
     sanctions: Optional[Sanctions] = Field(None, description="Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0.")
+    sanctions_eu: Optional[Sanctions] = Field(None, description="Entries on the EU consolidated list of persons, groups and entities subject to EU financial sanctions with exactly the legal names above: entities only, every name alias the list gives. uid is the EU reference number and programs the sanctions regime. A name match is not an identification. Null when the list could not be read or no name was found; absent on readings taken before 2026-10-14. Added in trooth 0.18.0.")
     sources: Optional[List[Source]] = Field(None, description="Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.")
     not_read: List[NotRead] = Field(..., description="Each source that was not read, or did not answer, and why. A source not read is never guessed at.")
     note: str = Field(..., description="What the reading is and is not, as a paragraph.")
@@ -720,9 +721,9 @@ class SanctionsEntry(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    uid: str = Field(..., description="The entry number on the list.")
+    uid: str = Field(..., description="The entry number on the list (OFAC's entry number; on the EU list, the EU reference number).")
     name: str = Field(..., description="The name as listed.")
-    programs: str = Field(..., description="The sanctions programs.")
+    programs: str = Field(..., description="The sanctions programs (on the EU list, the regime code).")
 
 class Source(BaseModel):
     "One response read."

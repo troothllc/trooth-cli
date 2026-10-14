@@ -2,6 +2,14 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.18.0 (2026-10-14)
+
+### The EU consolidated sanctions list in the public record
+
+- `trooth public-record` prints a second sanctions line when the reading carries `sanctions_eu`: the same exact-name check against the EU consolidated list of persons, groups and entities subject to EU financial sanctions, published by the European Commission. Entities only, every name alias the list gives; a same-name entry is shown with its EU reference number and regime and called a name match, never an identification. A reading taken before the scan worker read the EU list carries no `sanctions_eu` and prints nothing for it.
+- `schemas/public-record.v1.schema.json` describes `sanctions_eu` (the existing `Sanctions` shape; `uid` is the EU reference number, `programs` the regime). The generated TypeScript, Pydantic and Go types carry it. docs/EVIDENCE.md names the list and adds `sanctions_eu` to the `sanctions_list` evidence class, which now goes stale with the staler of the two lists.
+- tests/public-record.test.mjs covers a match and a reading without the field; tests/schemas.test.mjs validates the new fixture.
+
 ## 0.17.0 (2026-10-14)
 
 ### Quiet runs and explicit color control

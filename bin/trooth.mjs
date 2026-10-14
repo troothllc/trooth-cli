@@ -2449,6 +2449,7 @@ function printPublicRecord(d, sig) {
   if (d.security_txt) out(`  security.txt ${d.security_txt.contacts.join(', ')}${d.security_txt.expired ? ` ${bad('expired')}` : d.security_txt.expires ? ` ${D}(expires ${d.security_txt.expires.slice(0, 10)})${X}` : ''}`);
   if (d.site.links?.length) out(`  linked       ${d.site.links.map((l) => `${l.kind.replace(/_/g, ' ')} ${D}${l.url}${X}`).join(' · ')}`);
   if (d.sanctions) out(`  sanctions    ${d.sanctions.matches.length ? warn(`${d.sanctions.matches.length} OFAC SDN entr${d.sanctions.matches.length === 1 ? 'y' : 'ies'} with the same name: ${d.sanctions.matches.map((x) => `${x.name} (${x.programs})`).join('; ')}. A name match is not an identification.`) : `no OFAC SDN entity with the name ${d.sanctions.names_checked.join(' or ')}`}`);
+  if (d.sanctions_eu) out(`               ${d.sanctions_eu.matches.length ? warn(`${d.sanctions_eu.matches.length} EU sanctions entr${d.sanctions_eu.matches.length === 1 ? 'y' : 'ies'} with the same name: ${d.sanctions_eu.matches.map((x) => `${x.name} (${x.uid}, ${x.programs})`).join('; ')}. A name match is not an identification.`) : `no EU sanctions entity with the name ${d.sanctions_eu.names_checked.join(' or ')}`}`);
   if (d.sam) {
     const regs = d.sam.registrations.map((x) => `${x.legal_name}${x.uei ? ` UEI ${x.uei}` : ''}${x.status ? ` (${x.status}${x.expires ? `, expires ${x.expires}` : ''})` : ''}`);
     out(`  SAM.gov      ${regs.length ? regs.join('; ') : `no registration named ${d.sam.names_checked.join(' or ')}`} ${D}(read ${fmtDate(d.sam.read_at)})${X}`);

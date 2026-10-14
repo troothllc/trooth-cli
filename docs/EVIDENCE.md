@@ -71,7 +71,7 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Merger review | FTC early termination notices under the Hart-Scott-Rodino Act | Read: public record `merger_review`, notices with a party of exactly the legal name, cached 7 days per name |
 | Renames, acquisitions and dispositions (8-K Item 2.01), changes in control (Item 5.01), previous legal names, parents | EDGAR, GLEIF | Read: public record `changes`, with merger review and domain events, newest first |
 | The domain's registration: registrar, registration, expiry, transfer | RDAP (RFC 9083) through rdap.org | Read: public record `domain_registration` |
-| Sanctions lists | OFAC Specially Designated Nationals list | Read: public record `sanctions`, entities' primary names, exact name after folding; a name match is not an identification. Other lists are not read |
+| Sanctions lists | OFAC Specially Designated Nationals list; EU consolidated financial sanctions list (European Commission, since 0.18.0) | Read: public record `sanctions` (OFAC, entities' primary names) and `sanctions_eu` (EU, entities' every name alias), exact name after folding; a name match is not an identification. Other lists are not read |
 | Patents | USPTO Open Data Portal | Read when Trooth holds a USPTO key: public record `patents`, applications whose first applicant is the legal name, cached 7 days per name |
 | Trademarks | USPTO, EUIPO | Declared (I4, I7); not read in this version |
 | Certificates issued for the domain | Certificate Transparency logs, through the Cert Spotter monitor | Read: public record `certificates` (unexpired certificates for the exact name, issuers, newest and soonest-expiring) |
@@ -187,7 +187,7 @@ An LEI tied through a corroborated SEC filer takes the filer's proof method.
 |---|---|---|
 | `regulator_filing` | `sec` | 90 |
 | `registry_record` | `lei`, `registries` | 365 |
-| `sanctions_list` | `sanctions` | 7 |
+| `sanctions_list` | `sanctions`, `sanctions_eu` | 7 |
 | `procurement_exclusion` | `sam` | 7 |
 | `domain_registration` | `domain_registration` | 30 |
 | `dns_configuration` | `dns` | 2 |

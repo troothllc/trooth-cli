@@ -51,6 +51,18 @@ test('apple.com: the filer and the LEI, each with its status and evidence, the f
   } finally { srv.close(); }
 });
 
+test('the EU sanctions list: a same-name entry is shown with its EU reference and regime, and called a name match', async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'eu-match.example'], port);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /sanctions\s+no OFAC SDN entity with the name Apple Inc\./);
+    assert.match(r.out, /1 EU sanctions entry with the same name: Apple Inc\. \(EU\.TEST\.1, TEST\)\. A name match is not an identification\./);
+    const a = await run(['public-record', 'apple.com'], port);
+    assert.doesNotMatch(a.out, /EU sanctions/, 'a reading taken before the EU list was read prints nothing for it');
+  } finally { srv.close(); }
+});
+
 test('a look-alike site is only a claim', async () => {
   const srv = await server(); const port = srv.address().port;
   try {

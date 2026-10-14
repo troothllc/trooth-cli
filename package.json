@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Read any company's record on the Trooth Network from your terminal: each fact with who said it and when, and Trooth's signed witness statement checked on your machine. No key, no account. Claim your company's record free at trooth.co.",
   "type": "module",
   "bin": {

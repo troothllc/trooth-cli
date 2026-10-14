@@ -671,6 +671,8 @@ type PublicRecordReading struct {
 	SecurityTxt *SecurityTxt `json:"security_txt,omitempty"`
 	// Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0.
 	Sanctions *Sanctions `json:"sanctions,omitempty"`
+	// Entries on the EU consolidated list of persons, groups and entities subject to EU financial sanctions with exactly the legal names above: entities only, every name alias the list gives. uid is the EU reference number and programs the sanctions regime. A name match is not an identification. Null when the list could not be read or no name was found; absent on readings taken before 2026-10-14. Added in trooth 0.18.0.
+	SanctionsEu *Sanctions `json:"sanctions_eu,omitempty"`
 	// Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.
 	Sources []Source `json:"sources,omitempty"`
 	// Each source that was not read, or did not answer, and why. A source not read is never guessed at.
@@ -943,11 +945,11 @@ type Sanctions struct {
 
 // SanctionsEntry: A list entry.
 type SanctionsEntry struct {
-	// The entry number on the list.
+	// The entry number on the list (OFAC's entry number; on the EU list, the EU reference number).
 	Uid string `json:"uid"`
 	// The name as listed.
 	Name string `json:"name"`
-	// The sanctions programs.
+	// The sanctions programs (on the EU list, the regime code).
 	Programs string `json:"programs"`
 }
 
