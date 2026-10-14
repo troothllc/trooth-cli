@@ -409,7 +409,8 @@ Run `lint` as an ordinary step. Pin one exact version, so a new release never ch
 | `TROOTH_PROGRESS` | `1` prints `public-record`'s "reading in progress" note on stderr even when stderr is not a terminal; `0` never prints it. By default it is printed only on a terminal, after 5 seconds. |
 | `TROOTH_LINT_MAX_FILES` | The number of selected files after which `lint` stops walking and reports the read as truncated. Defaults to 5000. |
 | `TROOTH_DOH` | The DNS-over-HTTPS endpoint (`application/dns-json`) `declare check` reads the `_trooth-key` TXT record from. Defaults to `https://cloudflare-dns.com/dns-query`. |
-| `NO_COLOR` | Disables ANSI color. Color is already off when stdout is not a TTY. |
+| `NO_COLOR` | Disables ANSI color (any non-empty value), as `--no-color` does. Color is already off when stdout is not a TTY. |
+| `FORCE_COLOR` | `0` or `false` disables color; any other value turns it on even when stdout is not a TTY. `NO_COLOR` and `--no-color` win over it. |
 
 There is no API key. The binary asks for no credential of any kind and has no write path.
 

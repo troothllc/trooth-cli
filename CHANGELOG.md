@@ -2,6 +2,15 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.17.0 (2026-10-14)
+
+### Quiet runs and explicit color control
+
+- New `--quiet` (`-q`), accepted by every command in any position. A command that runs prints nothing on stdout and no notes on stderr, and returns the exit code it would have returned, so a script or a CI step can branch on the code alone (`trooth check trooth.co -q && deploy`). An error that stops the command still prints its one `error` line on stderr, as `grep -q` does, so a broken invocation is never silent. `--quiet` with `--json` asks for nothing and for one JSON document at once, and is a usage error (exit 2); `guard hook` answers Claude Code on stdout and refuses `--quiet` the same way. `--help` and `--version` still print when asked for.
+- New `--no-color`, accepted by every command, and `FORCE_COLOR`: `0` or `false` turns color off, any other value turns it on even when stdout is not a terminal (for a CI log that renders ANSI). `--no-color` and a non-empty `NO_COLOR` turn it off and win over `FORCE_COLOR`. With none of them set, color stays on a terminal only, as before.
+- `trooth --help` lists both flags; the README's environment table lists `FORCE_COLOR`.
+- New `tests/cli-0170.test.mjs` in `npm test`: silence and the unchanged exit code in every flag position, the one error line under `--quiet`, the two usage refusals, help and version under `--quiet`, every color rule, and both flags accepted by every command.
+
 ## 0.16.5 (2026-10-13)
 
 ### The package page reads like the Network it serves

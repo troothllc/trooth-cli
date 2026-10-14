@@ -189,14 +189,34 @@ try { VERSION = require('../package.json').version; } catch {}
 
 const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10, EXPIRED: 11, GUARD_HOLD: 20, GUARD_DENY: 21, GUARD_CI_FOUND: 22 };
 
-// Color only when stdout is a TTY and NO_COLOR is unset, so piped output is clean.
-const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
-const c = (code) => (useColor ? code : '');
-const J = c('\x1b[32m'), D = c('\x1b[2m'), B = c('\x1b[1m'), R = c('\x1b[31m'), A = c('\x1b[33m'), C = c('\x1b[36m'), X = c('\x1b[0m');
-
-const argv = process.argv.slice(2);
+// --quiet (-q) and --no-color are accepted by every command, anywhere on the
+// line (0.17.0), so they are read here and taken out before the command is.
+const GLOBAL_BOOL = ['--quiet', '-q', '--no-color'];
+const rawArgv = process.argv.slice(2);
+const argv = rawArgv.filter((a) => !GLOBAL_BOOL.includes(a));
 const cmd = argv[0];
 const asJson = argv.includes('--json');
+
+//   --quiet     nothing on stdout and no notes on stderr; the exit code is the
+//               answer, for a script or a CI step that only branches on it. An
+//               error that stops the command still prints its one line on
+//               stderr, as grep -q does, so a broken invocation is not silent.
+//   --no-color  no terminal escape codes, whatever the terminal is.
+const quiet = rawArgv.includes('--quiet') || rawArgv.includes('-q');
+
+// Color, in this order: --no-color or NO_COLOR (any value) turns it off;
+// FORCE_COLOR=0 or false turns it off; FORCE_COLOR set to anything else turns
+// it on even when stdout is not a terminal; otherwise only a terminal gets it.
+// So piped and captured output carries no escape codes unless asked for.
+function colorWanted() {
+  if (rawArgv.includes('--no-color') || process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') return false;
+  const force = process.env.FORCE_COLOR;
+  if (force !== undefined) return !(force === '0' || force.toLowerCase() === 'false');
+  return !!process.stdout.isTTY;
+}
+const useColor = colorWanted();
+const c = (code) => (useColor ? code : '');
+const J = c('\x1b[32m'), D = c('\x1b[2m'), B = c('\x1b[1m'), R = c('\x1b[31m'), A = c('\x1b[33m'), C = c('\x1b[36m'), X = c('\x1b[0m');
 
 /* ------------------------------------------------------------- output ---- */
 
@@ -244,8 +264,12 @@ async function drainOutput() {
     await Promise.race([Promise.all([...pendingWrites]), closed]);
   }
 }
-function out(s) { write('stdout', process.stdout, s + '\n'); }
-function diag(s) { write('stderr', process.stderr, s + '\n'); }
+function out(s) { if (!quiet) write('stdout', process.stdout, s + '\n'); }
+function diag(s) { if (!quiet) write('stderr', process.stderr, s + '\n'); }
+/** The one line an error prints, even under --quiet. */
+function errLine(s) { write('stderr', process.stderr, s + '\n'); }
+/** Help and the version are printed when asked for, even under --quiet. */
+function outAlways(s) { write('stdout', process.stdout, s + '\n'); }
 function emitJson(obj) { out(JSON.stringify(obj, null, 2)); }
 
 /** Thrown to end a command with an exit code; caught only by the dispatcher. */
@@ -254,7 +278,7 @@ class ExitWith {
 }
 
 function fail(code, message, extra = {}) {
-  diag(`${R}error${X} ${message}`);
+  errLine(`${R}error${X} ${message}`);
   if (asJson) emitJson({ ok: false, error: message, exit: code, ...extra });
   throw new ExitWith(code);
 }
@@ -378,6 +402,8 @@ ${B}Examples${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
+  --quiet, -q               print nothing; the exit code is the answer (an error still prints one line on stderr)
+  --no-color                no terminal escape codes (also NO_COLOR=1, or FORCE_COLOR=0)
   --help, -h                this command's usage, flags and exit codes; exits 0
   --allow-incomplete        lint: exit 0 even when a file was skipped, invalid or unreadable
   --section <names>         profile: only these sections (comma-separated; trooth profile --help lists them)
@@ -3301,22 +3327,28 @@ function guardHookUsage(why) { diag(`trooth guard: ${why}`); return 2; }
 let hookMode = false;
 
 async function main() {
-  if (cmd === '--version' || cmd === '-v' || cmd === 'version') { out(VERSION); return EXIT.OK; }
+  if (cmd === '--version' || cmd === '-v' || cmd === 'version') { outAlways(VERSION); return EXIT.OK; }
   if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') {
     // `trooth help <command> [<subcommand>]` and `trooth --help <command>`.
     const topic = argv.slice(1).filter((a) => !a.startsWith('-'));
-    if (!topic.length) { out(helpText()); return EXIT.OK; }
+    if (!topic.length) { outAlways(helpText()); return EXIT.OK; }
     const [name, sub] = topic;
     if (!Object.prototype.hasOwnProperty.call(COMMAND_HELP, name)) {
       fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
     }
-    out(commandHelpText(sub && (SUBCOMMANDS[name] || []).includes(sub) ? `${name} ${sub}` : name));
+    outAlways(commandHelpText(sub && (SUBCOMMANDS[name] || []).includes(sub) ? `${name} ${sub}` : name));
     return EXIT.OK;
   }
   // `trooth <command> [<subcommand>] --help` (or -h) prints that command's
   // usage and exits 0, before any flag or argument is checked.
   const helpKey = helpRequest(cmd, argv.slice(1));
-  if (helpKey) { out(commandHelpText(helpKey)); return EXIT.OK; }
+  if (helpKey) { outAlways(commandHelpText(helpKey)); return EXIT.OK; }
+  if (quiet && asJson) {
+    fail(EXIT.USAGE, '--quiet prints nothing and --json prints one JSON document; pass one of them.');
+  }
+  if (quiet && cmd === 'guard' && argv[1] === 'hook') {
+    fail(EXIT.USAGE, '`trooth guard hook` answers Claude Code on stdout, so it does not take --quiet.');
+  }
   if (cmd === 'check') return check();
   if (cmd === 'profile') return profileCmd();
   if (cmd === 'lint') return lint();
