@@ -71,6 +71,7 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Merger review | FTC early termination notices under the Hart-Scott-Rodino Act | Read: public record `merger_review`, notices with a party of exactly the legal name, cached 7 days per name |
 | Renames, acquisitions and dispositions (8-K Item 2.01), changes in control (Item 5.01), previous legal names, parents | EDGAR, GLEIF | Read: public record `changes`, with merger review and domain events, newest first |
 | The domain's registration: registrar, registration, expiry, transfer | RDAP (RFC 9083) through rdap.org | Read: public record `domain_registration` |
+| Software bill of materials | The company's own site: the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom; OSV (api.osv.dev) for advisories on the package versions it lists (since 0.19.0) | Read: public record `sbom`. An OSV advisory for a listed package version is not a finding that the company's product is affected; VEX is not read |
 | Sanctions lists | OFAC Specially Designated Nationals list; EU consolidated financial sanctions list (European Commission, since 0.18.0) | Read: public record `sanctions` (OFAC, entities' primary names) and `sanctions_eu` (EU, entities' every name alias), exact name after folding; a name match is not an identification. Other lists are not read |
 | Patents | USPTO Open Data Portal | Read when Trooth holds a USPTO key: public record `patents`, applications whose first applicant is the legal name, cached 7 days per name |
 | Trademarks | USPTO, EUIPO | Declared (I4, I7); not read in this version |
@@ -192,7 +193,7 @@ An LEI tied through a corroborated SEC filer takes the filer's proof method.
 | `domain_registration` | `domain_registration` | 30 |
 | `dns_configuration` | `dns` | 2 |
 | `certificate_transparency` | `certificates` | 7 |
-| `site_publication` | `site`, `security_txt` | 30 |
+| `site_publication` | `site`, `security_txt`, `sbom` | 30 |
 | `patent_record` | `patents` | 90 |
 | `merger_review` | `merger_review` | 30 |
 

@@ -673,6 +673,8 @@ type PublicRecordReading struct {
 	Sanctions *Sanctions `json:"sanctions,omitempty"`
 	// Entries on the EU consolidated list of persons, groups and entities subject to EU financial sanctions with exactly the legal names above: entities only, every name alias the list gives. uid is the EU reference number and programs the sanctions regime. A name match is not an identification. Null when the list could not be read or no name was found; absent on readings taken before 2026-10-14. Added in trooth 0.18.0.
 	SanctionsEu *Sanctions `json:"sanctions_eu,omitempty"`
+	// The SBOM the company's site publishes (the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom), and OSV's advisories for the package versions it lists. An advisory for a package version does not show that the company's product is affected: the SBOM may be out of date, the code may not be reached, and a VEX statement is not read. Null when no SBOM was found there or the site opts out of being read; absent on readings taken before 2026-10-14. Added in trooth 0.19.0.
+	Sbom *Sbom `json:"sbom,omitempty"`
 	// Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.
 	Sources []Source `json:"sources,omitempty"`
 	// Each source that was not read, or did not answer, and why. A source not read is never guessed at.
@@ -1231,6 +1233,54 @@ type DeclarationReading struct {
 	Apis []DeclaredApi `json:"apis"`
 	// The repositories it names, when it checks; empty otherwise.
 	Repositories []string `json:"repositories"`
+}
+
+// Sbom: The SBOM a site publishes, and OSV's advisories for its package versions.
+type Sbom struct {
+	// The address the SBOM was read from.
+	URL string `json:"url"`
+	// The SBOM's format. One of: CycloneDX, SPDX.
+	Format string `json:"format"`
+	// The format's version, as the document states it.
+	SpecVersion *string `json:"spec_version,omitempty"`
+	// What the SBOM says it describes, as written.
+	Describes *string `json:"describes,omitempty"`
+	// When the SBOM says it was made, as written; null when it does not say.
+	Created *string `json:"created,omitempty"`
+	// Components the SBOM lists.
+	Components int64 `json:"components"`
+	// Components with a package URL that carries a version: the ones OSV can be asked about.
+	WithVersionedPurl int64 `json:"with_versioned_purl"`
+	// Distinct package versions asked of OSV, at most 1000.
+	Checked int64 `json:"checked"`
+	// True when more package versions were listed than were asked about.
+	Truncated bool `json:"truncated"`
+	// OSV's answer, or null when OSV was not read (not_read says why).
+	Osv *SbomOsv `json:"osv"`
+}
+
+// SbomOsv: OSV's advisories for the package versions asked about.
+type SbomOsv struct {
+	// The OSV endpoint asked (https://api.osv.dev/v1/querybatch).
+	Source string `json:"source"`
+	// When OSV answered.
+	ReadAt string `json:"read_at"`
+	// Distinct advisory ids across every package version asked about.
+	Advisories int64 `json:"advisories"`
+	// Package versions with at least one advisory.
+	ComponentsAffected int64 `json:"components_affected"`
+	// Affected package versions, most advisories first, at most 100.
+	Affected []SbomAffected `json:"affected"`
+	// True when OSV had more advisories for a package version than it returned in one page.
+	MorePages bool `json:"more_pages"`
+}
+
+// SbomAffected: One package version OSV lists advisories for.
+type SbomAffected struct {
+	// The package URL, without qualifiers or subpath.
+	Purl string `json:"purl"`
+	// OSV advisory ids (GHSA, CVE, PYSEC and the like).
+	Ids []string `json:"ids"`
 }
 
 // VerificationBundle: Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list.

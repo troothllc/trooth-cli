@@ -2,6 +2,14 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.19.0 (2026-10-14)
+
+### The SBOM a company publishes, in the public record
+
+- `trooth public-record` prints an SBOM line when the reading carries `sbom`: the first CycloneDX or SPDX JSON document the company's own site publishes at /.well-known/sbom, /sbom.json or /sbom, its format, what it describes and how many components it lists, and what OSV (api.osv.dev) lists for the package versions it names: how many advisories, across how many of them, and the first few by id. An advisory for a package version is called that, never a finding that the company's product is affected: the SBOM may be out of date, the code may not be reached, and a VEX statement is not read. A reading with no SBOM prints nothing for it, and `not_read` says where the reader looked.
+- `schemas/public-record.v1.schema.json` describes `sbom` (`Sbom`, `SbomOsv`, `SbomAffected`); the generated TypeScript, Pydantic and Go types carry it. docs/EVIDENCE.md names the source and adds `sbom` to the `site_publication` evidence class.
+- tests/public-record.test.mjs covers an SBOM with an advisory and a reading without one; tests/schemas.test.mjs validates the new fixture.
+
 ## 0.18.0 (2026-10-14)
 
 ### The EU consolidated sanctions list in the public record

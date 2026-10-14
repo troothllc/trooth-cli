@@ -2450,6 +2450,13 @@ function printPublicRecord(d, sig) {
   if (d.site.links?.length) out(`  linked       ${d.site.links.map((l) => `${l.kind.replace(/_/g, ' ')} ${D}${l.url}${X}`).join(' · ')}`);
   if (d.sanctions) out(`  sanctions    ${d.sanctions.matches.length ? warn(`${d.sanctions.matches.length} OFAC SDN entr${d.sanctions.matches.length === 1 ? 'y' : 'ies'} with the same name: ${d.sanctions.matches.map((x) => `${x.name} (${x.programs})`).join('; ')}. A name match is not an identification.`) : `no OFAC SDN entity with the name ${d.sanctions.names_checked.join(' or ')}`}`);
   if (d.sanctions_eu) out(`               ${d.sanctions_eu.matches.length ? warn(`${d.sanctions_eu.matches.length} EU sanctions entr${d.sanctions_eu.matches.length === 1 ? 'y' : 'ies'} with the same name: ${d.sanctions_eu.matches.map((x) => `${x.name} (${x.uid}, ${x.programs})`).join('; ')}. A name match is not an identification.`) : `no EU sanctions entity with the name ${d.sanctions_eu.names_checked.join(' or ')}`}`);
+  if (d.sbom) {
+    const sb = d.sbom;
+    out(`  SBOM         ${sb.format}${sb.describes ? ` for ${sb.describes}` : ''}, ${sb.components} component${sb.components === 1 ? '' : 's'} published by the site ${D}${sb.url}${X}`);
+    if (!sb.osv) out(`               OSV was not read for it on this reading`);
+    else if (!sb.osv.advisories) out(`               OSV lists no advisory for the ${sb.checked}${sb.truncated ? ' (first)' : ''} package version${sb.checked === 1 ? '' : 's'} asked ${D}(read ${fmtDate(sb.osv.read_at)})${X}`);
+    else out(`               ${warn(`OSV lists ${sb.osv.advisories} advisor${sb.osv.advisories === 1 ? 'y' : 'ies'} across ${sb.osv.components_affected} of the ${sb.checked} package versions asked${sb.osv.affected.length ? `, among them ${sb.osv.affected.slice(0, 3).map((a) => `${a.purl} (${a.ids.slice(0, 3).join(', ')}${a.ids.length > 3 ? ', ...' : ''})`).join('; ')}` : ''}.`)} An advisory for a package version does not show that the product is affected. ${D}(read ${fmtDate(sb.osv.read_at)})${X}`);
+  }
   if (d.sam) {
     const regs = d.sam.registrations.map((x) => `${x.legal_name}${x.uei ? ` UEI ${x.uei}` : ''}${x.status ? ` (${x.status}${x.expires ? `, expires ${x.expires}` : ''})` : ''}`);
     out(`  SAM.gov      ${regs.length ? regs.join('; ') : `no registration named ${d.sam.names_checked.join(' or ')}`} ${D}(read ${fmtDate(d.sam.read_at)})${X}`);

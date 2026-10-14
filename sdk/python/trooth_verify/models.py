@@ -521,6 +521,7 @@ class PublicRecordReading(BaseModel):
     security_txt: Optional[SecurityTxt] = Field(None, description="The site's /.well-known/security.txt (RFC 9116), or null when there is none or the site opted out of being read. Added in trooth 0.11.0.")
     sanctions: Optional[Sanctions] = Field(None, description="Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0.")
     sanctions_eu: Optional[Sanctions] = Field(None, description="Entries on the EU consolidated list of persons, groups and entities subject to EU financial sanctions with exactly the legal names above: entities only, every name alias the list gives. uid is the EU reference number and programs the sanctions regime. A name match is not an identification. Null when the list could not be read or no name was found; absent on readings taken before 2026-10-14. Added in trooth 0.18.0.")
+    sbom: Optional[Sbom] = Field(None, description="The SBOM the company's site publishes (the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom), and OSV's advisories for the package versions it lists. An advisory for a package version does not show that the company's product is affected: the SBOM may be out of date, the code may not be reached, and a VEX statement is not read. Null when no SBOM was found there or the site opts out of being read; absent on readings taken before 2026-10-14. Added in trooth 0.19.0.")
     sources: Optional[List[Source]] = Field(None, description="Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.")
     not_read: List[NotRead] = Field(..., description="Each source that was not read, or did not answer, and why. A source not read is never guessed at.")
     note: str = Field(..., description="What the reading is and is not, as a paragraph.")
@@ -945,6 +946,42 @@ class DeclarationReading(BaseModel):
     apis: List[DeclaredApi] = Field(..., description="The APIs it names, when it checks; empty otherwise.")
     repositories: List[str] = Field(..., description="The repositories it names, when it checks; empty otherwise.")
 
+class Sbom(BaseModel):
+    "The SBOM a site publishes, and OSV's advisories for its package versions."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    url: str = Field(..., description="The address the SBOM was read from.")
+    format: Literal["CycloneDX", "SPDX"] = Field(..., description="The SBOM's format.")
+    spec_version: Optional[str] = Field(None, description="The format's version, as the document states it.")
+    describes: Optional[str] = Field(None, description="What the SBOM says it describes, as written.")
+    created: Optional[str] = Field(None, description="When the SBOM says it was made, as written; null when it does not say.")
+    components: int = Field(..., description="Components the SBOM lists.")
+    with_versioned_purl: int = Field(..., description="Components with a package URL that carries a version: the ones OSV can be asked about.")
+    checked: int = Field(..., description="Distinct package versions asked of OSV, at most 1000.")
+    truncated: bool = Field(..., description="True when more package versions were listed than were asked about.")
+    osv: Optional[SbomOsv] = Field(..., description="OSV's answer, or null when OSV was not read (not_read says why).")
+
+class SbomOsv(BaseModel):
+    "OSV's advisories for the package versions asked about."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    source: str = Field(..., description="The OSV endpoint asked (https://api.osv.dev/v1/querybatch).")
+    read_at: str = Field(..., description="When OSV answered.")
+    advisories: int = Field(..., description="Distinct advisory ids across every package version asked about.")
+    components_affected: int = Field(..., description="Package versions with at least one advisory.")
+    affected: List[SbomAffected] = Field(..., description="Affected package versions, most advisories first, at most 100.")
+    more_pages: bool = Field(..., description="True when OSV had more advisories for a package version than it returned in one page.")
+
+class SbomAffected(BaseModel):
+    "One package version OSV lists advisories for."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    purl: str = Field(..., description="The package URL, without qualifiers or subpath.")
+    ids: List[str] = Field(..., description="OSV advisory ids (GHSA, CVE, PYSEC and the like).")
+
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
 
@@ -1317,6 +1354,9 @@ ContinuityPrevious.model_rebuild()
 Continuity.model_rebuild()
 Proof.model_rebuild()
 DeclarationReading.model_rebuild()
+Sbom.model_rebuild()
+SbomOsv.model_rebuild()
+SbomAffected.model_rebuild()
 VerificationBundle.model_rebuild()
 BundleLog.model_rebuild()
 LoggedCorrection.model_rebuild()

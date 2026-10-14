@@ -51,6 +51,19 @@ test('apple.com: the filer and the LEI, each with its status and evidence, the f
   } finally { srv.close(); }
 });
 
+test('the SBOM the site publishes: format, size, OSV advisories, and that an advisory is not a finding (0.19.0)', async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'sbom.example'], port);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /SBOM\s+CycloneDX for trooth-web 1\.0\.0, 865 components published by the site https:\/\/sbom\.example\/sbom\.json/);
+    assert.match(r.out, /OSV lists 1 advisory across 1 of the 865 package versions asked, among them pkg:npm\/braces@3\.0\.3 \(GHSA-vfj7-8cjw-p6xm\)\./);
+    assert.match(r.out, /An advisory for a package version does not show that the product is affected\./);
+    const a = await run(['public-record', 'apple.com'], port);
+    assert.doesNotMatch(a.out, /SBOM/, 'a reading without an SBOM prints nothing for it');
+  } finally { srv.close(); }
+});
+
 test('the EU sanctions list: a same-name entry is shown with its EU reference and regime, and called a name match', async () => {
   const srv = await server(); const port = srv.address().port;
   try {
