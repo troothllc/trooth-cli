@@ -1,6 +1,6 @@
 # The domain-signed declaration
 
-Version 1.0, October 7, 2026. Normative for `trooth.declaration.v1` ([schema](../schemas/declaration.v1.schema.json)), `trooth declare` and `trooth/declaration` (bin/lib/declaration.mjs). Added in trooth 0.14.0.
+Version 1.1, October 15, 2026 (adds `record_version` and `record_digest`, section 2.1, and `--bind-record`, section 3). Version 1.0, October 7, 2026. Normative for `trooth.declaration.v1` ([schema](../schemas/declaration.v1.schema.json)), `trooth declare` and `trooth/declaration` (bin/lib/declaration.mjs). Added in trooth 0.14.0.
 
 A company can publish, on its own site, one small document signed with its own key. It names that key, the company's products, its APIs (with the hash of an MCP server's tool manifest) and its code repositories. Trooth reads it as part of a public record reading, signs and logs that reading, and carries what checked into the record's subjects and proofs ([EVIDENCE.md](EVIDENCE.md) section 11).
 
@@ -13,7 +13,7 @@ https://<domain>/.well-known/trooth.json
 - Served over HTTPS from the domain itself, with status 200. A redirect, to any host, means the document is not read: it is reported as invalid.
 - At most 64 KB (65,536 bytes).
 - The document's `domain` equals the host it is served from. A subdomain serves its own document, naming itself.
-- No URL inside it is ever fetched, by the CLI or by Trooth. URLs are checked as text.
+- No URL inside it is ever fetched, by the CLI or by Trooth. URLs are checked as text. (The one request made about a URL in it is to trooth.co's record API for the slug `record` names, when `record_version` is present or `--bind-record` is asked for; section 2.1. The record page itself is never fetched.)
 
 ## 2. The format
 
@@ -24,6 +24,8 @@ https://<domain>/.well-known/trooth.json
   "issued_at": "2026-10-07T00:00:00Z",
   "expires_at": "2027-10-07T00:00:00Z",
   "record": "https://trooth.co/network/company/acme",
+  "record_version": 12,
+  "record_digest": "sha-256=<64 hex>",
   "keys": [ { "kid": "acme.com#<thumbprint>", "kty": "OKP", "crv": "Ed25519", "x": "<base64url>" } ],
   "products": [ { "id": "widget", "name": "Widget", "url": "https://acme.com/widget" } ],
   "apis": [ { "base_url": "https://api.acme.com", "mcp": { "url": "https://api.acme.com/mcp", "manifest_sha256": "<64 hex>" } } ],
@@ -34,11 +36,11 @@ https://<domain>/.well-known/trooth.json
 
 A declaration checks when every rule below holds. `trooth declare check` and `checkDeclaration` apply all of them; the first that fails is the reason, and every failure is listed.
 
-1. Size and syntax: at most 64 KB, valid JSON, a JSON object, with no member outside the ones above. Numbers are not used; a fraction has no form under the RFC 8785 profile ([VERIFY.md](VERIFY.md) section 2.1) and fails.
+1. Size and syntax: at most 64 KB, valid JSON, a JSON object, with no member outside the ones above. The one number is `record_version`, a whole number; a fraction has no form under the RFC 8785 profile ([VERIFY.md](VERIFY.md) section 2.1) and fails.
 2. `format` is `trooth.declaration.v1`.
 3. `domain` is a lowercase domain name and equals the host the document was served from. (Read from a file, the host is not known; `--domain` requires one, and without it this rule is reported as not checked.)
 4. `issued_at` and `expires_at` are ISO 8601 times in UTC; `expires_at` is after `issued_at` and at most 400 days after it; `issued_at` is not more than five minutes in the future.
-5. `record`, when present, is `https://trooth.co/network/company/<slug>`: the company's Trooth record, and the one URL not on the domain.
+5. `record`, when present, is `https://trooth.co/network/company/<slug>`: the company's Trooth record, and the one URL not on the domain. `record_version` (a whole number of 1 or more) and `record_digest` (`sha-256=` and 64 lowercase hex) are present together or not at all, and only when `record` is (section 2.1).
 6. `keys` holds one to eight Ed25519 public keys as JWKs (RFC 8037), each with exactly `kid`, `kty` (`OKP`), `crv` (`Ed25519`) and `x` (32 bytes, base64url). A key with `d`, a private key, fails. Each `kid` is `<domain>#<thumbprint>`, where the thumbprint is the RFC 7638 JWK thumbprint: SHA-256 over `{"crv":"Ed25519","kty":"OKP","x":"<x>"}`, base64url without padding. No `kid` repeats.
 7. Every URL in `products` and `apis` (including `mcp.url`) is `https`, with no user name, password, port or fragment, on the domain or a subdomain of it. `products[].id` matches `^[a-z0-9][a-z0-9-]{0,62}$` and is unique; `name` is 1 to 200 characters. `mcp.manifest_sha256` is 64 lowercase hex characters (the manifest hash of [EVIDENCE.md](EVIDENCE.md) section 9). At most 100 entries in each list.
 8. `repositories` are organizations or users on github.com, gitlab.com, bitbucket.org or codeberg.org: `https://<host>/<owner>`.
@@ -47,12 +49,16 @@ A declaration checks when every rule below holds. `trooth declare check` and `ch
 
 Only a declaration that checks carries anything into a record's subjects. One that is invalid or expired carries nothing but its status and reason.
 
+### 2.1 The owner-signed record: `record_version` and `record_digest`
+
+Added in trooth 0.21.0. The two members are the version and digest of the company's Trooth record that the signer names as the version it published, as the record API's `Trooth-Record-Version` and `Trooth-Record-Digest` headers gave them (`GET https://trooth.co/api/network/profile?q=<slug>&contract=2`) when the declaration was signed. What they mean: the company, with its own key, says "this is the record I published". What they do not mean: Trooth still does not sign the record; the binding is the company's statement, and a reader labels it as such. It goes stale when the company publishes its record again, until the company signs a new declaration. `trooth declare sign --bind-record` reads the two headers and writes the members (section 3); `trooth declare check` and Trooth's public record reading ([EVIDENCE.md](EVIDENCE.md) section 11, `owner_signed_record`) compare them with the head the record API names now and report `current`, `superseded` (by version N) or `unknown`, as a fact and never as a grade, and the exit code of `check` does not change with it.
+
 ## 3. Publishing one
 
 ```
 trooth declare init --domain acme.com
 trooth declare sign --domain acme.com --key ~/.trooth/declaration-key/acme.com.jwk \
-  --record https://trooth.co/network/company/acme \
+  --record https://trooth.co/network/company/acme --bind-record \
   --product widget=Widget=https://acme.com/widget \
   --api https://api.acme.com,https://api.acme.com/mcp,<manifest sha256> \
   --repo https://github.com/acme \
@@ -63,8 +69,8 @@ trooth declare check --file trooth.json --domain acme.com
 Then serve `trooth.json` at `https://acme.com/.well-known/trooth.json`, and run `trooth declare check acme.com`.
 
 - `init` makes an Ed25519 key with node:crypto and writes it as a private JWK to `--key`, by default `~/.trooth/declaration-key/<domain>.jwk`, with mode 0600 in a directory with mode 0700. It never overwrites a file. It prints the path, the `kid` and the DNS pin line; it never prints the private key.
-- `sign` writes the signed document to `--out` (never overwriting). The validity is `--days`, 365 by default and at most 400. `--product`, `--api`, `--repo` and `--add-key` repeat. It checks the result against every rule before writing, and refuses (exit 2) what would not check, such as a product URL on another host. It prints where to publish the document and the TXT line for the pin.
-- `check <domain>` fetches the document (no redirects, 64 KB, the CLI's deadline), checks every rule, and reads the pin over DNS over HTTPS. `check --file <path>` checks a saved copy. `--no-dns` skips the pin; `--json` prints one JSON document.
+- `sign` writes the signed document to `--out` (never overwriting). The validity is `--days`, 365 by default and at most 400. `--product`, `--api`, `--repo` and `--add-key` repeat. It checks the result against every rule before writing, and refuses (exit 2) what would not check, such as a product URL on another host. It prints where to publish the document and the TXT line for the pin. With `--record` and `--bind-record` it first asks the record API for the record's current `Trooth-Record-Version` and `Trooth-Record-Digest` (one GET, `TROOTH_WEB` names another host) and writes them as `record_version` and `record_digest`; when the API names no version for that slug it refuses (exit 2), and when it cannot be read it stops (exit 3), never guessing a version. Sign again with `--bind-record` after each time you publish the record.
+- `check <domain>` fetches the document (no redirects, 64 KB, the CLI's deadline), checks every rule, and reads the pin over DNS over HTTPS. `check --file <path>` checks a saved copy. `--no-dns` skips the pin; `--json` prints one JSON document. When the declaration carries `record_version` and `record_digest`, `check` asks the record API whether that is the version published now and reports `current`, `superseded by version N` or `unknown` (`owner_signed_record` in `--json`); `--no-record` skips that request. The result is reported, never graded, and leaves the exit code unchanged.
 
 Keep the key file off shared machines and out of repositories. Anyone holding it can sign a declaration for the domain; but only someone who controls the site's content can publish one there.
 
@@ -82,7 +88,7 @@ It is optional. When it is present and names a key in a declaration that checks,
 
 A declaration is self-signed. What one that checks shows is that whoever controlled the site's content when it was read published this key and these subjects. With the pin, the same holds for whoever controlled the DNS zone.
 
-It does not establish the legal entity behind the domain, a person's authority to act for it, that the products exist or do what their names say, that the APIs are safe to call, or that the company controls the repositories it lists (the `repository_control` proof is a separate reading of the code host). A site that is taken over can publish a new declaration with a new key.
+It does not establish the legal entity behind the domain, a person's authority to act for it, that the products exist or do what their names say, that the APIs are safe to call, or that the company controls the repositories it lists (the `repository_control` proof is a separate reading of the code host). A site that is taken over can publish a new declaration with a new key. `record_version` and `record_digest` show which version of its Trooth record the company stood behind when it signed; they are not Trooth's signature on the record, and they say nothing about a version published later.
 
 What Trooth adds is continuity. Each reading of the declaration is signed and logged, so the first key Trooth saw and every later change are public: the record's continuity events `declaration_appeared`, `declaration_key_changed` and `declaration_disappeared` ([EVIDENCE.md](EVIDENCE.md) section 11). A reader can see when a domain's key changed and decide what that means under its own policy. Evidence from a declaration is stale after 30 days (`domain_declaration`).
 
@@ -113,7 +119,7 @@ Each step is a change Trooth's readings record as `declaration_key_changed`. A k
 
 ## 8. IANA considerations
 
-This document is meant to be the specification for two registrations. Neither has been submitted.
+This document is meant to be the specification for two registrations. The well-known URI request is filed as an issue in [protocol-registries/well-known-uris](https://github.com/protocol-registries/well-known-uris/issues?q=trooth.json), where the designated expert reviews it; the DNS node name request goes to IANA through its protocol assignment form. Until IANA lists them, neither is registered.
 
 **Well-Known URIs registry** ([RFC 8615](https://www.rfc-editor.org/rfc/rfc8615) section 3.1; registration policy: Specification Required):
 

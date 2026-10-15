@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import {
   jwkThumbprint, generateDeclarationKey, buildDeclaration, signDeclaration, checkDeclaration, fetchDeclaration,
   readKeyPin, pinStatus, pinLine, txtValue, isSignatureProblem, readPrivateJwk, keyIdFor, MAX_DECLARATION_BYTES,
+  readRecordHead, recordBindingState, recordSlugOf,
 } from '../bin/lib/declaration.mjs';
 
 const cli = new URL('../bin/trooth.mjs', import.meta.url).pathname;
@@ -333,4 +334,159 @@ test('CLI: the DNS pin read over DNS over HTTPS: matches (exit 0), another key (
   const r = await run(['declare', 'check', '--file', path, '--json'], { home });
   assert.equal(r.code, 0, 'a DNS answer that cannot be read is reported, and the pin is optional');
   assert.equal(JSON.parse(r.out).dns_pin.status, 'not_read');
+});
+
+/* ---- record_version and record_digest: the company's statement of which record it published (0.21.0) ---- */
+
+const DIGEST = `sha-256=${'b'.repeat(64)}`;
+const bound = (extra = {}) => good({ recordVersion: 7, recordDigest: DIGEST, ...extra });
+
+test('record_version and record_digest: both carried when together with record; the shape rules; one without the other, or without record, fails', () => {
+  const d = bound();
+  assert.equal(d.record_version, 7); assert.equal(d.record_digest, DIGEST);
+  const r = check(d);
+  assert.equal(r.status, 'checked', r.problems.join('; '));
+  assert.equal(r.record_version, 7); assert.equal(r.record_digest, DIGEST);
+  const plain = check(good());
+  assert.equal(plain.record_version, null); assert.equal(plain.record_digest, null);
+  const cases = [
+    [(x) => { delete x.record_digest; }, /go together/],
+    [(x) => { delete x.record_version; }, /go together/],
+    [(x) => { delete x.record; }, /need record/],
+    [(x) => { x.record_version = 0; }, /whole number of 1 or more/],
+    [(x) => { x.record_version = '7'; }, /whole number of 1 or more/],
+    [(x) => { x.record_digest = 'b'.repeat(64); }, /sha-256=<64 lowercase hex>/],
+    [(x) => { x.record_digest = `sha-256=${'B'.repeat(64)}`; }, /sha-256=<64 lowercase hex>/],
+  ];
+  for (const [edit, re] of cases) {
+    const x = structuredClone(bound()); edit(x);
+    const rr = check(signDeclaration(x, KEY.privateJwk));
+    assert.equal(rr.status, 'invalid', String(re));
+    assert.ok(rr.problems.some((p) => re.test(p)), `${re} in ${rr.problems.join(' | ')}`);
+    assert.equal(rr.record_version, null, 'nothing from a document that does not check is carried');
+  }
+  assert.throws(() => good({ recordVersion: 7 }), /go together/);
+  assert.throws(() => buildDeclaration({ domain: 'acme.com', privateJwk: KEY.privateJwk, now: NOW, recordVersion: 7, recordDigest: DIGEST }), /need record/);
+  assert.equal(recordSlugOf('https://trooth.co/network/company/acme'), 'acme');
+  assert.equal(recordSlugOf('https://trooth.co/network/company/Acme'), null);
+  assert.equal(recordSlugOf('https://evil.example/network/company/acme'), null);
+});
+
+test('readRecordHead: the two headers of the record API; absent when no record or no version is named; not read on an error; never another slug', async () => {
+  const calls = [];
+  const api = (status, headers = {}, body = { found: true, slug: 'acme' }) => async (url, init) => { calls.push({ url, init }); return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } }); };
+  let h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(200, { 'trooth-record-version': '12', 'trooth-record-digest': DIGEST }), userAgent: 'trooth-cli/test' });
+  assert.deepEqual([h.status, h.slug, h.record_version, h.record_digest, h.http_status], ['read', 'acme', 12, DIGEST, 200]);
+  assert.equal(calls[0].url, 'https://trooth.co/api/network/profile?q=acme&contract=2');
+  assert.equal(calls[0].init.method, 'GET'); assert.equal(calls[0].init.redirect, 'error'); assert.equal(calls[0].init.headers['user-agent'], 'trooth-cli/test');
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(200, { 'trooth-record-version': '12', 'trooth-record-digest': DIGEST }), base: 'http://127.0.0.1:1/' });
+  assert.equal(h.url, 'http://127.0.0.1:1/api/network/profile?q=acme&contract=2');
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(200) });
+  assert.equal(h.status, 'absent'); assert.match(h.reason, /named no version/);
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(200, { 'trooth-record-version': '12', 'trooth-record-digest': 'sha-256=zz' }) });
+  assert.equal(h.status, 'absent');
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(200, {}, { found: false }) });
+  assert.equal(h.status, 'absent'); assert.match(h.reason, /no Trooth record has the slug acme/);
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(404) });
+  assert.equal(h.status, 'absent');
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(200, { 'trooth-record-version': '12', 'trooth-record-digest': DIGEST }, { found: true, slug: 'other' }) });
+  assert.equal(h.status, 'not_read'); assert.match(h.reason, /answered for other, not acme/);
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: api(503) });
+  assert.equal(h.status, 'not_read'); assert.match(h.reason, /HTTP 503/);
+  h = await readRecordHead('https://trooth.co/network/company/acme', { fetch: async () => { throw new Error('ECONNREFUSED'); } });
+  assert.equal(h.status, 'not_read'); assert.match(h.reason, /could not be reached/);
+  h = await readRecordHead('https://evil.example/network/company/acme', { fetch: api(200) });
+  assert.equal(h.status, 'not_read'); assert.equal(h.url, null); assert.equal(calls.length, 8, 'nothing is fetched for a URL that is not a Trooth record');
+});
+
+test('recordBindingState: current, superseded, unknown; never a grade', () => {
+  const decl = { record_version: 7, record_digest: DIGEST };
+  const head = (v, d = DIGEST) => ({ status: 'read', record_version: v, record_digest: d });
+  let b = recordBindingState(decl, head(7));
+  assert.deepEqual([b.state, b.current_version, b.current_digest], ['current', 7, DIGEST]); assert.match(b.reason, /version 7 is the version published now/);
+  b = recordBindingState(decl, head(9, `sha-256=${'c'.repeat(64)}`));
+  assert.deepEqual([b.state, b.current_version], ['superseded', 9]); assert.match(b.reason, /superseded by version 9/);
+  b = recordBindingState(decl, head(7, `sha-256=${'c'.repeat(64)}`));
+  assert.equal(b.state, 'unknown'); assert.match(b.reason, /another digest/);
+  b = recordBindingState(decl, head(3));
+  assert.equal(b.state, 'unknown'); assert.match(b.reason, /earlier than/);
+  b = recordBindingState(decl, { status: 'not_read', reason: 'the record API answered HTTP 503' });
+  assert.deepEqual([b.state, b.current_version, b.reason], ['unknown', null, 'the record API answered HTTP 503']);
+  b = recordBindingState({ record_version: null, record_digest: null }, head(7));
+  assert.equal(b.state, 'unknown'); assert.match(b.reason, /names no record version/);
+  for (const x of [b.reason, recordBindingState(decl, head(9)).reason]) assert.doesNotMatch(x, /score|rating|grade|tier|rank|verif/i);
+});
+
+/** A loopback record API that answers /api/network/profile with the given head. */
+function recordApi(headFor) {
+  return new Promise((resolve) => {
+    const srv = http.createServer((req, res) => {
+      const slug = new URL(req.url, 'http://x').searchParams.get('q');
+      const h = headFor(slug);
+      if (!h) { res.writeHead(404, { 'content-type': 'application/json' }); res.end(JSON.stringify({ found: false })); return; }
+      if (typeof h === 'number') { res.writeHead(h, { 'content-type': 'application/json' }); res.end('{}'); return; }
+      res.writeHead(200, { 'content-type': 'application/json', 'trooth-record-version': String(h.version), 'trooth-record-digest': h.digest });
+      res.end(JSON.stringify({ found: true, slug, domain: 'acme.com' }));
+    });
+    srv.listen(0, '127.0.0.1', () => resolve(srv));
+  });
+}
+
+test('CLI: sign --bind-record writes the record head the API names; check reports current, superseded or unknown and never changes the exit code', async () => {
+  const home = tmp();
+  const keyPath = join(home, 'k.jwk');
+  writeFileSync(keyPath, JSON.stringify(KEY.privateJwk), { mode: 0o600 });
+  let head = { acme: { version: 4, digest: DIGEST } };
+  const srv = await recordApi((slug) => head[slug]);
+  const env = { TROOTH_WEB: `http://127.0.0.1:${srv.address().port}` };
+  try {
+    const out = join(home, 'trooth.json');
+    let r = await run(['declare', 'sign', '--domain', 'acme.com', '--key', keyPath, '--record', 'https://trooth.co/network/company/acme', '--bind-record', '--out', out], { home, env });
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /record\s+version 4 \(sha-256=b+\): your statement, under your key/);
+    assert.match(r.err, /record https:\/\/trooth\.co\/network\/company\/acme is at version 4/);
+    const doc = JSON.parse(readFileSync(out, 'utf8'));
+    assert.equal(doc.record_version, 4); assert.equal(doc.record_digest, DIGEST);
+    assert.equal(check(doc, { now: Date.now() }).status, 'checked', 'the written document checks, signature over the two new members included');
+    const j = JSON.parse((await run(['declare', 'sign', '--domain', 'acme.com', '--key', keyPath, '--record', 'https://trooth.co/network/company/acme', '--bind-record', '--out', join(home, 't2.json'), '--json'], { home, env })).out);
+    assert.deepEqual([j.record, j.record_version, j.record_digest], ['https://trooth.co/network/company/acme', 4, DIGEST]);
+    const plain = JSON.parse((await run(['declare', 'sign', '--domain', 'acme.com', '--key', keyPath, '--out', join(home, 't3.json'), '--json'], { home, env })).out);
+    assert.deepEqual([plain.record, plain.record_version, plain.record_digest], [null, null, null]);
+    assert.ok(!('record_version' in JSON.parse(readFileSync(join(home, 't3.json'), 'utf8'))), 'without --bind-record the members are not written');
+
+    // check: current
+    r = await run(['declare', 'check', '--file', out, '--no-dns', '--json'], { home, env });
+    assert.equal(r.code, 0, r.err);
+    let c = JSON.parse(r.out);
+    assert.deepEqual([c.record_version, c.record_digest, c.owner_signed_record.state, c.owner_signed_record.current_version], [4, DIGEST, 'current', 4]);
+    assert.match(c.owner_signed_record.checked_at, /^\d{4}-/);
+    r = await run(['declare', 'check', '--file', out, '--no-dns'], { home, env });
+    assert.match(r.out, /record vers\. the company's declaration names version 4 of its record, which is the version published now/);
+    // superseded: the company published again and has not signed since
+    head = { acme: { version: 6, digest: `sha-256=${'c'.repeat(64)}` } };
+    r = await run(['declare', 'check', '--file', out, '--no-dns', '--json'], { home, env });
+    assert.equal(r.code, 0, 'superseded is reported, not failed');
+    c = JSON.parse(r.out);
+    assert.deepEqual([c.owner_signed_record.state, c.owner_signed_record.current_version, c.owner_signed_record.current_digest], ['superseded', 6, `sha-256=${'c'.repeat(64)}`]);
+    r = await run(['declare', 'check', '--file', out, '--no-dns'], { home, env });
+    assert.match(r.out, /which has since been superseded by version 6; the company has not signed since/);
+    // unknown: the API is down, or not asked
+    head = { acme: 503 };
+    c = JSON.parse((await run(['declare', 'check', '--file', out, '--no-dns', '--json'], { home, env })).out);
+    assert.equal(c.owner_signed_record.state, 'unknown'); assert.match(c.owner_signed_record.reason, /HTTP 503/);
+    c = JSON.parse((await run(['declare', 'check', '--file', out, '--no-dns', '--no-record', '--json'], { home, env })).out);
+    assert.deepEqual([c.owner_signed_record.state, c.owner_signed_record.reason, c.owner_signed_record.checked_at], ['unknown', 'not asked (--no-record)', null]);
+    // a declaration without the members: no owner_signed_record, and the API is not asked
+    c = JSON.parse((await run(['declare', 'check', '--file', join(home, 't3.json'), '--no-dns', '--json'], { home, env })).out);
+    assert.equal(c.owner_signed_record, null); assert.equal(c.record_version, null);
+
+    // sign refusals: --bind-record without --record (2); no record under the slug (2); the API down (3)
+    r = await run(['declare', 'sign', '--domain', 'acme.com', '--key', keyPath, '--bind-record', '--out', join(home, 'x.json')], { home, env });
+    assert.equal(r.code, 2); assert.match(r.err, /--bind-record needs --record/);
+    r = await run(['declare', 'sign', '--domain', 'acme.com', '--key', keyPath, '--record', 'https://trooth.co/network/company/nobody', '--bind-record', '--out', join(home, 'x.json')], { home, env });
+    assert.equal(r.code, 2); assert.match(r.err, /no Trooth record has the slug nobody/); assert.ok(!existsSync(join(home, 'x.json')));
+    r = await run(['declare', 'sign', '--domain', 'acme.com', '--key', keyPath, '--record', 'https://trooth.co/network/company/acme', '--bind-record', '--out', join(home, 'x.json')], { home, env });
+    assert.equal(r.code, 3, r.err); assert.match(r.err, /HTTP 503/); assert.ok(!existsSync(join(home, 'x.json')));
+    assert.equal((await run(['declare', 'check', '--file', out, '--bind-record'], { home, env })).code, 2, '--bind-record is a sign flag');
+  } finally { srv.close(); }
 });

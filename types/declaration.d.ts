@@ -11,6 +11,8 @@ export declare const DEFAULT_VALIDITY_DAYS: number;
 export declare const REPOSITORY_HOSTS: readonly string[];
 export declare const DOH_URL: string;
 export declare const RECORD_PREFIX: string;
+export declare const RECORD_API_BASE: string;
+export declare const RECORD_DIGEST_RE: RegExp;
 
 export interface Ed25519PublicJwk { kty: 'OKP'; crv: 'Ed25519'; x: string }
 /** Keep it secret: `d` is the private key. */
@@ -39,6 +41,9 @@ export declare function buildDeclaration(opts: {
   now?: number;
   days?: number;
   record?: string | null;
+  /** With recordDigest, and only with record: the record version the signer stands behind (0.21.0). */
+  recordVersion?: number | null;
+  recordDigest?: string | null;
   products?: DeclaredProduct[];
   apis?: DeclaredApi[];
   repositories?: string[];
@@ -61,6 +66,9 @@ export interface DeclarationCheck {
   thumbprints: string[];
   /** Only a 'checked' result carries the record and the subjects. */
   record: string | null;
+  /** The record version and digest the declaration names, together or both null (0.21.0). */
+  record_version: number | null;
+  record_digest: string | null;
   products: DeclaredProduct[];
   apis: DeclaredApi[];
   repositories: string[];
@@ -87,3 +95,27 @@ export interface KeyPin { status: 'present' | 'absent' | 'not_read'; name: strin
 export declare function readKeyPin(domain: string, opts?: { fetch?: typeof fetch; timeoutMs?: number; dohUrl?: string }): Promise<KeyPin>;
 export declare function txtValue(data: string): string;
 export declare function pinStatus(pin: KeyPin, thumbprints: string[]): { pinned: boolean; state: 'matches' | 'other_key' | 'absent' | 'not_read' | 'present'; thumbprint: string | null };
+
+/** The slug a record URL names, or null. */
+export declare function recordSlugOf(record: unknown): string | null;
+export interface RecordHead {
+  status: 'read' | 'absent' | 'not_read';
+  url: string | null;
+  slug: string | null;
+  record_version: number | null;
+  record_digest: string | null;
+  reason: string | null;
+  http_status: number | null;
+}
+/** The record API's Trooth-Record-Version and Trooth-Record-Digest for the record a declaration names (one GET; the body is not kept). */
+export declare function readRecordHead(record: string, opts?: { fetch?: typeof fetch; timeoutMs?: number; userAgent?: string; base?: string }): Promise<RecordHead>;
+export interface RecordBindingState {
+  state: 'current' | 'superseded' | 'unknown';
+  record_version: number | null;
+  record_digest: string | null;
+  current_version: number | null;
+  current_digest: string | null;
+  reason: string | null;
+}
+/** A checked declaration's record_version/record_digest against the head read now. A fact, never a grade. */
+export declare function recordBindingState(decl: Pick<DeclarationCheck, 'record_version' | 'record_digest'>, head: Pick<RecordHead, 'status' | 'record_version' | 'record_digest' | 'reason'> | null): RecordBindingState;

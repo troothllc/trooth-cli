@@ -77,7 +77,11 @@
 //                           (its key, products, APIs and repositories), and check one,
 //                           read from the site (no redirects, 64 KB at most) or a file,
 //                           with the optional key pin at _trooth-key.<domain> read over
-//                           DNS over HTTPS. Nothing secret is printed.
+//                           DNS over HTTPS. `sign --bind-record` writes the version and
+//                           digest of the company's Trooth record the company stands
+//                           behind (record_version, record_digest, from the record API's
+//                           headers); `check` says whether that version is the one
+//                           published now. Nothing secret is printed.
 //   trooth --help           Show help.   trooth --version  Show version.
 //   trooth <command> --help Show one command's usage, flags and exit codes (also -h,
 //                           and trooth help <command> [<subcommand>]).
@@ -166,7 +170,7 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { loadPolicy as loadGuardPolicy, createGuard, PolicyError } from './lib/guard.mjs';
 import { addedLines, scanLines } from './lib/guard-ci.mjs';
-import { generateDeclarationKey, readPrivateJwk, publicJwkOf, buildDeclaration, checkDeclaration, fetchDeclaration, readKeyPin, pinStatus, pinLine, isSignatureProblem, DeclarationError, DECLARATION_PATH, MAX_VALIDITY_DAYS, DEFAULT_VALIDITY_DAYS, DOH_URL, keyIdFor, jwkThumbprint } from './lib/declaration.mjs';
+import { generateDeclarationKey, readPrivateJwk, publicJwkOf, buildDeclaration, checkDeclaration, fetchDeclaration, readKeyPin, pinStatus, pinLine, isSignatureProblem, readRecordHead, recordBindingState, DeclarationError, DECLARATION_PATH, MAX_VALIDITY_DAYS, DEFAULT_VALIDITY_DAYS, DOH_URL, keyIdFor, jwkThumbprint } from './lib/declaration.mjs';
 import { ID_TYPES } from './lib/ids.mjs';
 import { SECTION_NAMES, SECTION_OF_CATEGORY, parseSectionArgs, buildSections, renderText, renderMarkdown } from './lib/profile.mjs';
 import { homedir } from 'node:os';
@@ -312,7 +316,7 @@ const FLAGS = {
   mirror: { bool: ['--json', '--check'], value: ['--from', '--log-vkey'] },
   'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey', '--timeout'] },
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
-  declare: { bool: ['--json', '--no-dns'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
+  declare: { bool: ['--json', '--no-dns', '--no-record', '--bind-record'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
   guard: { bool: ['--json', '--offline'], value: ['--policy', '--tool', '--host', '--args', '--cache', '--max-age', '--base', '--log-vkey', '--timeout-ms'], multi: ['--witness'] },
 };
 
@@ -442,7 +446,9 @@ ${B}Flags${X}
   --product id=name=url     declare sign: a product (repeatable); --api base_url[,mcp_url,manifest_sha256],
                             --repo <url>, --add-key <jwk> (a second key, for rotation) repeat too
   --record <url>, --days N  declare sign: the company's Trooth record; validity in days (default 365, at most 400)
+  --bind-record             declare sign: write the record's current version and digest (record_version, record_digest)
   --file <path>, --no-dns   declare check: check a saved file; do not read the _trooth-key TXT pin
+  --no-record               declare check: do not ask the record API whether record_version is the version published now
 
 ${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
   0  ok: check listed and witnessed; profile found and printed; lint complete; verify checked; a log, mirror or receipt checks;
@@ -901,7 +907,7 @@ const COMMAND_HELP = {
     usage: [
       'trooth declare init --domain <domain> [--key <path>] [--json]',
       'trooth declare sign --domain <domain> --key <path> --out <file> [...]',
-      'trooth declare check <domain> | --file <path> [--domain <domain>] [--no-dns] [--json]',
+      'trooth declare check <domain> | --file <path> [--domain <domain>] [--no-dns] [--no-record] [--json]',
     ],
     about: [
       'The domain-signed declaration (docs/DECLARATION.md): init makes an Ed25519 key kept on this',
@@ -929,16 +935,24 @@ const COMMAND_HELP = {
   },
   'declare sign': {
     usage: [
-      'trooth declare sign --domain <domain> --key <path> --out <file> [--record <url>] [--days <n>]',
+      'trooth declare sign --domain <domain> --key <path> --out <file> [--record <url> [--bind-record]] [--days <n>]',
       '                    [--product id=name=url]... [--api base_url[,mcp_url,manifest_sha256]]...',
       '                    [--repo <url>]... [--add-key <jwk>]... [--json]',
     ],
-    about: ['Writes the signed declaration you publish at https://<domain>/.well-known/trooth.json, checked against every rule before it is written, and prints the optional _trooth-key TXT pin.'],
+    about: [
+      'Writes the signed declaration you publish at https://<domain>/.well-known/trooth.json, checked against every rule before it is written, and prints the optional _trooth-key TXT pin.',
+      'With --bind-record it first reads the current version and digest of the record --record names from',
+      "the record API's Trooth-Record-Version and Trooth-Record-Digest headers and writes them as",
+      "record_version and record_digest: the company's own statement, under its own key, of which record",
+      'it published. Trooth does not sign the record. The statement goes stale when the record is',
+      'published again, until you sign a new declaration.',
+    ],
     flags: [
       ['--domain <domain>', 'the domain (required)'],
       ['--key <path>', 'the private JWK trooth declare init wrote (required)'],
       ['--out <file>', 'where to write the declaration (required; never overwrites)'],
       ['--record <url>', "the company's Trooth record"],
+      ['--bind-record', "with --record: write the record's current version and digest (one request to the record API)"],
       ['--days <n>', 'validity in days (default 365, at most 400)'],
       ['--product id=name=url', 'a product (repeatable)'],
       ['--api <spec>', 'an API: base_url, or base_url,mcp_url,manifest_sha256 (repeatable)'],
@@ -947,22 +961,26 @@ const COMMAND_HELP = {
       ['--json', 'one JSON document on stdout; diagnostics on stderr'],
     ],
     exits: [['0', 'the declaration was written'], ['2', 'usage error, including a refusal to overwrite and a document that would not check'], SEVEN],
-    examples: ['trooth declare sign --domain acme.com --key ~/.trooth/declaration-key/acme.com.jwk --out trooth.json'],
+    examples: ['trooth declare sign --domain acme.com --key ~/.trooth/declaration-key/acme.com.jwk --out trooth.json', 'trooth declare sign --domain acme.com --key ~/.trooth/declaration-key/acme.com.jwk --record https://trooth.co/network/company/acme --bind-record --out trooth.json'],
   },
   'declare check': {
     usage: [
-      'trooth declare check <domain> [--no-dns] [--json]',
-      'trooth declare check --file <path> [--domain <domain>] [--no-dns] [--json]',
+      'trooth declare check <domain> [--no-dns] [--no-record] [--json]',
+      'trooth declare check --file <path> [--domain <domain>] [--no-dns] [--no-record] [--json]',
     ],
     about: [
       "Reads a domain's declaration from https://<domain>/.well-known/trooth.json (no redirects, 64 KB at",
       'most) or a file, checks every rule, and reads the optional key pin at _trooth-key.<domain> over',
       'DNS over HTTPS. It takes a domain, not a Trooth slug: the document is read from the site itself.',
+      'When the declaration names record_version and record_digest, it asks the record API whether that',
+      'is the version published now (current), a version since superseded, or unknown. That is reported,',
+      'never graded, and does not change the exit code.',
     ],
     flags: [
       ['--file <path>', 'check a saved file instead of reading the site'],
       ['--domain <domain>', 'with --file: require the domain the document names'],
       ['--no-dns', 'do not read the _trooth-key TXT pin'],
+      ['--no-record', 'do not ask the record API about record_version and record_digest'],
       ['--json', 'one JSON document on stdout; diagnostics on stderr'],
     ],
     exits: [
@@ -2493,6 +2511,16 @@ function printPublicRecord(d, sig) {
     if (dc.reason && dc.status !== 'checked') parts.push(dc.reason);
     out(`  declaration  ${label} ${dc.url} ${D}${parts.length ? `(${parts.join('; ')})` : ''}${X}`);
   }
+  // The owner-signed record (0.21.0): the company's statement of which record
+  // version it published, against the record API's head. Labelled as the
+  // company's; reported, never graded.
+  if (d.owner_signed_record && typeof d.owner_signed_record === 'object') {
+    const o = d.owner_signed_record;
+    const text = o.state === 'current' ? ok(`the company's declaration names version ${o.record_version} of its record, which is the version published now`)
+      : o.state === 'superseded' ? warn(`the company's declaration names version ${o.record_version} of its record, which has since been superseded by version ${o.current_version}`)
+      : `${D}the company's declaration names version ${o.record_version} of its record; not compared: ${o.reason}${X}`;
+    out(`  owner-signed ${text} ${D}(the company's statement under its own key; Trooth does not sign the record)${X}`);
+  }
   if (Array.isArray(d.proofs)) {
     if (!d.proofs.length) out(`  ${D}proofs       none in this reading${X}`);
     for (const p of d.proofs) {
@@ -3200,7 +3228,7 @@ async function declareCmd() {
   const sub = positional[0];
   const rest = positional.slice(1);
   if (!['init', 'sign', 'check'].includes(sub)) fail(EXIT.USAGE, 'trooth declare takes init, sign or check. Try: trooth declare init --domain acme.com, or trooth declare --help');
-  const allowed = { init: ['--json', '--domain', '--key'], sign: ['--json', '--domain', '--key', '--record', '--days', '--out', '--product', '--api', '--repo', '--add-key'], check: ['--json', '--domain', '--file', '--no-dns'] }[sub];
+  const allowed = { init: ['--json', '--domain', '--key'], sign: ['--json', '--domain', '--key', '--record', '--bind-record', '--days', '--out', '--product', '--api', '--repo', '--add-key'], check: ['--json', '--domain', '--file', '--no-dns', '--no-record'] }[sub];
   for (const f of Object.keys(flags)) if (!allowed.includes(f)) fail(EXIT.USAGE, `${f} is not a flag of \`trooth declare ${sub}\`. Its flags: ${allowed.join(', ')}. Run \`trooth declare ${sub} --help\`.`);
 
   if (sub === 'init') {
@@ -3241,11 +3269,23 @@ async function declareCmd() {
     }
     const jwk = readKeyFile(flags['--key']);
     try { if (process.platform !== 'win32' && (statSync(flags['--key']).mode & 0o077)) diag(`note: ${flags['--key']} can be read by other users of this machine; chmod 600 it.`); } catch {}
+    // --bind-record: the record's current version and digest, from the record
+    // API's headers, written as the company's own statement of which record it
+    // published. A head that cannot be read is a plain failure, never a guess.
+    let head = null;
+    if (flags['--bind-record']) {
+      if (!flags['--record']) fail(EXIT.USAGE, '--bind-record needs --record <url>: the Trooth record whose version and digest to write.');
+      head = await readRecordHead(flags['--record'], { timeoutMs: TIMEOUT_MS, userAgent: `trooth-cli/${VERSION}`, base: WEB });
+      if (head.status !== 'read') fail(head.status === 'absent' ? EXIT.USAGE : EXIT.UPSTREAM, `--bind-record: the record's version and digest could not be read: ${head.reason}. Publish the record first, or sign without --bind-record.`);
+      diag(`record ${flags['--record']} is at version ${head.record_version} (${head.record_digest}); writing record_version and record_digest.`);
+    }
     let doc;
     try {
       doc = buildDeclaration({
         domain, privateJwk: jwk, days,
         record: flags['--record'] ?? null,
+        recordVersion: head ? head.record_version : null,
+        recordDigest: head ? head.record_digest : null,
         products: (flags['--product'] || []).map(parseProduct),
         apis: (flags['--api'] || []).map(parseApi),
         repositories: flags['--repo'] || [],
@@ -3259,12 +3299,13 @@ async function declareCmd() {
     try { writeFileSync(flags['--out'], text, { flag: 'wx' }); }
     catch (e) { fail(EXIT.USAGE, `could not write ${flags['--out']}: ${e && e.code ? e.code : e}`); }
     const tp = jwkThumbprint(publicJwkOf(jwk));
-    const res = { out: flags['--out'], domain, kid: doc.signature.kid, thumbprint: tp, issued_at: doc.issued_at, expires_at: doc.expires_at, sha256: createHash('sha256').update(text, 'utf8').digest('hex'), publish_at: `https://${domain}${DECLARATION_PATH}`, pin_txt: pinLine(domain, tp) };
+    const res = { out: flags['--out'], domain, kid: doc.signature.kid, thumbprint: tp, issued_at: doc.issued_at, expires_at: doc.expires_at, sha256: createHash('sha256').update(text, 'utf8').digest('hex'), publish_at: `https://${domain}${DECLARATION_PATH}`, pin_txt: pinLine(domain, tp), record: doc.record ?? null, record_version: doc.record_version ?? null, record_digest: doc.record_digest ?? null };
     if (asJson) emitJson(res);
     else {
       out(`${J}signed${X}  ${flags['--out']}  ${D}by ${res.kid}, valid until ${res.expires_at}${X}`);
       out(`  publish at   ${res.publish_at} ${D}(served directly, no redirect, at most 64 KB)${X}`);
       out(`  ${D}products ${doc.products.length} · apis ${doc.apis.length} · repositories ${doc.repositories.length}${doc.record ? ` · record ${doc.record}` : ''}${X}`);
+      if (doc.record_version) out(`  record       version ${doc.record_version} ${D}(${doc.record_digest}): your statement, under your key, that this is the record you published. It goes stale when you publish the record again; sign a new declaration then.${X}`);
       out(`  DNS pin      add this TXT record to bind the key to the zone as well:`);
       out(`               ${res.pin_txt}`);
       out(`  then         trooth declare check ${domain}`);
@@ -3291,7 +3332,15 @@ async function declareCmd() {
     const got = await fetchDeclaration(domain, { timeoutMs: TIMEOUT_MS, userAgent: `trooth-cli/${VERSION}` });
     source = 'network'; url = got.url;
     if (got.status === 'read') r = checkDeclaration(got.bytes, { domain, now: Date.now() });
-    else { readFailure = got; r = { status: got.status, reason: got.reason, problems: got.status === 'invalid' ? [got.reason] : [], signature: 'not_checked', sha256: null, domain, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], record: null, products: [], apis: [], repositories: [], host_checked: true }; }
+    else { readFailure = got; r = { status: got.status, reason: got.reason, problems: got.status === 'invalid' ? [got.reason] : [], signature: 'not_checked', sha256: null, domain, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], record: null, record_version: null, record_digest: null, products: [], apis: [], repositories: [], host_checked: true }; }
+  }
+  // The record version the company stands behind, against the record API's
+  // current head. Reported as current, superseded or unknown; never graded,
+  // and never a change to the exit code.
+  let binding = null;
+  if ((r.status === 'checked' || r.status === 'expired') && r.record_version !== null) {
+    const head = flags['--no-record'] ? { status: 'not_read', reason: 'not asked (--no-record)' } : await readRecordHead(r.record, { timeoutMs: TIMEOUT_MS, userAgent: `trooth-cli/${VERSION}`, base: WEB });
+    binding = { ...recordBindingState(r, head), checked_at: flags['--no-record'] ? null : new Date().toISOString() };
   }
   // The optional zone pin, read over DNS over HTTPS.
   let pin = { status: 'not_read', name: r.domain ? `_trooth-key.${r.domain}` : null, thumbprints: [], reason: flags['--no-dns'] ? 'not asked (--no-dns)' : 'no domain to ask about' };
@@ -3301,7 +3350,7 @@ async function declareCmd() {
     url, source, status: r.status, reason: r.reason, problems: r.problems, sha256: r.sha256,
     issued_at: r.issued_at, expires_at: r.expires_at, signature: r.signature, kid: r.kid, keys: r.keys,
     key_pinned_by_dns: ps.pinned, dns_pin: { name: pin.name, status: pin.status, state: ps.state, thumbprints: pin.thumbprints, reason: pin.reason },
-    host_checked: r.host_checked, record: r.record, products: r.products, apis: r.apis, repositories: r.repositories,
+    host_checked: r.host_checked, record: r.record, record_version: r.record_version, record_digest: r.record_digest, owner_signed_record: binding, products: r.products, apis: r.apis, repositories: r.repositories,
   };
   if (r.status === 'checked' && ps.state === 'other_key') doc.problems = [...doc.problems, `${pin.name} pins ${ps.thumbprint}, which is not a key in the declaration`];
   if (asJson) emitJson(doc);
@@ -3317,6 +3366,12 @@ async function declareCmd() {
       for (const k of r.keys) out(`  key          ${k}`);
       out(`  DNS pin      ${ps.state === 'matches' ? ok(`${pin.name} pins ${ps.thumbprint}: the key is bound to the zone as well`) : ps.state === 'other_key' ? bad(`${pin.name} pins ${ps.thumbprint}, which is not a key in the declaration`) : ps.state === 'absent' ? `${D}none at ${pin.name}; to add one: ${pinLine(r.domain, r.thumbprints[0])}${X}` : warn(`not read: ${pin.reason}`)}`);
       if (r.record) out(`  record       ${r.record}`);
+      if (binding) {
+        const line = binding.state === 'current' ? ok(`the company's declaration names version ${binding.record_version} of its record, which is the version published now`)
+          : binding.state === 'superseded' ? warn(`the company's declaration names version ${binding.record_version} of its record, which has since been superseded by version ${binding.current_version}; the company has not signed since`)
+          : `${D}the company's declaration names version ${binding.record_version} of its record; not compared: ${binding.reason}${X}`;
+        out(`  record vers. ${line}`);
+      }
       for (const p of r.products) out(`  product      ${p.id}  ${p.name}  ${D}${p.url}${X}`);
       for (const a of r.apis) out(`  api          ${a.base_url}${a.mcp ? `  ${D}MCP ${a.mcp.url} manifest sha256 ${a.mcp.manifest_sha256}${X}` : ''}`);
       for (const x of r.repositories) out(`  repository   ${x}`);

@@ -2,11 +2,11 @@
 // uses, validated with no dependency (the package keeps exactly one). It
 // supports $ref (local and to a sibling file by name), type, const, enum,
 // properties, required, additionalProperties, items, minItems, maxItems,
-// minLength, maxLength, minimum, pattern, oneOf and anyOf, and takes format as an annotation only. A keyword outside that set is refused so a
+// minLength, maxLength, minimum, pattern, dependentRequired, oneOf and anyOf, and takes format as an annotation only. A keyword outside that set is refused so a
 // schema cannot quietly use something this validator ignores.
 import { readFileSync, readdirSync } from 'node:fs';
 
-const KNOWN = new Set(['$schema', '$id', '$defs', '$ref', 'title', 'description', 'type', 'const', 'enum', 'properties', 'required', 'additionalProperties', 'items', 'minItems', 'maxItems', 'minLength', 'maxLength', 'minimum', 'pattern', 'oneOf', 'anyOf', 'format']);
+const KNOWN = new Set(['$schema', '$id', '$defs', '$ref', 'title', 'description', 'type', 'const', 'enum', 'properties', 'required', 'additionalProperties', 'items', 'minItems', 'maxItems', 'minLength', 'maxLength', 'minimum', 'pattern', 'dependentRequired', 'oneOf', 'anyOf', 'format']);
 
 export function loadSchemas(dirUrl) {
   const out = {};
@@ -53,6 +53,7 @@ export function makeValidator(schemas) {
     }
     if (typeOf(v) === 'object') {
       for (const r of s.required || []) if (!(r in v)) errs.push(`${path}: missing ${r}`);
+      for (const [k, deps] of Object.entries(s.dependentRequired || {})) if (k in v) for (const r of deps) if (!(r in v)) errs.push(`${path}: ${k} requires ${r}`);
       for (const [k, x] of Object.entries(v)) {
         if (s.properties && k in s.properties) check(s.properties[k], x, file, `${path}.${k}`, errs);
         else if (s.additionalProperties === false) errs.push(`${path}: unexpected ${k}`);

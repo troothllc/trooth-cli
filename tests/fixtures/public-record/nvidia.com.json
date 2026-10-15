@@ -731,7 +731,9 @@
       "status": "Active",
       "entity_type": "FOREIGN BUSINESS CORPORATION",
       "formed": "2016-08-01",
-      "formation_jurisdiction": "Delaware"
+      "formation_jurisdiction": "Delaware",
+      "read_at": "2026-10-07T03:59:43.546Z",
+      "sha256": "0f0580859026d63b05cd2580179434966373c3fa7d2190576cede2c0c56c2802"
     },
     {
       "jurisdiction": "US-CO",
@@ -742,7 +744,9 @@
       "status": "Good Standing",
       "entity_type": "FPC",
       "formed": "2001-11-06",
-      "formation_jurisdiction": "DE"
+      "formation_jurisdiction": "DE",
+      "read_at": "2026-10-07T03:59:43.840Z",
+      "sha256": "ea607332f9334bc8d40f7929d00caaa4cbab9f4f022524fde9b07cef81d8d5f3"
     },
     {
       "jurisdiction": "US-CT",
@@ -753,7 +757,9 @@
       "status": "Active",
       "entity_type": "Stock",
       "formed": "2021-09-09",
-      "formation_jurisdiction": "DELAWARE"
+      "formation_jurisdiction": "DELAWARE",
+      "read_at": "2026-10-07T03:59:44.233Z",
+      "sha256": "ae946dd52ce9564c0491cb0c0b725a87cac6e3b108a4e3a59fc29bc36d051d2e"
     },
     {
       "jurisdiction": "US-OR",
@@ -764,7 +770,9 @@
       "status": "Active",
       "entity_type": "FOREIGN BUSINESS CORPORATION",
       "formed": "2001-11-05",
-      "formation_jurisdiction": "DE"
+      "formation_jurisdiction": "DE",
+      "read_at": "2026-10-07T03:59:44.744Z",
+      "sha256": "d7f8340a0ba3078185b2ab0ad73ffce97c3181c1e072579f88eb2c260ae6ab75"
     }
   ],
   "merger_review": {

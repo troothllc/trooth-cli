@@ -12,8 +12,18 @@
 //
 // No URL inside a declaration is ever fetched. The only requests this module
 // makes are the declaration itself (https://<domain>/.well-known/trooth.json,
-// no redirects, 64 KB at most, a deadline) and one DNS-over-HTTPS query for the
-// optional key pin at _trooth-key.<domain>.
+// no redirects, 64 KB at most, a deadline), one DNS-over-HTTPS query for the
+// optional key pin at _trooth-key.<domain>, and, when asked, the head of the
+// company's Trooth record (the record API's Trooth-Record-Version and
+// Trooth-Record-Digest headers) so that `record_version` and `record_digest`
+// can be written at signing and compared at check. That request goes to
+// trooth.co's record API for the slug `record` names; the record page itself
+// is never fetched.
+//
+// record_version and record_digest (trooth 0.21.0) are the company's own
+// statement, under its own key, of which version of its Trooth record it
+// published. Trooth does not sign the record; the binding is the company's,
+// and it goes stale when the company publishes again until it signs anew.
 
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign as edSign, verify as edVerify } from 'node:crypto';
 import { canonicalize } from './jcs.mjs';
@@ -26,11 +36,13 @@ export const DEFAULT_VALIDITY_DAYS = 365;
 export const REPOSITORY_HOSTS = ['github.com', 'gitlab.com', 'bitbucket.org', 'codeberg.org'];
 export const DOH_URL = 'https://cloudflare-dns.com/dns-query';
 export const RECORD_PREFIX = 'https://trooth.co/network/company/';
+export const RECORD_API_BASE = 'https://trooth.co';
+export const RECORD_DIGEST_RE = /^sha-256=[0-9a-f]{64}$/;
 const DAY = 86400000;
 const CLOCK_SKEW_MS = 5 * 60000;
 const MAX_KEYS = 8;
 const MAX_ITEMS = 100;
-const TOP_LEVEL = ['format', 'domain', 'issued_at', 'expires_at', 'record', 'keys', 'products', 'apis', 'repositories', 'signature'];
+const TOP_LEVEL = ['format', 'domain', 'issued_at', 'expires_at', 'record', 'record_version', 'record_digest', 'keys', 'products', 'apis', 'repositories', 'signature'];
 const DOMAIN_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const PRODUCT_ID_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
@@ -113,8 +125,10 @@ export function isoSeconds(ms) { return new Date(ms).toISOString().replace(/\.\d
  * listed after it, for a key rotation. Throws DeclarationError when the result
  * would not check.
  */
-export function buildDeclaration({ domain, privateJwk, now = Date.now(), days = DEFAULT_VALIDITY_DAYS, record = null, products = [], apis = [], repositories = [], extraKeys = [] }) {
+export function buildDeclaration({ domain, privateJwk, now = Date.now(), days = DEFAULT_VALIDITY_DAYS, record = null, recordVersion = null, recordDigest = null, products = [], apis = [], repositories = [], extraKeys = [] }) {
   if (!Number.isInteger(days) || days < 1 || days > MAX_VALIDITY_DAYS) throw new DeclarationError(`the validity is 1 to ${MAX_VALIDITY_DAYS} days`);
+  if ((recordVersion === null) !== (recordDigest === null)) throw new DeclarationError('record_version and record_digest go together');
+  if (recordVersion !== null && !record) throw new DeclarationError('record_version and record_digest need record');
   const jwk = readPrivateJwk(privateJwk);
   const pub = publicJwkOf(jwk);
   const issued = isoSeconds(now);
@@ -124,6 +138,7 @@ export function buildDeclaration({ domain, privateJwk, now = Date.now(), days = 
     issued_at: issued,
     expires_at: isoSeconds(Date.parse(issued) + days * DAY),
     ...(record ? { record } : {}),
+    ...(recordVersion !== null ? { record_version: recordVersion, record_digest: recordDigest } : {}),
     keys: [pub, ...extraKeys.map(publicJwkOf)].map((k) => ({ kid: keyIdFor(domain, k), ...k })),
     products,
     apis,
@@ -168,12 +183,13 @@ const sha256Hex = (b) => createHash('sha256').update(b).digest('hex');
  * Returns { status: 'checked' | 'invalid' | 'expired', reason, problems[],
  * signature: 'valid' | 'invalid' | 'not_checked', sha256, domain, issued_at,
  * expires_at, kid, keys[kid], thumbprints[], products, apis, repositories,
- * record, host_checked }. Only a 'checked' result carries subjects.
+ * record, record_version, record_digest, host_checked }. Only a 'checked'
+ * result carries subjects.
  */
 export function checkDeclaration(input, { domain = null, now = Date.now() } = {}) {
   const problems = [];
-  const res = { status: 'invalid', reason: null, problems, signature: 'not_checked', sha256: null, domain: null, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], record: null, products: [], apis: [], repositories: [], host_checked: domain !== null };
-  const done = (status, reason) => { res.status = status; res.reason = reason; if (status !== 'checked') { res.products = []; res.apis = []; res.repositories = []; res.record = null; } return res; };
+  const res = { status: 'invalid', reason: null, problems, signature: 'not_checked', sha256: null, domain: null, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], record: null, record_version: null, record_digest: null, products: [], apis: [], repositories: [], host_checked: domain !== null };
+  const done = (status, reason) => { res.status = status; res.reason = reason; if (status !== 'checked') { res.products = []; res.apis = []; res.repositories = []; res.record = null; res.record_version = null; res.record_digest = null; } return res; };
   let doc = input;
   if (typeof input === 'string' || Buffer.isBuffer(input) || input instanceof Uint8Array) {
     const bytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
@@ -212,6 +228,15 @@ export function checkDeclaration(input, { domain = null, now = Date.now() } = {}
     if (typeof doc.record === 'string' && doc.record.startsWith(RECORD_PREFIX)) ok = SLUG_RE.test(doc.record.slice(RECORD_PREFIX.length));
     if (!ok) problems.push(`record is not a Trooth company record URL (${RECORD_PREFIX}<slug>)`);
     else res.record = doc.record;
+  }
+  // The version and digest of that record the signer stands behind (optional, together, with record).
+  const hasVersion = doc.record_version !== undefined, hasDigest = doc.record_digest !== undefined;
+  if (hasVersion || hasDigest) {
+    if (hasVersion !== hasDigest) problems.push('record_version and record_digest go together: one is present without the other');
+    if (doc.record === undefined || doc.record === null) problems.push('record_version and record_digest need record');
+    if (hasVersion && !(Number.isInteger(doc.record_version) && doc.record_version >= 1)) problems.push('record_version is not a whole number of 1 or more');
+    if (hasDigest && !(typeof doc.record_digest === 'string' && RECORD_DIGEST_RE.test(doc.record_digest))) problems.push('record_digest is not sha-256=<64 lowercase hex>');
+    if (hasVersion && hasDigest && res.record && Number.isInteger(doc.record_version) && doc.record_version >= 1 && RECORD_DIGEST_RE.test(String(doc.record_digest))) { res.record_version = doc.record_version; res.record_digest = doc.record_digest; }
   }
 
   // Keys.
@@ -390,6 +415,71 @@ export async function readKeyPin(domain, { fetch: f = globalThis.fetch, timeoutM
 export function txtValue(data) {
   const parts = [...String(data).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replace(/\\(.)/g, '$1'));
   return parts.length ? parts.join('') : String(data);
+}
+
+/* ------------------------------------------------------ record head ---- */
+
+/** The slug a record URL (https://trooth.co/network/company/<slug>) names; null when it is not one. */
+export function recordSlugOf(record) {
+  if (typeof record !== 'string' || !record.startsWith(RECORD_PREFIX)) return null;
+  const slug = record.slice(RECORD_PREFIX.length);
+  return SLUG_RE.test(slug) ? slug : null;
+}
+
+/**
+ * Read the head of a company's Trooth record from the record API: the
+ * Trooth-Record-Version and Trooth-Record-Digest headers of
+ * GET {base}/api/network/profile?q=<slug>&contract=2. The body is not kept.
+ * Returns { status: 'read' | 'absent' | 'not_read', url, slug,
+ * record_version, record_digest, reason, http_status }. 'absent' when the
+ * API answers that no record has the slug, or answers without the two
+ * headers (the record has no version yet, or history is not set up).
+ */
+export async function readRecordHead(record, { fetch: f = globalThis.fetch, timeoutMs = 10000, userAgent = 'trooth-cli', base = RECORD_API_BASE } = {}) {
+  const slug = recordSlugOf(record);
+  const out = { status: 'not_read', url: null, slug, record_version: null, record_digest: null, reason: null, http_status: null };
+  if (!slug) return { ...out, reason: `${String(record).slice(0, 120)} is not a Trooth company record URL (${RECORD_PREFIX}<slug>)` };
+  const url = `${String(base).replace(/\/+$/, '')}/api/network/profile?q=${encodeURIComponent(slug)}&contract=2`;
+  out.url = url;
+  let res;
+  try {
+    res = await f(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(timeoutMs), headers: { accept: 'application/json', 'user-agent': userAgent } });
+  } catch (e) {
+    const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    return { ...out, reason: timedOut ? `the record API did not answer within ${timeoutMs} ms` : `the record API could not be reached: ${e && e.message ? e.message : e}` };
+  }
+  out.http_status = res.status;
+  let body = null;
+  if (res.status === 200) { try { const got = await readCapped(res, 2 * 1024 * 1024); if (!got.over) body = JSON.parse(got.bytes.toString('utf8')); } catch { body = null; } }
+  else { try { await res.body?.cancel(); } catch {} }
+  if (res.status === 404) return { ...out, status: 'absent', reason: `no Trooth record has the slug ${slug}` };
+  if (res.status !== 200) return { ...out, reason: `the record API answered HTTP ${res.status}` };
+  if (body && body.found === false) return { ...out, status: 'absent', reason: `no Trooth record has the slug ${slug}` };
+  if (body && typeof body.slug === 'string' && body.slug.toLowerCase() !== slug) return { ...out, reason: `the record API answered for ${body.slug.slice(0, 80)}, not ${slug}` };
+  const version = Number(res.headers.get('trooth-record-version'));
+  const digest = String(res.headers.get('trooth-record-digest') || '');
+  if (!(Number.isInteger(version) && version >= 1) || !RECORD_DIGEST_RE.test(digest)) return { ...out, status: 'absent', reason: 'the record API named no version for this record (Trooth-Record-Version and Trooth-Record-Digest were not sent)' };
+  return { ...out, status: 'read', record_version: version, record_digest: digest, reason: null };
+}
+
+/**
+ * A checked declaration's record_version/record_digest against the record
+ * head read now. Returns { state: 'current' | 'superseded' | 'unknown',
+ * record_version, record_digest, current_version, current_digest, reason }.
+ * 'current' when the version and the digest both match; 'superseded' when
+ * the record now names a later version; 'unknown' when the head could not be
+ * read, or names something that is neither (an earlier version, or the same
+ * version with another digest). Never a grade: it says only whether the
+ * company has published again since it signed.
+ */
+export function recordBindingState(decl, head) {
+  const out = { state: 'unknown', record_version: decl?.record_version ?? null, record_digest: decl?.record_digest ?? null, current_version: null, current_digest: null, reason: null };
+  if (out.record_version === null || out.record_digest === null) return { ...out, reason: 'the declaration names no record version' };
+  if (!head || head.status !== 'read') return { ...out, reason: head?.reason ?? 'the record head was not read' };
+  out.current_version = head.record_version; out.current_digest = head.record_digest;
+  if (head.record_version === out.record_version && head.record_digest === out.record_digest) return { ...out, state: 'current', reason: `version ${out.record_version} is the version published now` };
+  if (head.record_version > out.record_version) return { ...out, state: 'superseded', reason: `version ${out.record_version} has since been superseded by version ${head.record_version}` };
+  return { ...out, reason: head.record_version === out.record_version ? `the record API names version ${head.record_version} with another digest` : `the record API names version ${head.record_version}, earlier than the ${out.record_version} the declaration names` };
 }
 
 /** Compare a pin reading with a checked declaration's thumbprints. */

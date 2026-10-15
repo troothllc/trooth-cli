@@ -13,6 +13,10 @@
     "signature"
   ],
   "additionalProperties": false,
+  "dependentRequired": {
+    "record_version": ["record", "record_digest"],
+    "record_digest": ["record", "record_version"]
+  },
   "properties": {
     "format": {
       "type": "string",
@@ -38,6 +42,16 @@
       "type": "string",
       "description": "Optional: the company's Trooth record, https://trooth.co/network/company/<slug>. The one URL not on the domain.",
       "pattern": "^https://trooth\\.co/network/company/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "record_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional, with record_digest and only when `record` is present: the version of the company's Trooth record that the signer names as the version it published, as the record API's Trooth-Record-Version header gave it when this declaration was signed (`trooth declare sign --bind-record`). The company, with its own key, says: this is the record I published. Trooth still does not sign the record; the binding is the company's statement, and it goes stale when the company publishes again until it signs a new declaration. Added in trooth 0.21.0."
+    },
+    "record_digest": {
+      "type": "string",
+      "pattern": "^sha-256=[0-9a-f]{64}$",
+      "description": "Optional, with record_version and only when `record` is present: the digest of that version of the company's Trooth record, as the record API's Trooth-Record-Digest header gave it when this declaration was signed. Added in trooth 0.21.0."
     },
     "keys": {
       "type": "array",

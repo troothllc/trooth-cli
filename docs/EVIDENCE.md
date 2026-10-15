@@ -66,7 +66,7 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Subsidiaries (Exhibit 21) | 10-K exhibits | Not read |
 | Legal Entity Identifier record: legal name, other names, jurisdiction, legal form, business registry and number, status, addresses, registration dates, corroboration level | GLEIF | Read: public record `lei.facts` |
 | Direct and ultimate parent | GLEIF | Read: `lei.direct_parent`, `lei.ultimate_parent` |
-| State or country business registry entry | New York, Colorado, Connecticut and Oregon open-data registries; the registry number the LEI record carries | Read: public record `registries`, exact legal name; a name match is not an identification. Other states publish no open-data registry with a common query interface; B1 is declared |
+| State or country business registry entry | New York, Colorado, Connecticut and Oregon open-data registries, Florida's Division of Corporations bulk data (Trooth's copy); the registry number the LEI record carries | Read: public record `registries`, exact legal name; a name match is not an identification. Other states publish no open-data registry with a common query interface; B1 is declared |
 | Federal contractor registration and exclusions | SAM.gov Entity and Exclusions APIs | Read when Trooth holds a SAM.gov key: public record `sam`, exact legal name, cached 30 days per name, at most 8 requests a day; a name match is not an identification |
 | Merger review | FTC early termination notices under the Hart-Scott-Rodino Act | Read: public record `merger_review`, notices with a party of exactly the legal name, cached 7 days per name |
 | Renames, acquisitions and dispositions (8-K Item 2.01), changes in control (Item 5.01), previous legal names, parents | EDGAR, GLEIF | Read: public record `changes`, with merger review and domain events, newest first |
@@ -135,7 +135,7 @@ What the signature establishes: Trooth read these sources and got these answers 
 - Foreign issuers reporting in IFRS: filings are listed, financial values are not read.
 - Filing text (Items 1A, 1C, 3; exhibits) is linked, not read.
 - The Trust Profile shows a reading when one was taken in the last day; otherwise the reader can ask for one there.
-- SAM.gov is read for at most four names a day (its allowance for a key without a federal role is 10 requests); the others are listed under `not_read` and read on a later day. Trademarks are not read. State registries other than New York, Colorado, Connecticut and Oregon are not read. Code registries are not read; investor-relations, sustainability and trust-center pages are linked, not read.
+- SAM.gov is read for at most four names a day (its allowance for a key without a federal role is 10 requests); the others are listed under `not_read` and read on a later day. Trademarks are not read. State registries other than New York, Colorado, Connecticut, Oregon and Florida are not read. Code registries are not read; investor-relations, sustainability and trust-center pages are linked, not read.
 - RDAP answers only for top-level domains whose registry publishes an RDAP service; some country-code registries do not.
 - The FTC publishes early termination notices only for filings granted early termination; a merger reviewed to the end of its waiting period has no notice.
 - Certificates are counted for the exact domain name only, from one CT monitor's first page.
@@ -228,6 +228,8 @@ Added in version 1.4 (trooth 0.14.0). Additive: the format stays `trooth.public-
 
 **The declaration.** `declaration` is null when the reading did not look for one, or `{ url, status, reason, sha256, issued_at, expires_at, keys, key_pinned_by_dns, products, apis, repositories }`. `status` is `checked`, `invalid`, `expired`, `absent` or `not_read`; `sha256` is of the bytes served. Only a declaration that checks carries `products`, `apis` and `repositories`, and only those reach `subjects`. The declaration is fetched only through the scan worker's fetch guard (DNS resolved, https only, no redirect to another host, 64 KB), and no URL inside it is followed.
 
+**The owner-signed record** (trooth 0.21.0). When the declaration that checks carries `record_version` and `record_digest` ([DECLARATION.md](DECLARATION.md) section 2), the reading carries `owner_signed_record`: `{ record, record_version, record_digest, current_version, current_digest, state, reason, checked_at }`. `current_version` and `current_digest` are the `Trooth-Record-Version` and `Trooth-Record-Digest` headers of the one record projection read the reading already makes for the domain; no second request. `state` is `current` (the same version and digest), `superseded` (the record API names a later version: the company has published its record again and not signed since) or `unknown` (the API could not be read or named no version, the declaration names another record than the one Trooth keeps for this domain, or the numbers do not line up; `unknown` is also listed under `not_read`). It is the company's statement, under its own key, that this is the record it published; Trooth does not sign the record, and the reading reports the comparison, never a grade. Null when the declaration names no version.
+
 **New subjects.** `subjects` gains three kinds and widens two:
 
 - `company`: the company's Trooth record, `trooth:company:<slug>` ([IDS.md](IDS.md) 1.5). It names the record, not a legal entity.
@@ -242,7 +244,7 @@ Added in version 1.4 (trooth 0.14.0). Additive: the format stays `trooth.public-
 
 | Class | Sections | Stale after (days) | Does not establish |
 |---|---|---|---|
-| `domain_declaration` | `declaration`, `proofs` | 30 | A key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it. |
+| `domain_declaration` | `declaration`, `owner_signed_record`, `proofs` | 30 | A key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it. |
 | `trooth_claim_record` | `proofs` | 365 | Domain control at claim time; it does not establish that the person may act for the legal entity. |
 
-**In the terminal and the guard.** `trooth public-record` prints the declaration line and each proof with its method and status. The guard derives `domain_control_confirmed` from these proofs ([GUARD.md](GUARD.md) section 4): a proof binding the domain to the company record or to the declaration key, confirmed by `dns_txt`, `domain_email_code`, `identity_provider_sign_in` or `domain_signed_declaration`, fresh for its evidence class.
+**In the terminal and the guard.** `trooth public-record` prints the declaration line, the owner-signed record line when the reading carries one, and each proof with its method and status. The guard derives `domain_control_confirmed` from these proofs ([GUARD.md](GUARD.md) section 4): a proof binding the domain to the company record or to the declaration key, confirmed by `dns_txt`, `domain_email_code`, `identity_provider_sign_in` or `domain_signed_declaration`, fresh for its evidence class.

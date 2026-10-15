@@ -200,6 +200,29 @@ test('the Phase 3 public record fields validate, and values outside their enums 
   bad({ ...p3, subjects: [{ id: 'trooth:contact:x.example', kind: 'officer', basis: 'x' }] }, 'an unknown subject kind');
 });
 
+test('a registry entry is an observation: read_at and sha256 match the source it came from, and the Florida bulk-file entry names its file', () => {
+  const r = JSON.parse(readFileSync(new URL('./fixtures/public-record/nvidia.com.json', import.meta.url), 'utf8'));
+  ok('public-record.v1.schema.json', r, 'entries with read_at and sha256');
+  const byHost = Object.fromEntries(r.sources.map((s) => [new URL(s.url).hostname, s]));
+  for (const e of r.registries) {
+    const s = byHost[new URL(e.source).hostname];
+    assert.equal(e.sha256, s.sha256, `${e.jurisdiction}: the digest of the answer the entry was read from, as sources[] records it`);
+    assert.equal(e.read_at, s.fetched_at, `${e.jurisdiction}: and its fetch time`);
+  }
+  const fl = {
+    jurisdiction: 'US-FL', registry: 'Florida Department of State, Division of Corporations (bulk data)', id: 'F02000005432', name: 'NVIDIA CORPORATION', status: 'Active', entity_type: 'Foreign Profit Corporation', formed: '2002-10-28', formation_jurisdiction: 'DE',
+    source: "document number F02000005432 in the Florida Department of State's bulk data (https://dos.fl.gov/sunbiz/other-services/data-downloads/): quarterly file cordata.zip of 2026-10-07, daily files through 20261013c.txt, as Trooth copied them; this record from 20261013c.txt (SHA-256 4c9a1e0b77d2)",
+    source_file: '20261013c.txt', sha256: '4c9a1e0b77d2' + 'e'.repeat(52), read_at: '2026-10-14T03:12:08.511Z',
+  };
+  ok('public-record.v1.schema.json', { ...r, registries: [...r.registries, fl] }, 'a Florida entry read from a daily file');
+  ok('public-record.v1.schema.json', { ...r, registries: r.registries.map(({ read_at, sha256, ...e }) => e) }, 'a reading taken before the fields existed');
+  const bad = (v, label) => assert.notDeepEqual(validate('public-record.v1.schema.json', v), [], label);
+  bad({ ...r, registries: [{ ...fl, sha256: fl.sha256.toUpperCase() }] }, 'an upper-case digest');
+  bad({ ...r, registries: [{ ...fl, sha256: fl.sha256.slice(0, 12) }] }, 'a truncated digest');
+  bad({ ...r, registries: [{ ...fl, read_at: 20261014 }] }, 'a read time that is not a string');
+  bad({ ...r, registries: [{ ...fl, source_file: 7 }] }, 'a file name that is not a string');
+});
+
 test('contact ids: security.txt contacts in canonical form (docs/IDS.md 1.4)', () => {
   assert.equal(formatId('contact', 'mailto:Security@Example.COM?subject=x'), 'trooth:contact:mailto:Security@example.com');
   assert.equal(formatId('contact', 'https://Example.com/Report/?a=1#b'), 'trooth:contact:example.com/Report');
@@ -226,6 +249,24 @@ test('0.14.0: proofs, the declaration, the new subject kinds, continuity kinds a
   bad({ ...r, declaration: { ...r.declaration, status: 'trusted' } }, 'an unknown declaration status');
   bad({ ...r, bindings: [{ ...r.bindings[0], proof_method: 'self_asserted' }] }, 'an unknown binding proof method');
   ok('public-record.v1.schema.json', { ...r, bindings: r.bindings.map((b) => ({ ...b, proof_method: 'domain_signed_declaration' })) }, 'a new proof method on a binding');
+});
+
+test('0.21.0: owner_signed_record validates in the public record; a state outside its enum or a digest outside its pattern does not; record_version and record_digest go together in a declaration', () => {
+  const r = JSON.parse(readFileSync(new URL('./fixtures/public-record/owner-signed.example.json', import.meta.url), 'utf8'));
+  ok('public-record.v1.schema.json', r, 'a reading with an owner-signed record');
+  ok('public-record.v1.schema.json', { ...r, owner_signed_record: null }, 'a declaration that names no version');
+  const bad = (v, label) => assert.notDeepEqual(validate('public-record.v1.schema.json', v), [], label);
+  bad({ ...r, owner_signed_record: { ...r.owner_signed_record, state: 'graded' } }, 'an unknown state');
+  bad({ ...r, owner_signed_record: { ...r.owner_signed_record, record_digest: 'b'.repeat(64) } }, 'a digest without its prefix');
+  bad({ ...r, owner_signed_record: { ...r.owner_signed_record, record_version: 0 } }, 'version 0');
+  const k = generateDeclarationKey();
+  const d = buildDeclaration({ domain: 'acme.com', privateJwk: k.privateJwk, record: 'https://trooth.co/network/company/acme', recordVersion: 4, recordDigest: r.owner_signed_record.record_digest });
+  ok('declaration.v1.schema.json', d, 'a declaration with record_version and record_digest');
+  const { record_digest: _d, ...noDigest } = d; void _d;
+  assert.notDeepEqual(validate('declaration.v1.schema.json', noDigest), [], 'record_version without record_digest');
+  const { record: _r, ...noRecord } = d; void _r;
+  assert.notDeepEqual(validate('declaration.v1.schema.json', noRecord), [], 'the pair without record');
+  assert.notDeepEqual(validate('declaration.v1.schema.json', { ...d, record_version: 1.5 }), [], 'a fraction');
 });
 
 test('a declaration trooth declare sign writes validates against declaration.v1, and one with a private key or an extra member does not', () => {

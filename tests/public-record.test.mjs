@@ -51,6 +51,20 @@ test('apple.com: the filer and the LEI, each with its status and evidence, the f
   } finally { srv.close(); }
 });
 
+test("the owner-signed record: the company's declaration names a record version, printed as the company's statement and never graded (0.21.0)", async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'owner-signed.example'], port);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /owner-signed the company's declaration names version 4 of its record, which has since been superseded by version 6 \(the company's statement under its own key; Trooth does not sign the record\)/);
+    assert.doesNotMatch(r.out.split('\n').find((l) => /owner-signed /.test(l)), /score|rating|grade|\btier\b|\brank|verif/i);
+    const j = JSON.parse((await run(['public-record', 'owner-signed.example', '--json'], port)).out);
+    assert.deepEqual([j.owner_signed_record.state, j.owner_signed_record.record_version, j.owner_signed_record.current_version], ['superseded', 4, 6]);
+    const a = await run(['public-record', 'apple.com'], port);
+    assert.doesNotMatch(a.out, /owner-signed/, 'a reading without one prints nothing for it');
+  } finally { srv.close(); }
+});
+
 test('build and test components an SBOM marks excluded are printed apart from the delivered ones (0.20.0)', async () => {
   const srv = await server(); const port = srv.address().port;
   try {

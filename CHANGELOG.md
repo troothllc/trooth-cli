@@ -2,6 +2,16 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.21.0 (2026-10-15)
+
+### The owner-signed record: a company stands behind a version of its record, with its own key
+
+- The domain-signed declaration (`trooth.declaration.v1`) gains two optional members beside `record`: `record_version` (a whole number of 1 or more) and `record_digest` (`sha-256=` and 64 lowercase hex), present together or not at all, and only with `record`. They are the version and digest of the company's Trooth record that the signer stands behind, as the record API's `Trooth-Record-Version` and `Trooth-Record-Digest` headers gave them when the declaration was signed. The company, with its own key, says "this is the record I published". Trooth still does not sign the record; the binding is the company's statement, and it goes stale when the company publishes again until it signs a new declaration. `schemas/declaration.v1.schema.json` describes them (`dependentRequired`); docs/DECLARATION.md section 2.1 is the text.
+- `trooth declare sign --bind-record` (with `--record`) reads the two headers from the record API (one GET to `https://trooth.co/api/network/profile?q=<slug>&contract=2`; `TROOTH_WEB` names another host) and writes the members before signing. When the API names no version for that slug it refuses (exit 2); when it cannot be read it stops (exit 3); it never guesses. `trooth declare check` checks the pair's shape as part of the rules and, when the declaration carries them, asks the record API whether that is the version published now: `current`, `superseded` (by version N) or `unknown`, printed and carried as `owner_signed_record` in `--json`, never as a grade and with no change to the exit code; `--no-record` skips the request. Library: `readRecordHead`, `recordBindingState`, `recordSlugOf` in `trooth/declaration`.
+- The public record reading gains an optional `owner_signed_record` (`OwnerSignedRecord` in `schemas/public-record.v1.schema.json`): the pair from a declaration that checks against the head the scan worker read from the same record projection request it already makes, with `state`, `reason` and `checked_at`; `unknown` is also listed under `not_read`. The `domain_declaration` evidence class now lists `owner_signed_record` among its sections. `trooth public-record` prints it as one `owner-signed` line, labelled as the company's statement under its own key. The generated TypeScript, Pydantic and Go types carry it.
+- docs/EVIDENCE.md names Florida (Trooth's copy of the Division of Corporations bulk data) beside the four open-data state registries, as the scan worker's `not_read` line now does.
+- tests/declaration.test.mjs covers the rules, `readRecordHead` with an injected fetch, `recordBindingState`, and the CLI end to end against a loopback record API; tests/schemas.test.mjs and tests/public-record.test.mjs cover the new fixture. tests/lib/mini-schema.mjs learns `dependentRequired`.
+
 ## 0.20.0 (2026-10-14)
 
 ### Build and test components kept apart from what is delivered

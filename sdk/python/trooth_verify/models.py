@@ -42,6 +42,8 @@ class DomainDeclaration(BaseModel):
     issued_at: str = Field(..., description="When the declaration was signed, ISO 8601 in UTC. Not in the future.")
     expires_at: str = Field(..., description="When the declaration stops checking, ISO 8601 in UTC; after issued_at and at most 400 days after it.")
     record: Optional[str] = Field(None, description="Optional: the company's Trooth record, https://trooth.co/network/company/<slug>. The one URL not on the domain.")
+    record_version: Optional[int] = Field(None, description="Optional, with record_digest and only when `record` is present: the version of the company's Trooth record that the signer names as the version it published, as the record API's Trooth-Record-Version header gave it when this declaration was signed (`trooth declare sign --bind-record`). The company, with its own key, says: this is the record I published. Trooth still does not sign the record; the binding is the company's statement, and it goes stale when the company publishes again until it signs a new declaration. Added in trooth 0.21.0.")
+    record_digest: Optional[str] = Field(None, description="Optional, with record_version and only when `record` is present: the digest of that version of the company's Trooth record, as the record API's Trooth-Record-Digest header gave it when this declaration was signed. Added in trooth 0.21.0.")
     keys: List[DeclarationKey] = Field(..., description="The company's own public keys, one to eight; more than one during a key rotation. Never a private key.")
     products: Optional[List[DeclaredProduct]] = Field(None, description="Products the domain's owner names. Each url is on the domain or a subdomain of it.")
     apis: Optional[List[DeclaredApi]] = Field(None, description="APIs the domain's owner names, each with an optional MCP server and the SHA-256 of its tool manifest.")
@@ -527,7 +529,7 @@ class PublicRecordReading(BaseModel):
     note: str = Field(..., description="What the reading is and is not, as a paragraph.")
     sam: Optional[SamReading] = Field(None, description="SAM.gov registrations and exclusions under the legal name, or null when SAM.gov was not read (not_read says why). A name match is not an identification. Added in trooth 0.12.0.")
     patents: Optional[PatentReading] = Field(None, description="Patent applications whose first applicant is the legal name, from the USPTO Open Data Portal, or null when it was not read. Added in trooth 0.12.0.")
-    registries: Optional[List[RegistryEntry]] = Field(None, description="Exact-name entries in the state business registries that publish open data (New York, Colorado, Connecticut, Oregon). A name match is not an identification. Added in trooth 0.12.0.")
+    registries: Optional[List[RegistryEntry]] = Field(None, description="Exact-name entries in the state business registries Trooth reads: the open-data registries of New York, Colorado, Connecticut and Oregon, and the Florida Department of State's bulk data (Division of Corporations), read from Trooth's own copy of the state's files. A name match is not an identification. Each entry is one observation: on readings taken from 2026-10-15 it carries read_at and sha256, the fetch time and digest of the source it was read from, and source_file where the source is a bulk file. Added in trooth 0.12.0.")
     merger_review: Optional[MergerReview] = Field(None, description="Hart-Scott-Rodino early termination notices the FTC published naming the legal name as a party, or null when they were not read. Added in trooth 0.12.0.")
     domain_registration: Optional[DomainRegistration] = Field(None, description="The domain's registration, from RDAP, or null when no RDAP service answered. Added in trooth 0.12.0.")
     changes: Optional[List[Change]] = Field(None, description="What the sources in this reading record as having changed (renames, acquisitions and dispositions, changes in control, previous legal names, parents, merger review, domain registration), newest first. Added in trooth 0.12.0.")
@@ -536,6 +538,7 @@ class PublicRecordReading(BaseModel):
     continuity: Optional[Continuity] = Field(None, description="What changed since the previous cached reading of the same domain (docs/EVIDENCE.md section 10). Optional; added in trooth 0.13.0.")
     proofs: Optional[List[Proof]] = Field(None, description="Each proof that binds two subjects, with its method and status (docs/EVIDENCE.md section 11): the domain to the company record (dns_txt, domain_email_code or identity_provider_sign_in, from Trooth's record of the claim or the challenge TXT), the domain to the company's own key (domain_signed_declaration, and dns_txt when the key pin matches), the domain to a code repository (repository_control). Optional; added in trooth 0.14.0.")
     declaration: Optional[DeclarationReading] = Field(None, description="The domain-signed declaration read at https://<domain>/.well-known/trooth.json (docs/DECLARATION.md), or null when it was not looked for. Only what checked is carried into subjects. Optional; added in trooth 0.14.0.")
+    owner_signed_record: Optional[OwnerSignedRecord] = Field(None, description="The company's statement, in its domain-signed declaration (record_version, record_digest; DECLARATION.md section 2), of which version of its Trooth record it published, compared with the version the record API names now. The company's statement under its own key, labelled so; Trooth does not sign the record. Null when the declaration names none. Optional; added in trooth 0.21.0.")
     signed: Optional[Signed] = Field(None, description="The statement that names this reading, and its log receipt. Not part of the bytes it names. Added in trooth 0.11.0.")
 
 class SamReading(BaseModel):
@@ -601,7 +604,7 @@ class PatentApplication(BaseModel):
     granted: Optional[str] = Field(..., description="The grant date.")
 
 class RegistryEntry(BaseModel):
-    "An entry in a state business registry with exactly the legal name."
+    "An entry in a state business registry with exactly the legal name: a Trooth observation of that registry, naming the registry, the file number, when Trooth read the source and the SHA-256 of what it read."
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -613,7 +616,10 @@ class RegistryEntry(BaseModel):
     entity_type: Optional[str] = Field(..., description="The entity type.")
     formed: Optional[str] = Field(..., description="The formation or registration date in that state.")
     formation_jurisdiction: Optional[str] = Field(..., description="Where the entity was formed, as the registry writes it.")
-    source: str = Field(..., description="The open-data URL for this entry.")
+    source: str = Field(..., description="Where the entry was read: the open-data URL for this entry, or a sentence naming the document number and the Florida bulk files (the quarterly file, the daily files through the newest applied, and the file this record came from with the first 12 hex of its SHA-256).")
+    read_at: Optional[str] = Field(None, description="When Trooth read the source this entry came from, ISO-8601 UTC: the time the open-data registry was asked (the fetched_at of that answer in sources[]), or when the Florida bulk file was read or applied to Trooth's copy. Absent on readings taken before 2026-10-15.")
+    sha256: Optional[str] = Field(None, description="SHA-256, lowercase hex, of the source bytes the entry was read from: the open-data answer (the same digest its record in sources[] carries), or the Florida bulk file as the state served it. Absent on readings taken before 2026-10-15, and when the copy's manifest records no digest for the file.")
+    source_file: Optional[str] = Field(None, description="The bulk file the entry was read from, by name, where the source is one: Florida's quarterly file (cordata.zip) or a daily file (yyyymmddc.txt). Absent for the open-data registries.")
 
 class MergerReview(BaseModel):
     "FTC early termination notices under the HSR Act, searched by words of the legal name and kept when a party has exactly that name. Cached for 7 days per name."
@@ -884,7 +890,7 @@ class EvidenceClass(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review", "domain_declaration", "trooth_claim_record"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity).")
+    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review", "domain_declaration", "trooth_claim_record"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity).")
     sections: List[str] = Field(..., description="The sections of this record that hold this class of evidence.")
     stale_after_days: int = Field(..., description="After this many days from observed_at a reader should take the evidence as stale and read again.")
     does_not_establish: str = Field(..., description="What this class of evidence does not show, in one sentence.")
@@ -928,6 +934,20 @@ class Proof(BaseModel):
     detail: str = Field(..., description="What was read, in words.")
     source: str = Field(..., description="The URL read, or \"trooth record\" for Trooth's own record of the claim.")
     observed_at: Optional[str] = Field(..., description="When the proof was observed: the reading's read_at, or for Trooth's record of the claim, when the claim was confirmed. Null when not read.")
+
+class OwnerSignedRecord(BaseModel):
+    "The version of its Trooth record a company names as the version it published in its declaration, against the version published now. Never a grade: it says only whether the company has published its record again since it signed."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    record: str = Field(..., description="The record the declaration names, https://trooth.co/network/company/<slug>.")
+    record_version: int = Field(..., description="The record version the declaration names.")
+    record_digest: str = Field(..., description="The digest of that version the declaration names.")
+    current_version: Optional[int] = Field(..., description="The version the record API named when this reading was taken (Trooth-Record-Version); null when it was not read or named none.")
+    current_digest: Optional[str] = Field(..., description="The digest the record API named (Trooth-Record-Digest); null when it was not read or named none.")
+    state: Literal["current", "superseded", "unknown"] = Field(..., description="current: the version and digest the declaration names are the ones published now. superseded: the record API names a later version; the company has published again and not signed since. unknown: the record API could not be read or named no version, the declaration names another record than the one Trooth keeps for the domain, or the numbers do not line up.")
+    reason: str = Field(..., description="Why the state is what it is, in one plain sentence.")
+    checked_at: str = Field(..., description="When the comparison was made: the reading's read_at. An ISO 8601 date-time in UTC.")
 
 class DeclarationReading(BaseModel):
     "The domain-signed declaration as this reading found it."
@@ -1365,6 +1385,7 @@ ContinuityEvent.model_rebuild()
 ContinuityPrevious.model_rebuild()
 Continuity.model_rebuild()
 Proof.model_rebuild()
+OwnerSignedRecord.model_rebuild()
 DeclarationReading.model_rebuild()
 Sbom.model_rebuild()
 SbomOsv.model_rebuild()
