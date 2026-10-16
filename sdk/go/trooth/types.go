@@ -3,6 +3,213 @@
 
 package trooth
 
+// ActionEvidencePayload: The decoded payload of an action evidence reference (format trooth.action-evidence.v1): the short-lived object api.trooth.co signs when a workspace's agent is authorized for one action under a delegation. It travels as an Ed25519 compact JWS with the header {"alg":"EdDSA","typ":"trooth-action-evidence+jwt","kid":"trooth-evidence-2026-10"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It is evidence beside a payment partner's mandate: it does not move money and does not say a payment will be made. docs/ACTION-EVIDENCE.md; built by issueInner in trooth-os-worker-f src/action-authz.ts.
+type ActionEvidencePayload struct {
+	// Always trooth.action-evidence.v1. One of: trooth.action-evidence.v1.
+	Format string `json:"format"`
+	// Always https://api.trooth.co. One of: https://api.trooth.co.
+	Iss string `json:"iss"`
+	// When Trooth issued the reference, in seconds since the epoch.
+	Iat int64 `json:"iat"`
+	// When the reference expires, in seconds since the epoch: iat + 600.
+	Exp int64 `json:"exp"`
+	// The reference's single-use id. Its public state is at https://api.trooth.co/public/action-evidence/<jti>.
+	Jti string `json:"jti"`
+	// The id of the action authorization the reference was issued for.
+	AuthorizationID string `json:"authorization_id"`
+	// The one action, as an OAuth Rich Authorization Requests (RFC 9396) authorization_details object.
+	AuthorizationDetails []ActionEvidenceDetail `json:"authorization_details"`
+	// The payment partner's mandate the reference is bound to.
+	Binding ActionEvidenceBinding `json:"binding"`
+	// The workspace and the person whose delegation this is.
+	Principal ActionPrincipal `json:"principal"`
+	// The delegation the action was checked against.
+	Delegation ActionEvidenceDelegation `json:"delegation"`
+	// How the delegation, and when it needed one, the action were approved.
+	Approval ActionEvidenceApprovals `json:"approval"`
+	// The counterparty and Trooth's latest signed reading of its public record.
+	Counterparty ActionEvidenceCounterparty `json:"counterparty"`
+	// The written responsibility boundary: what Trooth observed, what the buyer approved, what the vendor represents and what is not established.
+	Responsibility ActionResponsibilityBoundary `json:"responsibility"`
+	// Where to check the reference.
+	Verify ActionEvidenceVerify `json:"verify"`
+}
+
+// ActionEvidenceDetail: One authorization_details object: a payment or a data share.
+type ActionEvidenceDetail any
+
+// ActionEvidencePayment: A payment to the counterparty, at or under the delegation's limit and in its currency.
+type ActionEvidencePayment struct {
+	// Always trooth_payment. One of: trooth_payment.
+	Type string `json:"type"`
+	// Always ["pay"].
+	Actions []string `json:"actions"`
+	// https URLs on the counterparty's domain (or a subdomain) where the action is taken.
+	Locations []string `json:"locations"`
+	// The amount and its currency.
+	InstructedAmount ActionEvidenceAmount `json:"instructedAmount"`
+	// The payee's name, as the agent gave it.
+	CreditorName *string `json:"creditorName,omitempty"`
+	// What the payment is for, as the agent gave it.
+	Description *string `json:"description,omitempty"`
+}
+
+// ActionEvidenceDataShare: Sharing data of one class with the counterparty, at or under the delegation's data class.
+type ActionEvidenceDataShare struct {
+	// Always trooth_data_share. One of: trooth_data_share.
+	Type string `json:"type"`
+	// Always ["share"].
+	Actions []string `json:"actions"`
+	// https URLs on the counterparty's domain (or a subdomain) where the data is sent.
+	Locations []string `json:"locations"`
+	// The one data class shared.
+	Datatypes []ActionDataClass `json:"datatypes"`
+	// What is shared, as the agent gave it.
+	Description *string `json:"description,omitempty"`
+}
+
+// ActionEvidenceAmount: A decimal amount with at most two fraction digits, and an ISO 4217 currency code.
+type ActionEvidenceAmount struct {
+	// ISO 4217 code, three capital letters.
+	Currency string `json:"currency"`
+	// The amount as a decimal string, at most two fraction digits.
+	Amount string `json:"amount"`
+}
+
+// ActionDataClass: A data class, from least to most sensitive.
+type ActionDataClass string
+
+// ActionType: An action a delegation can permit.
+type ActionType string
+
+// ActionEvidenceBinding: The mandate the reference is bound to: one authorization per delegation, protocol and reference.
+type ActionEvidenceBinding struct {
+	// The payment protocol of the mandate. One of: ap2, acp, visa_tap, mastercard_agent_pay, other.
+	Protocol string `json:"protocol"`
+	// SHA-256 (hex) of the protocol, a newline and the mandate's reference.
+	ReferenceSha256 string `json:"reference_sha256"`
+}
+
+// ActionPrincipal: The workspace and the person who delegated.
+type ActionPrincipal struct {
+	// The workspace (company) id.
+	Workspace string `json:"workspace"`
+	// The id of the person in the workspace.
+	User string `json:"user"`
+}
+
+// ActionAgentKey: The agent's DPoP key, by thumbprint.
+type ActionAgentKey struct {
+	// The RFC 7638 JWK thumbprint (base64url SHA-256) of the agent's DPoP key.
+	Jkt string `json:"jkt"`
+}
+
+// ActionTarget: The counterparty the delegation names.
+type ActionTarget struct {
+	// The counterparty's domain, lowercase.
+	Domain string `json:"domain"`
+}
+
+// ActionEvidenceDelegation: The delegation the action was checked against.
+type ActionEvidenceDelegation struct {
+	// The delegation's id.
+	ID string `json:"id"`
+	// SHA-256 (hex) of the delegation document's canonical JSON: the digest its delegation receipt names.
+	Sha256 string `json:"sha256"`
+	// The agent the delegation is to.
+	Agent ActionAgentKey `json:"agent"`
+	// The role the agent acts in, as the person wrote it.
+	Role string `json:"role"`
+	// The counterparty.
+	Target ActionTarget `json:"target"`
+	// The actions the delegation permits.
+	Actions []ActionType `json:"actions"`
+	// The payment limit, or null for a delegation that does not pay.
+	Limit *ActionEvidenceAmount `json:"limit"`
+	// The highest data class it may share, or null.
+	DataClass *ActionDataClass `json:"data_class"`
+	// When the delegation expires (RFC 3339).
+	ExpiresAt string `json:"expires_at"`
+}
+
+// ActionApprovalRecord: How a person approved: who, when, and through which sign-in.
+type ActionApprovalRecord struct {
+	// The id of the person who approved.
+	ApprovedBy string `json:"approved_by"`
+	// When they approved (RFC 3339).
+	ApprovedAt string `json:"approved_at"`
+	// identity_provider: a sign-in through the workspace's identity provider within five minutes; session_reauth: a fresh sign-in within fifteen. One of: session_reauth, identity_provider.
+	Method string `json:"method"`
+	// The authentication context class matching method. One of: trooth:reauth, trooth:idp.
+	Acr string `json:"acr"`
+	// When that sign-in happened (RFC 3339).
+	AuthTime string `json:"auth_time"`
+	// The identity provider, or null for a fresh sign-in without one.
+	Idp *ActionApprovalIdp `json:"idp"`
+}
+
+// ActionApprovalIdp: The identity provider a person signed in through.
+type ActionApprovalIdp struct {
+	// The provider's name.
+	Provider string `json:"provider"`
+	// The provider's domain for the workspace.
+	Domain string `json:"domain"`
+}
+
+// ActionEvidenceApprovals: The approval of the delegation and, above its approval threshold, of the action.
+type ActionEvidenceApprovals struct {
+	// How the delegation was approved.
+	Delegation ActionApprovalRecord `json:"delegation"`
+	// How this action was approved, or null when it was at or under the approval threshold.
+	Action *ActionApprovalRecord `json:"action"`
+}
+
+// ActionCounterpartyReading: Trooth's latest signed reading of the counterparty's public record, or that it could not be read.
+type ActionCounterpartyReading struct {
+	// read, or not_read: then nothing about the counterparty is attested. One of: read, not_read.
+	Status string `json:"status"`
+	// When the reading was taken (RFC 3339), when the record says.
+	ReadAt *string `json:"read_at,omitempty"`
+	// The reading's index in Trooth's log, or null.
+	LogIndex *int64 `json:"log_index,omitempty"`
+	// SHA-256 (hex) of the public record answer read.
+	StatementSha256 *string `json:"statement_sha256,omitempty"`
+	// The URL read: https://api.trooth.co/scan/public-record/<domain>.
+	Source string `json:"source"`
+}
+
+// ActionEvidenceCounterparty: The counterparty and its reading.
+type ActionEvidenceCounterparty struct {
+	// The counterparty's domain: the delegation's target.
+	Domain string `json:"domain"`
+	// Trooth's latest signed reading of its public record.
+	Reading ActionCounterpartyReading `json:"reading"`
+}
+
+// ActionResponsibilityBoundary: Who stands behind what, in plain sentences.
+type ActionResponsibilityBoundary struct {
+	// The boundary text's version, e.g. trooth.responsibility-boundary.v1-draft.
+	Version string `json:"version"`
+	// What Trooth observed.
+	TroothObserved []string `json:"trooth_observed"`
+	// What the buyer's people approved.
+	BuyerApproved []string `json:"buyer_approved"`
+	// What the counterparty represents about itself.
+	VendorRepresented []string `json:"vendor_represented"`
+	// What the reference does not establish.
+	NotEstablished []string `json:"not_established"`
+}
+
+// ActionEvidenceVerify: Where to check the reference.
+type ActionEvidenceVerify struct {
+	// The key list: https://api.trooth.co/public/keys.
+	Keys string `json:"keys"`
+	// The kid of the key that signed it; the same as the JWS header's.
+	Kid string `json:"kid"`
+	// The reference's public state: https://api.trooth.co/public/action-evidence/<jti>.
+	Status string `json:"status"`
+}
+
 // CorrectionPayload: The JSON a trooth.correction.v1 payload holds: Trooth withdrawing or replacing a statement it signed. Signed like a v3 statement (RFC 8785 bytes, Ed25519, the signer inside the signed bytes) and entered in the witness statement log. The statement it corrects stays in the log; nothing is deleted.
 type CorrectionPayload struct {
 	// The payload type. One of: trooth.correction.v1.
@@ -109,6 +316,58 @@ type DeclarationSignature struct {
 	Canonicalization string `json:"canonicalization"`
 	// ed25519: and the 64-byte signature in base64.
 	Value string `json:"value"`
+}
+
+// DelegationReceiptPayload: The decoded payload of a delegation receipt (format trooth.delegation-receipt.v1): what api.trooth.co recorded when a person in a workspace created or revoked a delegation to an agent, and when. It travels as an Ed25519 compact JWS with the header {"alg":"EdDSA","typ":"trooth-delegation-receipt+jwt","kid":"trooth-evidence-2026-10"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It says what Trooth recorded, not that any action under the delegation is proper. The limit, data class and approval threshold are bound through delegation.sha256. docs/ACTION-EVIDENCE.md; built by delegationReceiptPayload in trooth-os-worker-f src/action-authz.ts.
+type DelegationReceiptPayload struct {
+	// Always trooth.delegation-receipt.v1. One of: trooth.delegation-receipt.v1.
+	Format string `json:"format"`
+	// Always https://api.trooth.co. One of: https://api.trooth.co.
+	Iss string `json:"iss"`
+	// When Trooth recorded the event, in seconds since the epoch (recorded_at, truncated).
+	Iat int64 `json:"iat"`
+	// created or revoked. One of: created, revoked.
+	Event string `json:"event"`
+	// When Trooth recorded the event (RFC 3339, milliseconds).
+	RecordedAt string `json:"recorded_at"`
+	// The id of the person who acted.
+	By string `json:"by"`
+	// How the creation was approved. Present on a created receipt; a revocation carries none.
+	Approval *ActionApprovalRecord `json:"approval,omitempty"`
+	// The delegation the event is about.
+	Delegation DelegationReceiptDelegation `json:"delegation"`
+	// What the receipt says, in one or two sentences.
+	Meaning string `json:"meaning"`
+	// Where to check the receipt.
+	Verify DelegationReceiptVerify `json:"verify"`
+}
+
+// DelegationReceiptDelegation: The delegation, by id and digest, with its principal, agent, target, actions and expiry.
+type DelegationReceiptDelegation struct {
+	// The delegation's id.
+	ID string `json:"id"`
+	// SHA-256 (hex) of the delegation document's canonical JSON (sorted keys, no spaces); the document carries the limit, data class, approval threshold and role.
+	Sha256 string `json:"sha256"`
+	// The delegation document's format: trooth.delegation.v1. One of: trooth.delegation.v1.
+	Format string `json:"format"`
+	// The workspace and the person who delegated.
+	Principal ActionPrincipal `json:"principal"`
+	// The agent's DPoP key, by thumbprint.
+	Agent ActionAgentKey `json:"agent"`
+	// The counterparty.
+	Target ActionTarget `json:"target"`
+	// The actions the delegation permits.
+	Actions []ActionType `json:"actions"`
+	// When the delegation expires (RFC 3339).
+	ExpiresAt string `json:"expires_at"`
+}
+
+// DelegationReceiptVerify: Where to check the receipt.
+type DelegationReceiptVerify struct {
+	// The key list: https://api.trooth.co/public/keys.
+	Keys string `json:"keys"`
+	// The kid of the key that signed it; the same as the JWS header's.
+	Kid string `json:"kid"`
 }
 
 // EvidenceManifest: The evidence manifest a v2 or v3 statement binds by digest, published beside the statement as `witnessEvidenceManifest`. Canonical bytes: entries sorted by check_id, each as {"check_id":..,"source":..} or {"check_id":..,"commitment":..}, no whitespace, UTF-8.
@@ -321,7 +580,7 @@ type PublicKey struct {
 	FirstListedAt *string `json:"first_listed_at,omitempty"`
 	// A short fingerprint of the key, for display.
 	Fingerprint *string `json:"fingerprint,omitempty"`
-	// What the key is for, as a short label.
+	// What the key is for, as a short label: trust-ledger, readings-and-receipts, or signed-references (the evidence key, which signs delegation receipts and action evidence references; docs/ACTION-EVIDENCE.md).
 	Purpose *string `json:"purpose,omitempty"`
 	// What the key signs, in words.
 	Signs *string `json:"signs,omitempty"`
@@ -679,6 +938,8 @@ type PublicRecordReading struct {
 	SanctionsEu *Sanctions `json:"sanctions_eu,omitempty"`
 	// The SBOM the company's site publishes (the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom), and OSV's advisories for the package versions it lists. An advisory for a package version does not show that the company's product is affected: the SBOM may be out of date, the code may not be reached, and a VEX statement is not read. Null when no SBOM was found there or the site opts out of being read; absent on readings taken before 2026-10-14. Added in trooth 0.19.0.
 	Sbom *Sbom `json:"sbom,omitempty"`
+	// The company's trust center page (SafeBase, Vanta, Drata, Conveyor, Whistic, TrustArc, Secureframe, OneTrust, or its own page), read once: the address the company states on trooth.co, else the first trust center link on its home page. Recorded are what the page names (frameworks, documents, whether it mentions subprocessors), never facts Trooth checked: What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims. A bot check, an error page or a script-only page is recorded with readable false and its reason, and nothing on it is taken as named. The page's bytes are in `sources` under `sha256`. Null when no address was stated on trooth.co or found on the home page (then `not_read` says so); absent on readings taken before 2026-10-15. Added in trooth 0.22.0.
+	TrustCenter *TrustCenter `json:"trust_center,omitempty"`
 	// Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.
 	Sources []Source `json:"sources,omitempty"`
 	// Each source that was not read, or did not answer, and why. A source not read is never guessed at.
@@ -1163,7 +1424,7 @@ type NotRead struct {
 
 // EvidenceClass: One class of evidence in the reading, kept apart from the others, with its own freshness rule and a line saying what it does not establish.
 type EvidenceClass struct {
-	// The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity). One of: regulator_filing, registry_record, sanctions_list, procurement_exclusion, domain_registration, dns_configuration, certificate_transparency, site_publication, patent_record, merger_review, domain_declaration, trooth_claim_record.
+	// The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity). Since trooth 0.22.0: trust_center_page 30 (sections trust_center; a trust center page shows what the company's page named when Trooth read it; it does not show that the company holds any framework it names or that the documents behind the page say what it claims). One of: regulator_filing, registry_record, sanctions_list, procurement_exclusion, domain_registration, dns_configuration, certificate_transparency, site_publication, patent_record, merger_review, domain_declaration, trooth_claim_record, trust_center_page.
 	Class string `json:"class"`
 	// The sections of this record that hold this class of evidence.
 	Sections []string `json:"sections"`
@@ -1329,6 +1590,42 @@ type SbomOsvExcluded struct {
 	ComponentsAffected int64 `json:"components_affected"`
 	// Affected build and test package versions, most advisories first, at most 100.
 	Affected []SbomAffected `json:"affected"`
+}
+
+// TrustCenter: What a company's trust center page named when Trooth read it. What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims.
+type TrustCenter struct {
+	// The address read, as stated or linked.
+	URL string `json:"url"`
+	// Where the address came from: the company's own statement on trooth.co (its record's trustCenter), or the first trust center link on its home page when it states none. One of: company_statement, home_page_link.
+	Source string `json:"source"`
+	// Where the request ended after redirects (each hop screened as every page Trooth reads); null when nothing answered.
+	FinalURL *string `json:"final_url"`
+	// The HTTP status of the final answer; 0 when nothing answered (refused host, timeout, not https, robots.txt opt-out).
+	Status int64 `json:"status"`
+	// When Trooth read the page, ISO 8601.
+	ReadAt string `json:"read_at"`
+	// SHA-256 of the body read, the same as its entry in `sources`; null when no body was read.
+	Sha256 *string `json:"sha256"`
+	// Bytes of the body read (at most the reader's 2 MB cap).
+	Bytes int64 `json:"bytes"`
+	// Who serves the page: a trust center provider, the company's own site (the final host is the domain or under it), or another host. A provider is not a party to the company's claims. One of: safebase, vanta, drata, conveyor, whistic, trustarc, secureframe, onetrust, own_site, other.
+	Provider string `json:"provider"`
+	// host: the final host is the provider's own domain (or the company's, or another); page: the page loads its assets from, posts to, or says it is powered by the provider, as a provider serving the company's own subdomain does. One of: host, page.
+	ProviderDetectedBy string `json:"provider_detected_by"`
+	// The page's <title>, trimmed, at most 200 characters; null when it has none.
+	Title *string `json:"title"`
+	// The frameworks of a fixed vocabulary the page's visible text names, as whole phrases (case-insensitive, with the usual spellings: SOC2, ISO/IEC, Type 2), in vocabulary order; SOC 2 gives way to SOC 2 Type I or Type II when one is named. That the page names a framework does not show the company holds it: Trooth did not read the report or certificate behind it. Empty when the page was not readable.
+	FrameworksNamed []string `json:"frameworks_named"`
+	// Up to 25 link texts or headings on the page that look like documents (report, policy, certificate, pentest, penetration, whitepaper, SOC, ISO, DPA, subprocessor), each at most 120 characters, in page order. Their names only: Trooth did not read the documents. Empty when the page was not readable.
+	DocumentsNamed []string `json:"documents_named"`
+	// Whether the page's visible text mentions subprocessors. Not a check of any list.
+	SubprocessorsListed bool `json:"subprocessors_listed"`
+	// False when the page answered with a bot check (Cloudflare's challenge, or another vendor's on 403, 429 or 503), an error status, or a script-only page (under 200 characters of visible text), or was not read at all; then nothing on it is taken as named.
+	Readable bool `json:"readable"`
+	// Why the page was not readable, in one plain sentence (also listed under `not_read`); null when it was.
+	Reason *string `json:"reason"`
+	// What these fields are: "What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims."
+	Basis string `json:"basis"`
 }
 
 // VerificationBundle: Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list.

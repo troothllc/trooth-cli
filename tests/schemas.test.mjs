@@ -10,6 +10,7 @@ import { loadSchemas, makeValidator } from './lib/mini-schema.mjs';
 import { formatId, parseId, statementId } from '../bin/lib/ids.mjs';
 import { canonicalize, isCanonical, CanonicalizationError } from '../bin/lib/jcs.mjs';
 import { generateDeclarationKey, buildDeclaration } from '../bin/lib/declaration.mjs';
+import * as AF from './lib/action-fixtures.mjs';
 
 const schemaDir = new URL('../schemas/', import.meta.url);
 const schemas = loadSchemas(schemaDir);
@@ -21,7 +22,7 @@ const live = JSON.parse(readFileSync(liveUrl, 'utf8'));
 const ok = (file, v, label) => assert.deepEqual(validate(file, v), [], `${label} against ${file}`);
 
 test('each schema names itself under https://trooth.co/schemas/ and states its dialect', () => {
-  assert.equal(Object.keys(schemas).length, 19);
+  assert.equal(Object.keys(schemas).length, 21);
   // The guard decision keeps the $id the brief published for it (docs/GUARD.md).
   const publishedIds = { 'guard-decision.v1.schema.json': 'https://trooth.co/schemas/guard-decision.v1.json' };
   for (const [f, s] of Object.entries(schemas)) {
@@ -120,7 +121,7 @@ test('trooth verify --json with a log answer validates against verify-result', a
 });
 
 test('public-record readings built by the scan worker validate (docs/EVIDENCE.md)', () => {
-  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com', 'nvidia.com', 'eu-match.example', 'sbom.example', 'sbom-scoped.example']) {
+  for (const n of ['apple.com', 'apple-support.example', 'cloudflare.com', 'nvidia.com', 'eu-match.example', 'sbom.example', 'sbom-scoped.example', 'trust-center.example', 'trust-center-blocked.example']) {
     ok('public-record.v1.schema.json', JSON.parse(readFileSync(new URL(`./fixtures/public-record/${n}.json`, import.meta.url), 'utf8')), n);
   }
   // A signed answer, as a local run of the scan worker served it on 2026-10-07
@@ -322,4 +323,41 @@ test('trooth profile --json validates against profile-output.v1, for a record (s
     bad({ ...doc, sections: [{ ...doc.sections[0], state: 'empty' }] }, 'an unknown state');
     bad({ ...doc, sections: [{ ...doc.sections[1], facts: [{ ...doc.sections[1].facts[0], date_kind: 'inferred' }] }] }, 'an unknown date kind');
   } finally { srv.close(); }
+});
+
+test('0.22.0: action evidence and delegation receipt payloads signed the way the Worker signs them validate; values outside the Worker\'s shapes do not', async () => {
+  const d = AF.delegationDoc();
+  const evs = [
+    AF.evidencePayload(d),
+    AF.evidencePayload(d, { details: [AF.DATA_DETAIL], actionApproval: AF.APPROVAL, reading: { status: 'not_read', source: AF.READING.source } }),
+    AF.evidencePayload(AF.delegationDoc({ actions: ['trooth_data_share'], limit: null, data_class: 'confidential', approval_above: null }), { details: [{ ...AF.DATA_DETAIL, datatypes: ['confidential'], description: 'the security questionnaire' }], protocol: 'acp' }),
+  ];
+  for (const [i, p] of evs.entries()) ok('action-evidence.v1.schema.json', p, `evidence ${i}`);
+  const rcs = [AF.receiptPayload(d), AF.receiptPayload(d, { event: 'revoked', approval: null, at: Date.parse('2026-10-20T10:00:00.123Z') })];
+  for (const [i, p] of rcs.entries()) ok('delegation-receipt.v1.schema.json', p, `receipt ${i}`);
+  const no = (file, v, label) => assert.notDeepEqual(validate(file, v), [], label);
+  const e = () => structuredClone(evs[0]);
+  no('action-evidence.v1.schema.json', { ...e(), extra: 1 }, 'a member outside the payload');
+  no('action-evidence.v1.schema.json', { ...e(), jti: 'ev_short' }, 'a jti outside its pattern');
+  const two = e(); two.authorization_details.push(AF.DATA_DETAIL); no('action-evidence.v1.schema.json', two, 'two actions');
+  const amt = e(); amt.authorization_details[0].instructedAmount.amount = '1.005'; no('action-evidence.v1.schema.json', amt, 'three fraction digits');
+  const proto = e(); proto.binding.protocol = 'swift'; no('action-evidence.v1.schema.json', proto, 'a protocol outside the enum');
+  const appr = e(); appr.approval.delegation.method = 'email'; no('action-evidence.v1.schema.json', appr, 'an approval method outside the enum');
+  no('delegation-receipt.v1.schema.json', { ...rcs[0], event: 'renewed' }, 'an event outside created and revoked');
+  no('delegation-receipt.v1.schema.json', { ...rcs[0], delegation: { ...rcs[0].delegation, limit: null } }, 'a scope member the receipt does not carry');
+  // What trooth evidence verify --json and delegation verify --json print carries the payload as decoded.
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'trooth-schema-ev-'));
+  const key = AF.makeKey();
+  writeFileSync(join(dir, 'keys.json'), JSON.stringify(AF.keysDoc(key)));
+  writeFileSync(join(dir, 'ev.jws'), AF.signJws(AF.evidencePayload(d), key, AF.EVIDENCE_HEADER));
+  writeFileSync(join(dir, 'rc.jws'), AF.signJws(AF.receiptPayload(d), key, AF.RECEIPT_HEADER));
+  const cli = new URL('../bin/trooth.mjs', import.meta.url).pathname;
+  for (const [cmd, f, schema] of [['evidence', 'ev.jws', 'action-evidence.v1.schema.json'], ['delegation', 'rc.jws', 'delegation-receipt.v1.schema.json']]) {
+    const r = spawnSync(process.execPath, [cli, cmd, 'verify', join(dir, f), '--keys', join(dir, 'keys.json'), '--json'], { encoding: 'utf8', env: { ...process.env, TROOTH_API: 'http://127.0.0.1:9' } });
+    assert.equal(r.status, 0, r.stderr);
+    ok(schema, JSON.parse(r.stdout).payload, `${cmd} verify --json payload`);
+  }
 });

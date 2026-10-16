@@ -9,6 +9,169 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ActionEvidencePayload(BaseModel):
+    "The decoded payload of an action evidence reference (format trooth.action-evidence.v1): the short-lived object api.trooth.co signs when a workspace's agent is authorized for one action under a delegation. It travels as an Ed25519 compact JWS with the header {\"alg\":\"EdDSA\",\"typ\":\"trooth-action-evidence+jwt\",\"kid\":\"trooth-evidence-2026-10\"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It is evidence beside a payment partner's mandate: it does not move money and does not say a payment will be made. docs/ACTION-EVIDENCE.md; built by issueInner in trooth-os-worker-f src/action-authz.ts."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    format: Literal["trooth.action-evidence.v1"] = Field(..., description="Always trooth.action-evidence.v1.")
+    iss: Literal["https://api.trooth.co"] = Field(..., description="Always https://api.trooth.co.")
+    iat: int = Field(..., description="When Trooth issued the reference, in seconds since the epoch.")
+    exp: int = Field(..., description="When the reference expires, in seconds since the epoch: iat + 600.")
+    jti: str = Field(..., description="The reference's single-use id. Its public state is at https://api.trooth.co/public/action-evidence/<jti>.")
+    authorization_id: str = Field(..., description="The id of the action authorization the reference was issued for.")
+    authorization_details: List[ActionEvidenceDetail] = Field(..., description="The one action, as an OAuth Rich Authorization Requests (RFC 9396) authorization_details object.")
+    binding: ActionEvidenceBinding = Field(..., description="The payment partner's mandate the reference is bound to.")
+    principal: ActionPrincipal = Field(..., description="The workspace and the person whose delegation this is.")
+    delegation: ActionEvidenceDelegation = Field(..., description="The delegation the action was checked against.")
+    approval: ActionEvidenceApprovals = Field(..., description="How the delegation, and when it needed one, the action were approved.")
+    counterparty: ActionEvidenceCounterparty = Field(..., description="The counterparty and Trooth's latest signed reading of its public record.")
+    responsibility: ActionResponsibilityBoundary = Field(..., description="The written responsibility boundary: what Trooth observed, what the buyer approved, what the vendor represents and what is not established.")
+    verify: ActionEvidenceVerify = Field(..., description="Where to check the reference.")
+
+class ActionEvidencePayment(BaseModel):
+    "A payment to the counterparty, at or under the delegation's limit and in its currency."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    type: Literal["trooth_payment"] = Field(..., description="Always trooth_payment.")
+    actions: List[Literal["pay"]] = Field(..., description="Always [\"pay\"].")
+    locations: List[str] = Field(..., description="https URLs on the counterparty's domain (or a subdomain) where the action is taken.")
+    instructedAmount: ActionEvidenceAmount = Field(..., description="The amount and its currency.")
+    creditorName: Optional[str] = Field(None, description="The payee's name, as the agent gave it.")
+    description: Optional[str] = Field(None, description="What the payment is for, as the agent gave it.")
+
+class ActionEvidenceDataShare(BaseModel):
+    "Sharing data of one class with the counterparty, at or under the delegation's data class."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    type: Literal["trooth_data_share"] = Field(..., description="Always trooth_data_share.")
+    actions: List[Literal["share"]] = Field(..., description="Always [\"share\"].")
+    locations: List[str] = Field(..., description="https URLs on the counterparty's domain (or a subdomain) where the data is sent.")
+    datatypes: List[ActionDataClass] = Field(..., description="The one data class shared.")
+    description: Optional[str] = Field(None, description="What is shared, as the agent gave it.")
+
+class ActionEvidenceAmount(BaseModel):
+    "A decimal amount with at most two fraction digits, and an ISO 4217 currency code."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    currency: str = Field(..., description="ISO 4217 code, three capital letters.")
+    amount: str = Field(..., description="The amount as a decimal string, at most two fraction digits.")
+
+class ActionEvidenceBinding(BaseModel):
+    "The mandate the reference is bound to: one authorization per delegation, protocol and reference."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    protocol: Literal["ap2", "acp", "visa_tap", "mastercard_agent_pay", "other"] = Field(..., description="The payment protocol of the mandate.")
+    reference_sha256: str = Field(..., description="SHA-256 (hex) of the protocol, a newline and the mandate's reference.")
+
+class ActionPrincipal(BaseModel):
+    "The workspace and the person who delegated."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    workspace: str = Field(..., description="The workspace (company) id.")
+    user: str = Field(..., description="The id of the person in the workspace.")
+
+class ActionAgentKey(BaseModel):
+    "The agent's DPoP key, by thumbprint."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    jkt: str = Field(..., description="The RFC 7638 JWK thumbprint (base64url SHA-256) of the agent's DPoP key.")
+
+class ActionTarget(BaseModel):
+    "The counterparty the delegation names."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    domain: str = Field(..., description="The counterparty's domain, lowercase.")
+
+class ActionEvidenceDelegation(BaseModel):
+    "The delegation the action was checked against."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="The delegation's id.")
+    sha256: str = Field(..., description="SHA-256 (hex) of the delegation document's canonical JSON: the digest its delegation receipt names.")
+    agent: ActionAgentKey = Field(..., description="The agent the delegation is to.")
+    role: str = Field(..., description="The role the agent acts in, as the person wrote it.")
+    target: ActionTarget = Field(..., description="The counterparty.")
+    actions: List[ActionType] = Field(..., description="The actions the delegation permits.")
+    limit: Optional[ActionEvidenceAmount] = Field(..., description="The payment limit, or null for a delegation that does not pay.")
+    data_class: Optional[ActionDataClass] = Field(..., description="The highest data class it may share, or null.")
+    expires_at: str = Field(..., description="When the delegation expires (RFC 3339).")
+
+class ActionApprovalRecord(BaseModel):
+    "How a person approved: who, when, and through which sign-in."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    approved_by: str = Field(..., description="The id of the person who approved.")
+    approved_at: str = Field(..., description="When they approved (RFC 3339).")
+    method: Literal["session_reauth", "identity_provider"] = Field(..., description="identity_provider: a sign-in through the workspace's identity provider within five minutes; session_reauth: a fresh sign-in within fifteen.")
+    acr: Literal["trooth:reauth", "trooth:idp"] = Field(..., description="The authentication context class matching method.")
+    auth_time: str = Field(..., description="When that sign-in happened (RFC 3339).")
+    idp: Optional[ActionApprovalIdp] = Field(..., description="The identity provider, or null for a fresh sign-in without one.")
+
+class ActionApprovalIdp(BaseModel):
+    "The identity provider a person signed in through."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    provider: str = Field(..., description="The provider's name.")
+    domain: str = Field(..., description="The provider's domain for the workspace.")
+
+class ActionEvidenceApprovals(BaseModel):
+    "The approval of the delegation and, above its approval threshold, of the action."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    delegation: ActionApprovalRecord = Field(..., description="How the delegation was approved.")
+    action: Optional[ActionApprovalRecord] = Field(..., description="How this action was approved, or null when it was at or under the approval threshold.")
+
+class ActionCounterpartyReading(BaseModel):
+    "Trooth's latest signed reading of the counterparty's public record, or that it could not be read."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    status: Literal["read", "not_read"] = Field(..., description="read, or not_read: then nothing about the counterparty is attested.")
+    read_at: Optional[str] = Field(None, description="When the reading was taken (RFC 3339), when the record says.")
+    log_index: Optional[int] = Field(None, description="The reading's index in Trooth's log, or null.")
+    statement_sha256: Optional[str] = Field(None, description="SHA-256 (hex) of the public record answer read.")
+    source: str = Field(..., description="The URL read: https://api.trooth.co/scan/public-record/<domain>.")
+
+class ActionEvidenceCounterparty(BaseModel):
+    "The counterparty and its reading."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    domain: str = Field(..., description="The counterparty's domain: the delegation's target.")
+    reading: ActionCounterpartyReading = Field(..., description="Trooth's latest signed reading of its public record.")
+
+class ActionResponsibilityBoundary(BaseModel):
+    "Who stands behind what, in plain sentences."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    version: str = Field(..., description="The boundary text's version, e.g. trooth.responsibility-boundary.v1-draft.")
+    trooth_observed: List[str] = Field(..., description="What Trooth observed.")
+    buyer_approved: List[str] = Field(..., description="What the buyer's people approved.")
+    vendor_represented: List[str] = Field(..., description="What the counterparty represents about itself.")
+    not_established: List[str] = Field(..., description="What the reference does not establish.")
+
+class ActionEvidenceVerify(BaseModel):
+    "Where to check the reference."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    keys: str = Field(..., description="The key list: https://api.trooth.co/public/keys.")
+    kid: str = Field(..., description="The kid of the key that signed it; the same as the JWS header's.")
+    status: str = Field(..., description="The reference's public state: https://api.trooth.co/public/action-evidence/<jti>.")
+
 class CorrectionPayload(BaseModel):
     "The JSON a trooth.correction.v1 payload holds: Trooth withdrawing or replacing a statement it signed. Signed like a v3 statement (RFC 8785 bytes, Ed25519, the signer inside the signed bytes) and entered in the witness statement log. The statement it corrects stays in the log; nothing is deleted."
 
@@ -94,6 +257,44 @@ class DeclarationSignature(BaseModel):
     alg: Literal["Ed25519"] = Field(..., description="The algorithm.")
     canonicalization: Literal["RFC8785"] = Field(..., description="The canonicalization of the signed bytes.")
     value: str = Field(..., description="ed25519: and the 64-byte signature in base64.")
+
+class DelegationReceiptPayload(BaseModel):
+    "The decoded payload of a delegation receipt (format trooth.delegation-receipt.v1): what api.trooth.co recorded when a person in a workspace created or revoked a delegation to an agent, and when. It travels as an Ed25519 compact JWS with the header {\"alg\":\"EdDSA\",\"typ\":\"trooth-delegation-receipt+jwt\",\"kid\":\"trooth-evidence-2026-10\"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It says what Trooth recorded, not that any action under the delegation is proper. The limit, data class and approval threshold are bound through delegation.sha256. docs/ACTION-EVIDENCE.md; built by delegationReceiptPayload in trooth-os-worker-f src/action-authz.ts."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    format: Literal["trooth.delegation-receipt.v1"] = Field(..., description="Always trooth.delegation-receipt.v1.")
+    iss: Literal["https://api.trooth.co"] = Field(..., description="Always https://api.trooth.co.")
+    iat: int = Field(..., description="When Trooth recorded the event, in seconds since the epoch (recorded_at, truncated).")
+    event: Literal["created", "revoked"] = Field(..., description="created or revoked.")
+    recorded_at: str = Field(..., description="When Trooth recorded the event (RFC 3339, milliseconds).")
+    by: str = Field(..., description="The id of the person who acted.")
+    approval: Optional[ActionApprovalRecord] = Field(None, description="How the creation was approved. Present on a created receipt; a revocation carries none.")
+    delegation: DelegationReceiptDelegation = Field(..., description="The delegation the event is about.")
+    meaning: str = Field(..., description="What the receipt says, in one or two sentences.")
+    verify: DelegationReceiptVerify = Field(..., description="Where to check the receipt.")
+
+class DelegationReceiptDelegation(BaseModel):
+    "The delegation, by id and digest, with its principal, agent, target, actions and expiry."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    id: str = Field(..., description="The delegation's id.")
+    sha256: str = Field(..., description="SHA-256 (hex) of the delegation document's canonical JSON (sorted keys, no spaces); the document carries the limit, data class, approval threshold and role.")
+    format: Literal["trooth.delegation.v1"] = Field(..., description="The delegation document's format: trooth.delegation.v1.")
+    principal: ActionPrincipal = Field(..., description="The workspace and the person who delegated.")
+    agent: ActionAgentKey = Field(..., description="The agent's DPoP key, by thumbprint.")
+    target: ActionTarget = Field(..., description="The counterparty.")
+    actions: List[ActionType] = Field(..., description="The actions the delegation permits.")
+    expires_at: str = Field(..., description="When the delegation expires (RFC 3339).")
+
+class DelegationReceiptVerify(BaseModel):
+    "Where to check the receipt."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    keys: str = Field(..., description="The key list: https://api.trooth.co/public/keys.")
+    kid: str = Field(..., description="The kid of the key that signed it; the same as the JWS header's.")
 
 class ManifestEntry(BaseModel):
     "One check and the evidence behind it: a public `source`, or a `commitment` to a private one. Exactly one of the two."
@@ -261,7 +462,7 @@ class PublicKey(BaseModel):
     activated_at: Optional[str] = Field(None, description="When the key was first used, when recorded. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
     first_listed_at: Optional[str] = Field(None, description="When the key first appeared on the list. An ISO 8601 date-time in UTC, as written by Trooth (for example 2026-10-06T20:00:44.820Z).")
     fingerprint: Optional[str] = Field(None, description="A short fingerprint of the key, for display.")
-    purpose: Optional[str] = Field(None, description="What the key is for, as a short label.")
+    purpose: Optional[str] = Field(None, description="What the key is for, as a short label: trust-ledger, readings-and-receipts, or signed-references (the evidence key, which signs delegation receipts and action evidence references; docs/ACTION-EVIDENCE.md).")
     signs: Optional[str] = Field(None, description="What the key signs, in words.")
     events: Optional[List[KeyEvent]] = Field(None, description="Lifecycle events, oldest first.")
 
@@ -524,6 +725,7 @@ class PublicRecordReading(BaseModel):
     sanctions: Optional[Sanctions] = Field(None, description="Entries on the OFAC sanctions list with exactly the legal names above. A name match is not an identification. Null when the list could not be read or no name was found. Added in trooth 0.11.0.")
     sanctions_eu: Optional[Sanctions] = Field(None, description="Entries on the EU consolidated list of persons, groups and entities subject to EU financial sanctions with exactly the legal names above: entities only, every name alias the list gives. uid is the EU reference number and programs the sanctions regime. A name match is not an identification. Null when the list could not be read or no name was found; absent on readings taken before 2026-10-14. Added in trooth 0.18.0.")
     sbom: Optional[Sbom] = Field(None, description="The SBOM the company's site publishes (the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom), and OSV's advisories for the package versions it lists. An advisory for a package version does not show that the company's product is affected: the SBOM may be out of date, the code may not be reached, and a VEX statement is not read. Null when no SBOM was found there or the site opts out of being read; absent on readings taken before 2026-10-14. Added in trooth 0.19.0.")
+    trust_center: Optional[TrustCenter] = Field(None, description="The company's trust center page (SafeBase, Vanta, Drata, Conveyor, Whistic, TrustArc, Secureframe, OneTrust, or its own page), read once: the address the company states on trooth.co, else the first trust center link on its home page. Recorded are what the page names (frameworks, documents, whether it mentions subprocessors), never facts Trooth checked: What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims. A bot check, an error page or a script-only page is recorded with readable false and its reason, and nothing on it is taken as named. The page's bytes are in `sources` under `sha256`. Null when no address was stated on trooth.co or found on the home page (then `not_read` says so); absent on readings taken before 2026-10-15. Added in trooth 0.22.0.")
     sources: Optional[List[Source]] = Field(None, description="Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.")
     not_read: List[NotRead] = Field(..., description="Each source that was not read, or did not answer, and why. A source not read is never guessed at.")
     note: str = Field(..., description="What the reading is and is not, as a paragraph.")
@@ -890,7 +1092,7 @@ class EvidenceClass(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review", "domain_declaration", "trooth_claim_record"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity).")
+    class_: Literal["regulator_filing", "registry_record", "sanctions_list", "procurement_exclusion", "domain_registration", "dns_configuration", "certificate_transparency", "site_publication", "patent_record", "merger_review", "domain_declaration", "trooth_claim_record", "trust_center_page"] = Field(..., alias="class", description="The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity). Since trooth 0.22.0: trust_center_page 30 (sections trust_center; a trust center page shows what the company's page named when Trooth read it; it does not show that the company holds any framework it names or that the documents behind the page say what it claims).")
     sections: List[str] = Field(..., description="The sections of this record that hold this class of evidence.")
     stale_after_days: int = Field(..., description="After this many days from observed_at a reader should take the evidence as stale and read again.")
     does_not_establish: str = Field(..., description="What this class of evidence does not show, in one sentence.")
@@ -1013,6 +1215,28 @@ class SbomOsvExcluded(BaseModel):
     advisories: int = Field(..., description="Distinct advisory ids across them.")
     components_affected: int = Field(..., description="Build and test package versions with at least one advisory.")
     affected: List[SbomAffected] = Field(..., description="Affected build and test package versions, most advisories first, at most 100.")
+
+class TrustCenter(BaseModel):
+    "What a company's trust center page named when Trooth read it. What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    url: str = Field(..., description="The address read, as stated or linked.")
+    source: Literal["company_statement", "home_page_link"] = Field(..., description="Where the address came from: the company's own statement on trooth.co (its record's trustCenter), or the first trust center link on its home page when it states none.")
+    final_url: Optional[str] = Field(..., description="Where the request ended after redirects (each hop screened as every page Trooth reads); null when nothing answered.")
+    status: int = Field(..., description="The HTTP status of the final answer; 0 when nothing answered (refused host, timeout, not https, robots.txt opt-out).")
+    read_at: str = Field(..., description="When Trooth read the page, ISO 8601.")
+    sha256: Optional[str] = Field(..., description="SHA-256 of the body read, the same as its entry in `sources`; null when no body was read.")
+    bytes: int = Field(..., description="Bytes of the body read (at most the reader's 2 MB cap).")
+    provider: Literal["safebase", "vanta", "drata", "conveyor", "whistic", "trustarc", "secureframe", "onetrust", "own_site", "other"] = Field(..., description="Who serves the page: a trust center provider, the company's own site (the final host is the domain or under it), or another host. A provider is not a party to the company's claims.")
+    provider_detected_by: Literal["host", "page"] = Field(..., description="host: the final host is the provider's own domain (or the company's, or another); page: the page loads its assets from, posts to, or says it is powered by the provider, as a provider serving the company's own subdomain does.")
+    title: Optional[str] = Field(..., description="The page's <title>, trimmed, at most 200 characters; null when it has none.")
+    frameworks_named: List[Literal["SOC 2 Type II", "SOC 2 Type I", "SOC 2", "SOC 1", "SOC 3", "ISO 27001", "ISO 27017", "ISO 27018", "ISO 27701", "ISO 42001", "ISO 9001", "PCI DSS", "HIPAA", "HITRUST", "GDPR", "CCPA", "FedRAMP", "StateRAMP", "CSA STAR", "TISAX", "NIST 800-53", "NIST CSF", "Cyber Essentials", "C5", "IRAP"]] = Field(..., description="The frameworks of a fixed vocabulary the page's visible text names, as whole phrases (case-insensitive, with the usual spellings: SOC2, ISO/IEC, Type 2), in vocabulary order; SOC 2 gives way to SOC 2 Type I or Type II when one is named. That the page names a framework does not show the company holds it: Trooth did not read the report or certificate behind it. Empty when the page was not readable.")
+    documents_named: List[str] = Field(..., description="Up to 25 link texts or headings on the page that look like documents (report, policy, certificate, pentest, penetration, whitepaper, SOC, ISO, DPA, subprocessor), each at most 120 characters, in page order. Their names only: Trooth did not read the documents. Empty when the page was not readable.")
+    subprocessors_listed: bool = Field(..., description="Whether the page's visible text mentions subprocessors. Not a check of any list.")
+    readable: bool = Field(..., description="False when the page answered with a bot check (Cloudflare's challenge, or another vendor's on 403, 429 or 503), an error status, or a script-only page (under 200 characters of visible text), or was not read at all; then nothing on it is taken as named.")
+    reason: Optional[str] = Field(..., description="Why the page was not readable, in one plain sentence (also listed under `not_read`); null when it was.")
+    basis: str = Field(..., description="What these fields are: \"What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims.\"")
 
 class VerificationBundle(BaseModel):
     "Everything needed to check one witness statement with no network: the statement, its evidence manifest, the key list as read, and the exact mapping bytes. Written by `trooth verify --save-bundle`; read by `trooth verify --bundle` and the SDKs. A bundle is only as fresh as its key list."
@@ -1298,6 +1522,15 @@ class WitnessStatement(BaseModel):
     alg: Literal["Ed25519"] = Field(..., description="The signature algorithm. Always Ed25519 (RFC 8032, pure EdDSA).")
     canonicalization: Literal["json-fixed-key-order-no-whitespace-utf8", "RFC8785"] = Field(..., description="How the payload bytes were produced. `json-fixed-key-order-no-whitespace-utf8` for v1 and v2; `RFC8785` (JSON Canonicalization Scheme, integers only) for v3, where the payload MUST equal the canonical form of the JSON it holds.")
 
+ActionEvidenceDetail = Union[ActionEvidencePayment, ActionEvidenceDataShare]
+"""One authorization_details object: a payment or a data share."""
+
+ActionDataClass = Literal["public", "internal", "confidential", "restricted"]
+"""A data class, from least to most sensitive."""
+
+ActionType = Literal["trooth_payment", "trooth_data_share"]
+"""An action a delegation can permit."""
+
 EvidenceManifest = List[ManifestEntry]
 """The evidence manifest a v2 or v3 statement binds by digest, published beside the statement as `witnessEvidenceManifest`. Canonical bytes: entries sorted by check_id, each as {"check_id":..,"source":..} or {"check_id":..,"commitment":..}, no whitespace, UTF-8."""
 
@@ -1305,6 +1538,22 @@ GuardDecideOutput = Union[GuardDecision, GuardNotCovered]
 """The one JSON document `trooth guard decide --json` prints on stdout when it decides or declines to: a GuardDecision when the policy covers the tool (exit 0 allow, 20 hold, 21 deny), or a GuardNotCovered when it does not (exit 0). A usage error prints the CLI's error document instead ({"ok": false, "error": "...", "exit": 2}), as every command does."""
 
 
+ActionEvidencePayload.model_rebuild()
+ActionEvidencePayment.model_rebuild()
+ActionEvidenceDataShare.model_rebuild()
+ActionEvidenceAmount.model_rebuild()
+ActionEvidenceBinding.model_rebuild()
+ActionPrincipal.model_rebuild()
+ActionAgentKey.model_rebuild()
+ActionTarget.model_rebuild()
+ActionEvidenceDelegation.model_rebuild()
+ActionApprovalRecord.model_rebuild()
+ActionApprovalIdp.model_rebuild()
+ActionEvidenceApprovals.model_rebuild()
+ActionCounterpartyReading.model_rebuild()
+ActionEvidenceCounterparty.model_rebuild()
+ActionResponsibilityBoundary.model_rebuild()
+ActionEvidenceVerify.model_rebuild()
 CorrectionPayload.model_rebuild()
 CorrectionReason.model_rebuild()
 DomainDeclaration.model_rebuild()
@@ -1313,6 +1562,9 @@ DeclaredProduct.model_rebuild()
 DeclaredMcp.model_rebuild()
 DeclaredApi.model_rebuild()
 DeclarationSignature.model_rebuild()
+DelegationReceiptPayload.model_rebuild()
+DelegationReceiptDelegation.model_rebuild()
+DelegationReceiptVerify.model_rebuild()
 ManifestEntry.model_rebuild()
 GuardDecision.model_rebuild()
 GuardNotCovered.model_rebuild()
@@ -1391,6 +1643,7 @@ Sbom.model_rebuild()
 SbomOsv.model_rebuild()
 SbomAffected.model_rebuild()
 SbomOsvExcluded.model_rebuild()
+TrustCenter.model_rebuild()
 VerificationBundle.model_rebuild()
 BundleLog.model_rebuild()
 LoggedCorrection.model_rebuild()

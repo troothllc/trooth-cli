@@ -77,7 +77,7 @@ test('color: off when piped, on with FORCE_COLOR=1, off again with FORCE_COLOR=0
 });
 
 test('every command accepts --quiet and --no-color without an unknown-flag error', async () => {
-  for (const c of ['check', 'profile', 'lint', 'verify', 'log', 'mirror', 'public-record', 'mcp-tools', 'declare']) {
+  for (const c of ['check', 'profile', 'lint', 'verify', 'log', 'mirror', 'public-record', 'mcp-tools', 'declare', 'evidence', 'delegation']) {
     const r = await run([c, '--no-color', '--quiet']);
     assert.ok(!/unknown flag/.test(r.err), `${c}: ${r.err}`);
   }

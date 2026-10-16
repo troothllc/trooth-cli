@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/delegation-receipt.v1.schema.json",
+  "title": "DelegationReceiptPayload",
+  "description": "The decoded payload of a delegation receipt (format trooth.delegation-receipt.v1): what api.trooth.co recorded when a person in a workspace created or revoked a delegation to an agent, and when. It travels as an Ed25519 compact JWS with the header {\"alg\":\"EdDSA\",\"typ\":\"trooth-delegation-receipt+jwt\",\"kid\":\"trooth-evidence-2026-10\"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It says what Trooth recorded, not that any action under the delegation is proper. The limit, data class and approval threshold are bound through delegation.sha256. docs/ACTION-EVIDENCE.md; built by delegationReceiptPayload in trooth-os-worker-f src/action-authz.ts.",
+  "type": "object",
+  "required": ["format", "iss", "iat", "event", "recorded_at", "by", "delegation", "meaning", "verify"],
+  "additionalProperties": false,
+  "properties": {
+    "format": { "description": "Always trooth.delegation-receipt.v1.", "const": "trooth.delegation-receipt.v1" },
+    "iss": { "description": "Always https://api.trooth.co.", "const": "https://api.trooth.co" },
+    "iat": { "description": "When Trooth recorded the event, in seconds since the epoch (recorded_at, truncated).", "type": "integer", "minimum": 0 },
+    "event": { "description": "created or revoked.", "enum": ["created", "revoked"] },
+    "recorded_at": { "description": "When Trooth recorded the event (RFC 3339, milliseconds).", "type": "string", "format": "date-time" },
+    "by": { "description": "The id of the person who acted.", "type": "string" },
+    "approval": { "description": "How the creation was approved. Present on a created receipt; a revocation carries none.", "$ref": "action-evidence.v1.schema.json#/$defs/approval" },
+    "delegation": { "description": "The delegation the event is about.", "$ref": "#/$defs/delegation" },
+    "meaning": { "description": "What the receipt says, in one or two sentences.", "type": "string" },
+    "verify": { "description": "Where to check the receipt.", "$ref": "#/$defs/verify" }
+  },
+  "$defs": {
+    "delegation": {
+      "title": "DelegationReceiptDelegation",
+      "description": "The delegation, by id and digest, with its principal, agent, target, actions and expiry.",
+      "type": "object",
+      "required": ["id", "sha256", "format", "principal", "agent", "target", "actions", "expires_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "description": "The delegation's id.", "type": "string", "pattern": "^dlg_[0-9a-f]{20}$" },
+        "sha256": { "description": "SHA-256 (hex) of the delegation document's canonical JSON (sorted keys, no spaces); the document carries the limit, data class, approval threshold and role.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "format": { "description": "The delegation document's format: trooth.delegation.v1.", "const": "trooth.delegation.v1" },
+        "principal": { "description": "The workspace and the person who delegated.", "$ref": "action-evidence.v1.schema.json#/$defs/principal" },
+        "agent": { "description": "The agent's DPoP key, by thumbprint.", "$ref": "action-evidence.v1.schema.json#/$defs/agentKey" },
+        "target": { "description": "The counterparty.", "$ref": "action-evidence.v1.schema.json#/$defs/target" },
+        "actions": { "description": "The actions the delegation permits.", "type": "array", "minItems": 1, "maxItems": 2, "items": { "$ref": "action-evidence.v1.schema.json#/$defs/actionType" } },
+        "expires_at": { "description": "When the delegation expires (RFC 3339).", "type": "string", "format": "date-time" }
+      }
+    },
+    "verify": {
+      "title": "DelegationReceiptVerify",
+      "description": "Where to check the receipt.",
+      "type": "object",
+      "required": ["keys", "kid"],
+      "additionalProperties": false,
+      "properties": {
+        "keys": { "description": "The key list: https://api.trooth.co/public/keys.", "type": "string" },
+        "kid": { "description": "The kid of the key that signed it; the same as the JWS header's.", "type": "string" }
+      }
+    }
+  }
+}

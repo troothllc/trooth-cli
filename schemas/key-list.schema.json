@@ -134,7 +134,7 @@
         },
         "purpose": {
           "type": "string",
-          "description": "What the key is for, as a short label."
+          "description": "What the key is for, as a short label: trust-ledger, readings-and-receipts, or signed-references (the evidence key, which signs delegation receipts and action evidence references; docs/ACTION-EVIDENCE.md)."
         },
         "signs": {
           "type": "string",

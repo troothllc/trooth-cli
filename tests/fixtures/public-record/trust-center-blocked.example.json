@@ -1,0 +1,559 @@
+{
+  "format": "trooth.public-record.v1",
+  "domain": "trust-center-blocked.example",
+  "subject_id": "trooth:domain:trust-center-blocked.example",
+  "read_at": "2026-10-15T12:00:00.000Z",
+  "site": {
+    "legal_names": [
+      {
+        "name": "Example Widgets Inc.",
+        "source": "https://trust-center-blocked.example/"
+      }
+    ],
+    "read": true,
+    "reason": null,
+    "links": [
+      {
+        "kind": "trust_center",
+        "url": "https://trust.vanta.com/example-widgets"
+      }
+    ]
+  },
+  "bindings": [],
+  "sec": null,
+  "lei": null,
+  "dns": [
+    {
+      "key": "dns.dnssec",
+      "label": "Zone signed with DNSSEC and validated",
+      "value": false,
+      "source": "dns:trust-center-blocked.example A/DS"
+    },
+    {
+      "key": "dns.mta_sts",
+      "label": "MTA-STS record",
+      "value": null,
+      "source": "dns:_mta-sts.trust-center-blocked.example TXT"
+    },
+    {
+      "key": "dns.mta_sts_mode",
+      "label": "MTA-STS policy mode",
+      "value": null,
+      "source": "https://mta-sts.trust-center-blocked.example/.well-known/mta-sts.txt"
+    },
+    {
+      "key": "dns.tls_rpt",
+      "label": "SMTP TLS reporting record",
+      "value": null,
+      "source": "dns:_smtp._tls.trust-center-blocked.example TXT"
+    },
+    {
+      "key": "dns.bimi",
+      "label": "BIMI record",
+      "value": null,
+      "source": "dns:default._bimi.trust-center-blocked.example TXT"
+    },
+    {
+      "key": "dns.dmarc_policy",
+      "label": "DMARC policy",
+      "value": null,
+      "source": "dns:_dmarc.trust-center-blocked.example TXT"
+    }
+  ],
+  "entity": null,
+  "certificates": null,
+  "security_txt": null,
+  "sbom": null,
+  "trust_center": {
+    "url": "https://trust.vanta.com/example-widgets",
+    "source": "home_page_link",
+    "final_url": "https://trust.vanta.com/example-widgets",
+    "status": 403,
+    "read_at": "2026-10-15T12:00:00.000Z",
+    "sha256": "ea8f8b1b57fa985e036a5a9ced9792f551ce6ec359c2b70014c112f580905c58",
+    "bytes": 286,
+    "provider": "vanta",
+    "provider_detected_by": "host",
+    "title": "Just a moment...",
+    "frameworks_named": [],
+    "documents_named": [],
+    "subprocessors_listed": false,
+    "readable": false,
+    "reason": "the page answered with a bot check or a script-only page; nothing on it was read",
+    "basis": "What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims."
+  },
+  "sanctions": null,
+  "sanctions_eu": null,
+  "sam": null,
+  "patents": null,
+  "registries": [],
+  "merger_review": null,
+  "domain_registration": null,
+  "declaration": {
+    "url": "https://trust-center-blocked.example/.well-known/trooth.json",
+    "status": "absent",
+    "reason": "the site answered 404: it publishes no declaration",
+    "sha256": null,
+    "issued_at": null,
+    "expires_at": null,
+    "keys": [],
+    "key_pinned_by_dns": false,
+    "products": [],
+    "apis": [],
+    "repositories": []
+  },
+  "owner_signed_record": null,
+  "proofs": [
+    {
+      "id": "dns_txt:1",
+      "binds": [
+        "trooth:domain:trust-center-blocked.example",
+        "trooth:company:example-widgets"
+      ],
+      "proof_method": "dns_txt",
+      "status": "confirmed",
+      "detail": "Trooth's record shows control of trust-center-blocked.example confirmed by a DNS TXT record on 2026-10-01T09:00:00Z",
+      "source": "trooth record",
+      "observed_at": "2026-10-01T09:00:00Z",
+      "evidence_class": "trooth_claim_record"
+    },
+    {
+      "id": "dns_txt:2",
+      "binds": [
+        "trooth:domain:trust-center-blocked.example",
+        "trooth:company:example-widgets"
+      ],
+      "proof_method": "dns_txt",
+      "status": "not_found",
+      "detail": "no TXT record starting trooth-domain-challenge= at _trooth-challenge.trust-center-blocked.example",
+      "source": "dns:_trooth-challenge.trust-center-blocked.example TXT",
+      "observed_at": "2026-10-15T12:00:00.000Z",
+      "evidence_class": "trooth_claim_record"
+    }
+  ],
+  "changes": [],
+  "subjects": [
+    {
+      "id": "trooth:domain:trust-center-blocked.example",
+      "kind": "domain",
+      "basis": "the domain read"
+    },
+    {
+      "id": "trooth:company:example-widgets",
+      "kind": "company",
+      "basis": "the company's Trooth record (https://trooth.co/network/company/example-widgets), read from the record projection"
+    }
+  ],
+  "evidence_classes": [
+    {
+      "class": "regulator_filing",
+      "sections": [
+        "sec"
+      ],
+      "stale_after_days": 90,
+      "does_not_establish": "A filing is the company's own statement to its regulator; it does not show that what the filing says is true or that the company is in good standing today.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "registry_record",
+      "sections": [
+        "lei",
+        "registries"
+      ],
+      "stale_after_days": 365,
+      "does_not_establish": "A registry record shows what the registry holds under that identifier; it does not show who controls the domain or that the entity is still operating.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "sanctions_list",
+      "sections": [
+        "sanctions",
+        "sanctions_eu"
+      ],
+      "stale_after_days": 7,
+      "does_not_establish": "A name match is not an identification, and no match does not show the company is not sanctioned under another name.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "procurement_exclusion",
+      "sections": [
+        "sam"
+      ],
+      "stale_after_days": 7,
+      "does_not_establish": "A name match is not an identification, and no exclusion under this name does not show the company is eligible for any contract.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "domain_registration",
+      "sections": [
+        "domain_registration"
+      ],
+      "stale_after_days": 30,
+      "does_not_establish": "The registration shows the registrar and dates RDAP reports; it does not show which legal entity controls the domain.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "dns_configuration",
+      "sections": [
+        "dns"
+      ],
+      "stale_after_days": 2,
+      "does_not_establish": "DNS records show how the zone was configured when it was read; they do not show who operates the zone or that mail is delivered securely.",
+      "read": true,
+      "observed_at": "2026-10-15T12:00:00.000Z",
+      "stale_after": "2026-10-17T12:00:00.000Z"
+    },
+    {
+      "class": "certificate_transparency",
+      "sections": [
+        "certificates"
+      ],
+      "stale_after_days": 7,
+      "does_not_establish": "Certificates in the logs show that certificates were issued for the name; they do not show who asked for them or that the site belongs to the company.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "site_publication",
+      "sections": [
+        "site",
+        "security_txt",
+        "sbom"
+      ],
+      "stale_after_days": 30,
+      "does_not_establish": "What the site publishes is the site's own claim; it does not show that the site belongs to the legal entity it names. An SBOM is the company's own list of components, and an OSV advisory for a listed package version does not show that its product is affected.",
+      "read": true,
+      "observed_at": "2026-10-15T12:00:00.000Z",
+      "stale_after": "2026-11-14T12:00:00.000Z"
+    },
+    {
+      "class": "patent_record",
+      "sections": [
+        "patents"
+      ],
+      "stale_after_days": 90,
+      "does_not_establish": "A name match on the first applicant is not an identification, and an application does not show the company owns or uses any technology today.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "merger_review",
+      "sections": [
+        "merger_review"
+      ],
+      "stale_after_days": 30,
+      "does_not_establish": "An early termination notice shows the FTC ended a waiting period; it does not show that the transaction closed, and a name match is not an identification.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    },
+    {
+      "class": "domain_declaration",
+      "sections": [
+        "declaration",
+        "owner_signed_record",
+        "proofs"
+      ],
+      "stale_after_days": 30,
+      "does_not_establish": "A key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it.",
+      "read": true,
+      "observed_at": "2026-10-15T12:00:00.000Z",
+      "stale_after": "2026-11-14T12:00:00.000Z"
+    },
+    {
+      "class": "trooth_claim_record",
+      "sections": [
+        "proofs"
+      ],
+      "stale_after_days": 365,
+      "does_not_establish": "Domain control at claim time; it does not establish that the person may act for the legal entity.",
+      "read": true,
+      "observed_at": "2026-10-01T09:00:00.000Z",
+      "stale_after": "2027-10-01T09:00:00.000Z"
+    },
+    {
+      "class": "trust_center_page",
+      "sections": [
+        "trust_center"
+      ],
+      "stale_after_days": 30,
+      "does_not_establish": "A trust center page shows what the company's page named when Trooth read it; it does not show that the company holds any framework it names or that the documents behind the page say what it claims.",
+      "read": false,
+      "observed_at": null,
+      "stale_after": null
+    }
+  ],
+  "continuity": {
+    "previous": null,
+    "events": []
+  },
+  "sources": [
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=trust-center-blocked.example&type=A&do=1",
+      "status": 200,
+      "sha256": "b0aa7cded9584d9cca9acdacac5fd8f2f09e7403adc02b0008ba54628af89d8f",
+      "bytes": 68,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=trust-center-blocked.example&type=DS&do=1",
+      "status": 200,
+      "sha256": "931af27340aee6e27a74cda821e4b6cfce978f0651441ed3aaa8a45c807ab765",
+      "bytes": 35,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_mta-sts.trust-center-blocked.example&type=TXT&do=1",
+      "status": 200,
+      "sha256": "931af27340aee6e27a74cda821e4b6cfce978f0651441ed3aaa8a45c807ab765",
+      "bytes": 35,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_smtp._tls.trust-center-blocked.example&type=TXT&do=1",
+      "status": 200,
+      "sha256": "931af27340aee6e27a74cda821e4b6cfce978f0651441ed3aaa8a45c807ab765",
+      "bytes": 35,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=default._bimi.trust-center-blocked.example&type=TXT&do=1",
+      "status": 200,
+      "sha256": "931af27340aee6e27a74cda821e4b6cfce978f0651441ed3aaa8a45c807ab765",
+      "bytes": 35,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_dmarc.trust-center-blocked.example&type=TXT&do=1",
+      "status": 200,
+      "sha256": "931af27340aee6e27a74cda821e4b6cfce978f0651441ed3aaa8a45c807ab765",
+      "bytes": 35,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://api.certspotter.com/v1/issuances?domain=trust-center-blocked.example&expand=issuer",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://rdap.org/domain/trust-center-blocked.example",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trooth.co/api/network/profile?q=trust-center-blocked.example&contract=2",
+      "status": 200,
+      "sha256": "097d006902b48207451877c8c1b163ceab7c9db7ca77ca2c87821680d0eac722",
+      "bytes": 182,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust-center-blocked.example/",
+      "status": 200,
+      "sha256": "2eecacae300c3ae2983918778c17e2aa09b9a921a3329f372fb6c9814fbdfde9",
+      "bytes": 137,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust-center-blocked.example/.well-known/security.txt",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust-center-blocked.example/.well-known/sbom",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust-center-blocked.example/sbom.json",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust-center-blocked.example/sbom",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust-center-blocked.example/.well-known/trooth.json",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Example%20Widgets%20Inc.&page%5Bsize%5D=100",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://trust.vanta.com/example-widgets",
+      "status": 403,
+      "sha256": "ea8f8b1b57fa985e036a5a9ced9792f551ce6ec359c2b70014c112f580905c58",
+      "bytes": 286,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://cloudflare-dns.com/dns-query?name=_trooth-challenge.trust-center-blocked.example&type=TXT&do=1",
+      "status": 200,
+      "sha256": "931af27340aee6e27a74cda821e4b6cfce978f0651441ed3aaa8a45c807ab765",
+      "bytes": 35,
+      "complete": true,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://data.ny.gov/resource/n9v6-gdp6.json?$where=upper(current_entity_name)%20in%20('EXAMPLE%20WIDGETS%20INC.')&$limit=20",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://data.colorado.gov/resource/4ykn-tg5h.json?$where=upper(entityname)%20in%20('EXAMPLE%20WIDGETS%20INC.')&$limit=20",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://data.ct.gov/resource/n7gp-d28j.json?$where=upper(name)%20in%20('EXAMPLE%20WIDGETS%20INC.')&$limit=20",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    },
+    {
+      "url": "https://data.oregon.gov/resource/tckn-sxa6.json?$where=upper(business_name)%20in%20('EXAMPLE%20WIDGETS%20INC.')&$limit=20",
+      "status": 404,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "complete": false,
+      "fetched_at": "2026-10-15T12:00:00.000Z"
+    }
+  ],
+  "not_read": [
+    {
+      "source": "SEC EDGAR",
+      "reason": "no SEC filer was identified: none was given, and the legal name the site states matches no listed filer (a private company files nothing here)"
+    },
+    {
+      "source": "GLEIF",
+      "reason": "the LEI search answered 404"
+    },
+    {
+      "source": "GLEIF",
+      "reason": "no LEI was identified: none was given, the SEC record carries none, and no single active LEI record carries the legal name"
+    },
+    {
+      "source": "https://trust-center-blocked.example/.well-known/security.txt",
+      "reason": "the site answered 404"
+    },
+    {
+      "source": "SBOM (https://trust-center-blocked.example/.well-known/sbom, https://trust-center-blocked.example/sbom.json, https://trust-center-blocked.example/sbom)",
+      "reason": "no CycloneDX or SPDX JSON document was found: /.well-known/sbom answered 404; /sbom.json answered 404; /sbom answered 404"
+    },
+    {
+      "source": "Trust center page (https://trust.vanta.com/example-widgets)",
+      "reason": "the page answered with a bot check or a script-only page; nothing on it was read"
+    },
+    {
+      "source": "Certificate Transparency logs (api.certspotter.com)",
+      "reason": "the CT monitor answered 404"
+    },
+    {
+      "source": "OFAC sanctions list",
+      "reason": "the list could not be read"
+    },
+    {
+      "source": "EU consolidated sanctions list",
+      "reason": "not read by this deployment"
+    },
+    {
+      "source": "SAM.gov registrations and exclusions",
+      "reason": "not read: Trooth holds no SAM.gov API key in this deployment"
+    },
+    {
+      "source": "USPTO patent applications",
+      "reason": "not read: Trooth holds no USPTO Open Data Portal key in this deployment"
+    },
+    {
+      "source": "New York Department of State, active corporations",
+      "reason": "data.ny.gov answered 404"
+    },
+    {
+      "source": "Colorado Secretary of State, business entities",
+      "reason": "data.colorado.gov answered 404"
+    },
+    {
+      "source": "Connecticut Secretary of the State, business registry",
+      "reason": "data.ct.gov answered 404"
+    },
+    {
+      "source": "Oregon Secretary of State, active businesses",
+      "reason": "data.oregon.gov answered 404"
+    },
+    {
+      "source": "RDAP domain registration",
+      "reason": "no RDAP service answers for this domain's top-level domain (some country-code registries publish none)"
+    },
+    {
+      "source": "Investor relations and sustainability pages",
+      "reason": "linked from the home page when found (site.links), not read: they are often served behind bot protection, and a page that cannot be read is never guessed at"
+    },
+    {
+      "source": "Trademark registrations",
+      "reason": "not read in this version"
+    },
+    {
+      "source": "State business registries beyond New York, Colorado, Connecticut, Oregon and Florida",
+      "reason": "not read: the other states publish no open-data registry with a common query interface"
+    }
+  ],
+  "note": "Each fact is what its source published, at the URL beside it, when Trooth read it. A filing is the company's statement to its regulator, not Trooth's finding. A binding between this domain and a legal entity is reported with the evidence for and against it. A sanctions entry, a SAM.gov exclusion, a state registry entry or a merger notice with the same name is not an identification. Nothing here grades, rates or ranks the company. Trooth signs a statement that names this reading by its SHA-256 and logs it; the signature says what Trooth read and when, not that what the sources say is true."
+}

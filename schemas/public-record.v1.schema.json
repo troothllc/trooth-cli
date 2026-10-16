@@ -142,6 +142,17 @@
       ],
       "description": "The SBOM the company's site publishes (the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom), and OSV's advisories for the package versions it lists. An advisory for a package version does not show that the company's product is affected: the SBOM may be out of date, the code may not be reached, and a VEX statement is not read. Null when no SBOM was found there or the site opts out of being read; absent on readings taken before 2026-10-14. Added in trooth 0.19.0."
     },
+    "trust_center": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TrustCenter"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The company's trust center page (SafeBase, Vanta, Drata, Conveyor, Whistic, TrustArc, Secureframe, OneTrust, or its own page), read once: the address the company states on trooth.co, else the first trust center link on its home page. Recorded are what the page names (frameworks, documents, whether it mentions subprocessors), never facts Trooth checked: What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims. A bot check, an error page or a script-only page is recorded with readable false and its reason, and nothing on it is taken as named. The page's bytes are in `sources` under `sha256`. Null when no address was stated on trooth.co or found on the home page (then `not_read` says so); absent on readings taken before 2026-10-15. Added in trooth 0.22.0."
+    },
     "sources": {
       "type": "array",
       "description": "Every response read for this reading, with the SHA-256 of the bytes read; Trooth keeps the bytes under that hash so a disputed fact can be replayed. Added in trooth 0.11.0.",
@@ -1740,7 +1751,7 @@
       "properties": {
         "class": {
           "type": "string",
-          "description": "The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity).",
+          "description": "The class of evidence. Default stale-after days: regulator_filing 90, registry_record 365, sanctions_list 7, procurement_exclusion 7, domain_registration 30, dns_configuration 2, certificate_transparency 7, site_publication 30, patent_record 90, merger_review 30. Since trooth 0.14.0: domain_declaration 30 (a key the site publishes shows who controlled the site's content when Trooth read it; it does not establish the legal entity or a person's authority to act for it; since 0.21.0 its sections include owner_signed_record), trooth_claim_record 365 (domain control at claim time; it does not establish that the person may act for the legal entity). Since trooth 0.22.0: trust_center_page 30 (sections trust_center; a trust center page shows what the company's page named when Trooth read it; it does not show that the company holds any framework it names or that the documents behind the page say what it claims).",
           "enum": [
             "regulator_filing",
             "registry_record",
@@ -1753,7 +1764,8 @@
             "patent_record",
             "merger_review",
             "domain_declaration",
-            "trooth_claim_record"
+            "trooth_claim_record",
+            "trust_center_page"
           ]
         },
         "sections": {
@@ -2289,6 +2301,160 @@
             "$ref": "#/$defs/SbomAffected"
           },
           "description": "Affected build and test package versions, most advisories first, at most 100."
+        }
+      }
+    },
+    "TrustCenter": {
+      "title": "TrustCenter",
+      "type": "object",
+      "description": "What a company's trust center page named when Trooth read it. What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims.",
+      "required": [
+        "url",
+        "source",
+        "final_url",
+        "status",
+        "read_at",
+        "sha256",
+        "bytes",
+        "provider",
+        "provider_detected_by",
+        "title",
+        "frameworks_named",
+        "documents_named",
+        "subprocessors_listed",
+        "readable",
+        "reason",
+        "basis"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The address read, as stated or linked."
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "company_statement",
+            "home_page_link"
+          ],
+          "description": "Where the address came from: the company's own statement on trooth.co (its record's trustCenter), or the first trust center link on its home page when it states none."
+        },
+        "final_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the request ended after redirects (each hop screened as every page Trooth reads); null when nothing answered."
+        },
+        "status": {
+          "type": "integer",
+          "description": "The HTTP status of the final answer; 0 when nothing answered (refused host, timeout, not https, robots.txt opt-out)."
+        },
+        "read_at": {
+          "type": "string",
+          "description": "When Trooth read the page, ISO 8601."
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SHA-256 of the body read, the same as its entry in `sources`; null when no body was read."
+        },
+        "bytes": {
+          "type": "integer",
+          "description": "Bytes of the body read (at most the reader's 2 MB cap)."
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "safebase",
+            "vanta",
+            "drata",
+            "conveyor",
+            "whistic",
+            "trustarc",
+            "secureframe",
+            "onetrust",
+            "own_site",
+            "other"
+          ],
+          "description": "Who serves the page: a trust center provider, the company's own site (the final host is the domain or under it), or another host. A provider is not a party to the company's claims."
+        },
+        "provider_detected_by": {
+          "type": "string",
+          "enum": [
+            "host",
+            "page"
+          ],
+          "description": "host: the final host is the provider's own domain (or the company's, or another); page: the page loads its assets from, posts to, or says it is powered by the provider, as a provider serving the company's own subdomain does."
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The page's <title>, trimmed, at most 200 characters; null when it has none."
+        },
+        "frameworks_named": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "SOC 2 Type II",
+              "SOC 2 Type I",
+              "SOC 2",
+              "SOC 1",
+              "SOC 3",
+              "ISO 27001",
+              "ISO 27017",
+              "ISO 27018",
+              "ISO 27701",
+              "ISO 42001",
+              "ISO 9001",
+              "PCI DSS",
+              "HIPAA",
+              "HITRUST",
+              "GDPR",
+              "CCPA",
+              "FedRAMP",
+              "StateRAMP",
+              "CSA STAR",
+              "TISAX",
+              "NIST 800-53",
+              "NIST CSF",
+              "Cyber Essentials",
+              "C5",
+              "IRAP"
+            ]
+          },
+          "description": "The frameworks of a fixed vocabulary the page's visible text names, as whole phrases (case-insensitive, with the usual spellings: SOC2, ISO/IEC, Type 2), in vocabulary order; SOC 2 gives way to SOC 2 Type I or Type II when one is named. That the page names a framework does not show the company holds it: Trooth did not read the report or certificate behind it. Empty when the page was not readable."
+        },
+        "documents_named": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to 25 link texts or headings on the page that look like documents (report, policy, certificate, pentest, penetration, whitepaper, SOC, ISO, DPA, subprocessor), each at most 120 characters, in page order. Their names only: Trooth did not read the documents. Empty when the page was not readable."
+        },
+        "subprocessors_listed": {
+          "type": "boolean",
+          "description": "Whether the page's visible text mentions subprocessors. Not a check of any list."
+        },
+        "readable": {
+          "type": "boolean",
+          "description": "False when the page answered with a bot check (Cloudflare's challenge, or another vendor's on 403, 429 or 503), an error status, or a script-only page (under 200 characters of visible text), or was not read at all; then nothing on it is taken as named."
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why the page was not readable, in one plain sentence (also listed under `not_read`); null when it was."
+        },
+        "basis": {
+          "type": "string",
+          "description": "What these fields are: \"What the company's trust center page named when Trooth read it; Trooth did not read the documents behind it or check the claims.\""
         }
       }
     }

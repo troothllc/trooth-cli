@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trooth.co/schemas/action-evidence.v1.schema.json",
+  "title": "ActionEvidencePayload",
+  "description": "The decoded payload of an action evidence reference (format trooth.action-evidence.v1): the short-lived object api.trooth.co signs when a workspace's agent is authorized for one action under a delegation. It travels as an Ed25519 compact JWS with the header {\"alg\":\"EdDSA\",\"typ\":\"trooth-action-evidence+jwt\",\"kid\":\"trooth-evidence-2026-10\"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It is evidence beside a payment partner's mandate: it does not move money and does not say a payment will be made. docs/ACTION-EVIDENCE.md; built by issueInner in trooth-os-worker-f src/action-authz.ts.",
+  "type": "object",
+  "required": ["format", "iss", "iat", "exp", "jti", "authorization_id", "authorization_details", "binding", "principal", "delegation", "approval", "counterparty", "responsibility", "verify"],
+  "additionalProperties": false,
+  "properties": {
+    "format": { "description": "Always trooth.action-evidence.v1.", "const": "trooth.action-evidence.v1" },
+    "iss": { "description": "Always https://api.trooth.co.", "const": "https://api.trooth.co" },
+    "iat": { "description": "When Trooth issued the reference, in seconds since the epoch.", "type": "integer", "minimum": 0 },
+    "exp": { "description": "When the reference expires, in seconds since the epoch: iat + 600.", "type": "integer", "minimum": 0 },
+    "jti": { "description": "The reference's single-use id. Its public state is at https://api.trooth.co/public/action-evidence/<jti>.", "type": "string", "pattern": "^ev_[0-9a-f]{32}$" },
+    "authorization_id": { "description": "The id of the action authorization the reference was issued for.", "type": "string", "pattern": "^act_[0-9a-f]{20}$" },
+    "authorization_details": { "description": "The one action, as an OAuth Rich Authorization Requests (RFC 9396) authorization_details object.", "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/detail" } },
+    "binding": { "description": "The payment partner's mandate the reference is bound to.", "$ref": "#/$defs/binding" },
+    "principal": { "description": "The workspace and the person whose delegation this is.", "$ref": "#/$defs/principal" },
+    "delegation": { "description": "The delegation the action was checked against.", "$ref": "#/$defs/delegation" },
+    "approval": { "description": "How the delegation, and when it needed one, the action were approved.", "$ref": "#/$defs/approvals" },
+    "counterparty": { "description": "The counterparty and Trooth's latest signed reading of its public record.", "$ref": "#/$defs/counterparty" },
+    "responsibility": { "description": "The written responsibility boundary: what Trooth observed, what the buyer approved, what the vendor represents and what is not established.", "$ref": "#/$defs/responsibility" },
+    "verify": { "description": "Where to check the reference.", "$ref": "#/$defs/verify" }
+  },
+  "$defs": {
+    "detail": {
+      "title": "ActionEvidenceDetail",
+      "description": "One authorization_details object: a payment or a data share.",
+      "anyOf": [{ "$ref": "#/$defs/payment" }, { "$ref": "#/$defs/dataShare" }]
+    },
+    "payment": {
+      "title": "ActionEvidencePayment",
+      "description": "A payment to the counterparty, at or under the delegation's limit and in its currency.",
+      "type": "object",
+      "required": ["type", "actions", "locations", "instructedAmount"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "description": "Always trooth_payment.", "const": "trooth_payment" },
+        "actions": { "description": "Always [\"pay\"].", "type": "array", "minItems": 1, "maxItems": 1, "items": { "const": "pay" } },
+        "locations": { "description": "https URLs on the counterparty's domain (or a subdomain) where the action is taken.", "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "string", "maxLength": 512 } },
+        "instructedAmount": { "description": "The amount and its currency.", "$ref": "#/$defs/amount" },
+        "creditorName": { "description": "The payee's name, as the agent gave it.", "type": "string", "maxLength": 200 },
+        "description": { "description": "What the payment is for, as the agent gave it.", "type": "string", "maxLength": 500 }
+      }
+    },
+    "dataShare": {
+      "title": "ActionEvidenceDataShare",
+      "description": "Sharing data of one class with the counterparty, at or under the delegation's data class.",
+      "type": "object",
+      "required": ["type", "actions", "locations", "datatypes"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "description": "Always trooth_data_share.", "const": "trooth_data_share" },
+        "actions": { "description": "Always [\"share\"].", "type": "array", "minItems": 1, "maxItems": 1, "items": { "const": "share" } },
+        "locations": { "description": "https URLs on the counterparty's domain (or a subdomain) where the data is sent.", "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "string", "maxLength": 512 } },
+        "datatypes": { "description": "The one data class shared.", "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/dataClass" } },
+        "description": { "description": "What is shared, as the agent gave it.", "type": "string", "maxLength": 500 }
+      }
+    },
+    "amount": {
+      "title": "ActionEvidenceAmount",
+      "description": "A decimal amount with at most two fraction digits, and an ISO 4217 currency code.",
+      "type": "object",
+      "required": ["currency", "amount"],
+      "additionalProperties": false,
+      "properties": {
+        "currency": { "description": "ISO 4217 code, three capital letters.", "type": "string", "pattern": "^[A-Z]{3}$" },
+        "amount": { "description": "The amount as a decimal string, at most two fraction digits.", "type": "string", "pattern": "^(0|[1-9]\\d{0,11})(\\.\\d{1,2})?$" }
+      }
+    },
+    "dataClass": {
+      "title": "ActionDataClass",
+      "description": "A data class, from least to most sensitive.",
+      "enum": ["public", "internal", "confidential", "restricted"]
+    },
+    "actionType": {
+      "title": "ActionType",
+      "description": "An action a delegation can permit.",
+      "enum": ["trooth_payment", "trooth_data_share"]
+    },
+    "binding": {
+      "title": "ActionEvidenceBinding",
+      "description": "The mandate the reference is bound to: one authorization per delegation, protocol and reference.",
+      "type": "object",
+      "required": ["protocol", "reference_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": { "description": "The payment protocol of the mandate.", "enum": ["ap2", "acp", "visa_tap", "mastercard_agent_pay", "other"] },
+        "reference_sha256": { "description": "SHA-256 (hex) of the protocol, a newline and the mandate's reference.", "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "principal": {
+      "title": "ActionPrincipal",
+      "description": "The workspace and the person who delegated.",
+      "type": "object",
+      "required": ["workspace", "user"],
+      "additionalProperties": false,
+      "properties": {
+        "workspace": { "description": "The workspace (company) id.", "type": "string" },
+        "user": { "description": "The id of the person in the workspace.", "type": "string" }
+      }
+    },
+    "agentKey": {
+      "title": "ActionAgentKey",
+      "description": "The agent's DPoP key, by thumbprint.",
+      "type": "object",
+      "required": ["jkt"],
+      "additionalProperties": false,
+      "properties": {
+        "jkt": { "description": "The RFC 7638 JWK thumbprint (base64url SHA-256) of the agent's DPoP key.", "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+      }
+    },
+    "target": {
+      "title": "ActionTarget",
+      "description": "The counterparty the delegation names.",
+      "type": "object",
+      "required": ["domain"],
+      "additionalProperties": false,
+      "properties": {
+        "domain": { "description": "The counterparty's domain, lowercase.", "type": "string" }
+      }
+    },
+    "delegation": {
+      "title": "ActionEvidenceDelegation",
+      "description": "The delegation the action was checked against.",
+      "type": "object",
+      "required": ["id", "sha256", "agent", "role", "target", "actions", "limit", "data_class", "expires_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "description": "The delegation's id.", "type": "string", "pattern": "^dlg_[0-9a-f]{20}$" },
+        "sha256": { "description": "SHA-256 (hex) of the delegation document's canonical JSON: the digest its delegation receipt names.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "agent": { "description": "The agent the delegation is to.", "$ref": "#/$defs/agentKey" },
+        "role": { "description": "The role the agent acts in, as the person wrote it.", "type": "string" },
+        "target": { "description": "The counterparty.", "$ref": "#/$defs/target" },
+        "actions": { "description": "The actions the delegation permits.", "type": "array", "minItems": 1, "maxItems": 2, "items": { "$ref": "#/$defs/actionType" } },
+        "limit": { "description": "The payment limit, or null for a delegation that does not pay.", "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/amount" }] },
+        "data_class": { "description": "The highest data class it may share, or null.", "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/dataClass" }] },
+        "expires_at": { "description": "When the delegation expires (RFC 3339).", "type": "string", "format": "date-time" }
+      }
+    },
+    "approval": {
+      "title": "ActionApprovalRecord",
+      "description": "How a person approved: who, when, and through which sign-in.",
+      "type": "object",
+      "required": ["approved_by", "approved_at", "method", "acr", "auth_time", "idp"],
+      "additionalProperties": false,
+      "properties": {
+        "approved_by": { "description": "The id of the person who approved.", "type": "string" },
+        "approved_at": { "description": "When they approved (RFC 3339).", "type": "string", "format": "date-time" },
+        "method": { "description": "identity_provider: a sign-in through the workspace's identity provider within five minutes; session_reauth: a fresh sign-in within fifteen.", "enum": ["session_reauth", "identity_provider"] },
+        "acr": { "description": "The authentication context class matching method.", "enum": ["trooth:reauth", "trooth:idp"] },
+        "auth_time": { "description": "When that sign-in happened (RFC 3339).", "type": "string", "format": "date-time" },
+        "idp": { "description": "The identity provider, or null for a fresh sign-in without one.", "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/idp" }] }
+      }
+    },
+    "idp": {
+      "title": "ActionApprovalIdp",
+      "description": "The identity provider a person signed in through.",
+      "type": "object",
+      "required": ["provider", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "description": "The provider's name.", "type": "string" },
+        "domain": { "description": "The provider's domain for the workspace.", "type": "string" }
+      }
+    },
+    "approvals": {
+      "title": "ActionEvidenceApprovals",
+      "description": "The approval of the delegation and, above its approval threshold, of the action.",
+      "type": "object",
+      "required": ["delegation", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "delegation": { "description": "How the delegation was approved.", "$ref": "#/$defs/approval" },
+        "action": { "description": "How this action was approved, or null when it was at or under the approval threshold.", "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/approval" }] }
+      }
+    },
+    "reading": {
+      "title": "ActionCounterpartyReading",
+      "description": "Trooth's latest signed reading of the counterparty's public record, or that it could not be read.",
+      "type": "object",
+      "required": ["status", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "description": "read, or not_read: then nothing about the counterparty is attested.", "enum": ["read", "not_read"] },
+        "read_at": { "description": "When the reading was taken (RFC 3339), when the record says.", "type": "string" },
+        "log_index": { "description": "The reading's index in Trooth's log, or null.", "type": ["integer", "null"] },
+        "statement_sha256": { "description": "SHA-256 (hex) of the public record answer read.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source": { "description": "The URL read: https://api.trooth.co/scan/public-record/<domain>.", "type": "string" }
+      }
+    },
+    "counterparty": {
+      "title": "ActionEvidenceCounterparty",
+      "description": "The counterparty and its reading.",
+      "type": "object",
+      "required": ["domain", "reading"],
+      "additionalProperties": false,
+      "properties": {
+        "domain": { "description": "The counterparty's domain: the delegation's target.", "type": "string" },
+        "reading": { "description": "Trooth's latest signed reading of its public record.", "$ref": "#/$defs/reading" }
+      }
+    },
+    "responsibility": {
+      "title": "ActionResponsibilityBoundary",
+      "description": "Who stands behind what, in plain sentences.",
+      "type": "object",
+      "required": ["version", "trooth_observed", "buyer_approved", "vendor_represented", "not_established"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "description": "The boundary text's version, e.g. trooth.responsibility-boundary.v1-draft.", "type": "string", "pattern": "^trooth\\.responsibility-boundary\\." },
+        "trooth_observed": { "description": "What Trooth observed.", "type": "array", "items": { "type": "string" } },
+        "buyer_approved": { "description": "What the buyer's people approved.", "type": "array", "items": { "type": "string" } },
+        "vendor_represented": { "description": "What the counterparty represents about itself.", "type": "array", "items": { "type": "string" } },
+        "not_established": { "description": "What the reference does not establish.", "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "verify": {
+      "title": "ActionEvidenceVerify",
+      "description": "Where to check the reference.",
+      "type": "object",
+      "required": ["keys", "kid", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "keys": { "description": "The key list: https://api.trooth.co/public/keys.", "type": "string" },
+        "kid": { "description": "The kid of the key that signed it; the same as the JWS header's.", "type": "string" },
+        "status": { "description": "The reference's public state: https://api.trooth.co/public/action-evidence/<jti>.", "type": "string" }
+      }
+    }
+  }
+}

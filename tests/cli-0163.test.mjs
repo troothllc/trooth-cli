@@ -36,6 +36,8 @@ const COMMANDS = {
   log: ['checkpoint', 'monitor', 'receipt'],
   guard: ['decide', 'hook', 'ci', 'cache'],
   declare: ['init', 'sign', 'check'],
+  evidence: ['verify'],
+  delegation: ['verify'],
 };
 const ALL = Object.entries(COMMANDS).flatMap(([c, subs]) => [[c], ...subs.map((s) => [c, s])]);
 

@@ -44,7 +44,7 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Accessibility statement, modern slavery statement | Not read |
 | Investor-relations site: earnings releases, call transcripts, guidance, presentations | Linked: public record `site.links` names the page when the home page links to it on the company's domain; its content is not read (often behind bot protection; never guessed at) |
 | Sustainability, ESG and climate reports | Linked, not read (`site.links`) |
-| Trust center: SOC 2, ISO 27001, PCI attestations it lists | Declared; the trust-center page is linked, not read (`site.links`) |
+| Trust center: SOC 2, ISO 27001, PCI attestations it lists | Read since 0.22.0: public record `trust_center`, what the page names (frameworks, documents, subprocessors), not the documents behind it |
 | Security advisories it publishes as a vendor | Not read |
 | Careers pages, press releases, blog | Not read |
 | Developer surfaces: OpenAPI documents, `.well-known` files | Read where the Standard asks (A14, I14); otherwise not read |
@@ -71,6 +71,7 @@ A `regulator_filing` is the company's own statement, made under the rules that g
 | Merger review | FTC early termination notices under the Hart-Scott-Rodino Act | Read: public record `merger_review`, notices with a party of exactly the legal name, cached 7 days per name |
 | Renames, acquisitions and dispositions (8-K Item 2.01), changes in control (Item 5.01), previous legal names, parents | EDGAR, GLEIF | Read: public record `changes`, with merger review and domain events, newest first |
 | The domain's registration: registrar, registration, expiry, transfer | RDAP (RFC 9083) through rdap.org | Read: public record `domain_registration` |
+| Trust center page | The address the company states on trooth.co, else the first trust center link on its home page (on the domain or a provider's own subdomain); read once through the guarded fetch (since 0.22.0) | Read: public record `trust_center`: the provider (by host or by the page), the status, the title, the frameworks of a fixed vocabulary the page names, up to 25 document-like link texts and headings, whether it mentions subprocessors, and the body's SHA-256 (its `sources` entry). What the page names, not facts Trooth checked: the documents behind it are not read. A bot check, an error status or a script-only page is `readable: false` with its reason, and nothing on it is named |
 | Software bill of materials | The company's own site: the first CycloneDX or SPDX JSON document at /.well-known/sbom, /sbom.json or /sbom; OSV (api.osv.dev) for advisories on the package versions it lists (since 0.19.0) | Read: public record `sbom`. Components a CycloneDX SBOM marks scope `excluded` (build and test, not delivered) are asked about and counted apart, in `sbom.osv.excluded` (since 0.20.0). An OSV advisory for a listed package version is not a finding that the company's product is affected; VEX is not read |
 | Sanctions lists | OFAC Specially Designated Nationals list; EU consolidated financial sanctions list (European Commission, since 0.18.0) | Read: public record `sanctions` (OFAC, entities' primary names) and `sanctions_eu` (EU, entities' every name alias), exact name after folding; a name match is not an identification. Other lists are not read |
 | Patents | USPTO Open Data Portal | Read when Trooth holds a USPTO key: public record `patents`, applications whose first applicant is the legal name, cached 7 days per name |
@@ -135,7 +136,7 @@ What the signature establishes: Trooth read these sources and got these answers 
 - Foreign issuers reporting in IFRS: filings are listed, financial values are not read.
 - Filing text (Items 1A, 1C, 3; exhibits) is linked, not read.
 - The Trust Profile shows a reading when one was taken in the last day; otherwise the reader can ask for one there.
-- SAM.gov is read for at most four names a day (its allowance for a key without a federal role is 10 requests); the others are listed under `not_read` and read on a later day. Trademarks are not read. State registries other than New York, Colorado, Connecticut, Oregon and Florida are not read. Code registries are not read; investor-relations, sustainability and trust-center pages are linked, not read.
+- SAM.gov is read for at most four names a day (its allowance for a key without a federal role is 10 requests); the others are listed under `not_read` and read on a later day. Trademarks are not read. State registries other than New York, Colorado, Connecticut, Oregon and Florida are not read. Code registries are not read; investor-relations and sustainability pages are linked, not read. The trust center page is read (since 0.22.0), but not the documents behind it.
 - RDAP answers only for top-level domains whose registry publishes an RDAP service; some country-code registries do not.
 - The FTC publishes early termination notices only for filings granted early termination; a merger reviewed to the end of its waiting period has no notice.
 - Certificates are counted for the exact domain name only, from one CT monitor's first page.
@@ -196,6 +197,7 @@ An LEI tied through a corroborated SEC filer takes the filer's proof method.
 | `site_publication` | `site`, `security_txt`, `sbom` | 30 |
 | `patent_record` | `patents` | 90 |
 | `merger_review` | `merger_review` | 30 |
+| `trust_center_page` | `trust_center` | 30 |
 
 A reader that has no rule of its own takes evidence past `stale_after` as stale and reads again. The guard (`trooth guard`) uses these days when a policy rule gives no `max_age_days`.
 

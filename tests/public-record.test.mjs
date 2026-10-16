@@ -89,6 +89,24 @@ test('the SBOM the site publishes: format, size, OSV advisories, and that an adv
   } finally { srv.close(); }
 });
 
+test("the trust center page: provider, status and the frameworks it names, as what the page names (0.22.0)", async () => {
+  const srv = await server(); const port = srv.address().port;
+  try {
+    const r = await run(['public-record', 'trust-center.example'], port);
+    assert.equal(r.code, 1, r.err);
+    assert.match(r.out, /trust center SafeBase \(named by the page\) · status 200 · names SOC 2 Type II, ISO 27001, HIPAA, GDPR, CCPA https:\/\/trust\.trust-center\.example\/ \(stated by the company on trooth\.co\)/);
+    assert.match(r.out, /6 documents named, subprocessors mentioned\. What the page names, not facts Trooth checked: Trooth did not read the documents behind it\./);
+    assert.doesNotMatch(r.out.split('\n').find((l) => /trust center /.test(l)), /score|rating|grade|\btier\b|\brank|verif|certified/i);
+    const j = JSON.parse((await run(['public-record', 'trust-center.example', '--json'], port)).out);
+    assert.deepEqual([j.trust_center.provider, j.trust_center.readable, j.trust_center.source], ['safebase', true, 'company_statement']);
+    const blocked = await run(['public-record', 'trust-center-blocked.example'], port);
+    assert.match(blocked.out, /trust center Vanta · status 403 · not read: the page answered with a bot check or a script-only page; nothing on it was read https:\/\/trust\.vanta\.com\/example-widgets \(linked from the home page\)/);
+    assert.doesNotMatch(blocked.out, /documents named/);
+    const a = await run(['public-record', 'apple.com'], port);
+    assert.doesNotMatch(a.out, /trust center /, 'a reading without one prints nothing for it');
+  } finally { srv.close(); }
+});
+
 test('the EU sanctions list: a same-name entry is shown with its EU reference and regime, and called a name match', async () => {
   const srv = await server(); const port = srv.address().port;
   try {

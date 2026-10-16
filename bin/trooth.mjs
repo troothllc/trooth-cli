@@ -7,8 +7,9 @@
 // The Trooth Network is one public record per company: identity, products and demos,
 // domain and marketing links, people, documents, security and privacy posture,
 // procurement terms, relationships and sub-processors. Each fact is labeled with where
-// it came from: witnessed, public record, attested or declared. Trooth signs one
-// object, the witness statement for a reading it took; the rest of the profile is not
+// it came from: witnessed, public record, attested or declared. Trooth signs witness
+// statements for readings it took and, for workspaces that create a delegation,
+// delegation receipts and action evidence references; the rest of the profile is not
 // signed. This CLI is the terminal interface to that record.
 //
 // Commands:
@@ -82,6 +83,20 @@
 //                           behind (record_version, record_digest, from the record API's
 //                           headers); `check` says whether that version is the one
 //                           published now. Nothing secret is printed.
+//   trooth evidence verify <file|->
+//                           Check an action evidence reference (docs/ACTION-EVIDENCE.md):
+//                           the Ed25519 compact JWS Trooth issues for one authorized
+//                           action, against the evidence key on api.trooth.co/public/keys
+//                           (purpose signed-references), its typ, format and ten-minute
+//                           lifetime. --keys <file> sends nothing; --online also reads
+//                           the reference's public state (issued, redeemed, expired,
+//                           revoked); --protocol and --reference check its mandate binding;
+//                           --log checks the signed commitment to its sha256 in the public
+//                           witness log (the log holds only that digest, never the object).
+//   trooth delegation verify <file|->
+//                           Check a delegation receipt the same way: the event (created or
+//                           revoked), the delegation, the agent key, the scope and when
+//                           Trooth recorded it; --log as above. Library: trooth/evidence.
 //   trooth --help           Show help.   trooth --version  Show version.
 //   trooth <command> --help Show one command's usage, flags and exit codes (also -h,
 //                           and trooth help <command> [<subcommand>]).
@@ -96,7 +111,8 @@
 //   It does not produce a verdict, a threshold result or a percentage.
 //   It publishes facts and counts, reported apart, and never adds them into one number.
 //
-// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0, 10 in 0.9.0):
+// Exit codes (stable, for scripts; 4 and 5 are new in 0.5.0, 6 in 0.6.0, 7 in 0.6.1, 8 and 9 in 0.7.0, 10 in 0.9.0,
+// 11 in 0.14.0, 12 in 0.22.0):
 //   0  ok                      (check: listed, and Trooth witnessed a reading;
 //                               lint: a complete read of at least one declaration)
 //   1  finding                 (check: not listed, or revoked; profile: no published
@@ -131,7 +147,18 @@
 //  10  superseded              (new in 0.9.0, verify: everything held, and a correction
 //                               Trooth signed and logged withdraws or replaces the statement)
 //  11  expired                 (new in 0.14.0, declare check: the declaration checks in every
-//                               other way, and its expires_at has passed)
+//                               other way, and its expires_at has passed; since 0.22.0 also
+//                               evidence verify: the reference checks, and its exp has passed,
+//                               or --online says it expired)
+//  12  not redeemable          (new in 0.22.0, evidence verify --online: the reference checks,
+//                               and its public state is redeemed or revoked)
+//   evidence verify and delegation verify also use 0 (it checks), 1 (--online: Trooth does
+//   not know the reference), 2 (usage, not a compact JWS), 3 (the key list, the state or
+//   the log entry could not be read), 8 (malformed, alg not EdDSA, kid not on the list or not
+//   signed-references, key not trusted, or the signature does not verify; with --log also
+//   the log commitment's) and 9 (the signature verifies, but typ, format, iss, the claims, the
+//   lifetime, the mandate binding or the delegation digest do not hold; with --log also: no
+//   entry at that index, or its commitment is not to this JWS's sha256 or of another kind).
 //   declare check also uses 0 (it checks), 1 (the site answers 404 or 410: no declaration),
 //   3 (the site or DNS could not be read), 8 (the signature does not check, or its kid is
 //   not one of the keys) and 9 (any other rule fails: wrong domain, a URL on another host,
@@ -173,6 +200,7 @@ import { addedLines, scanLines } from './lib/guard-ci.mjs';
 import { generateDeclarationKey, readPrivateJwk, publicJwkOf, buildDeclaration, checkDeclaration, fetchDeclaration, readKeyPin, pinStatus, pinLine, isSignatureProblem, readRecordHead, recordBindingState, DeclarationError, DECLARATION_PATH, MAX_VALIDITY_DAYS, DEFAULT_VALIDITY_DAYS, DOH_URL, keyIdFor, jwkThumbprint } from './lib/declaration.mjs';
 import { ID_TYPES } from './lib/ids.mjs';
 import { SECTION_NAMES, SECTION_OF_CATEGORY, parseSectionArgs, buildSections, renderText, renderMarkdown } from './lib/profile.mjs';
+import { verifyEvidence, verifyDelegationReceipt, verifyLogCommitment, commitmentFromLogEntry, extractJws, EvidenceInputError, PUBLIC_STATES } from './lib/evidence.mjs';
 import { homedir } from 'node:os';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
@@ -191,7 +219,7 @@ const require = createRequire(import.meta.url);
 let VERSION = '0.11.0';
 try { VERSION = require('../package.json').version; } catch {}
 
-const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10, EXPIRED: 11, GUARD_HOLD: 20, GUARD_DENY: 21, GUARD_CI_FOUND: 22 };
+const EXIT = { OK: 0, FINDING: 1, USAGE: 2, UPSTREAM: 3, INCOMPLETE: 4, NOT_WITNESSED: 5, WITHHELD: 6, OUTPUT: 7, NOT_TRUSTED: 8, MISMATCH: 9, SUPERSEDED: 10, EXPIRED: 11, NOT_REDEEMABLE: 12, GUARD_HOLD: 20, GUARD_DENY: 21, GUARD_CI_FOUND: 22 };
 
 // --quiet (-q) and --no-color are accepted by every command, anywhere on the
 // line (0.17.0), so they are read here and taken out before the command is.
@@ -318,6 +346,8 @@ const FLAGS = {
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
   declare: { bool: ['--json', '--no-dns', '--no-record', '--bind-record'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
   guard: { bool: ['--json', '--offline'], value: ['--policy', '--tool', '--host', '--args', '--cache', '--max-age', '--base', '--log-vkey', '--timeout-ms'], multi: ['--witness'] },
+  evidence: { bool: ['--json', '--online', '--log'], value: ['--keys', '--protocol', '--reference', '--log-index'] },
+  delegation: { bool: ['--json', '--log'], value: ['--keys', '--delegation', '--log-index'] },
 };
 
 /** Commands that existed in an earlier release and are gone. Naming them explicitly
@@ -385,6 +415,8 @@ ${B}Usage${X}
   trooth declare init --domain <domain> [--key <path>]   Make the Ed25519 key for your domain's declaration
   trooth declare sign --domain <domain> --key <path> --out <file>   Sign /.well-known/trooth.json
   trooth declare check <domain> | --file <path>   Check a domain's signed declaration and its DNS pin
+  trooth evidence verify <file|-> [--keys <file>] [--online] [--log]   Check an action evidence reference Trooth signed
+  trooth delegation verify <file|-> [--keys <file>] [--log]   Check a delegation receipt Trooth signed
   trooth <command> --help   A command's usage, flags and exit codes (also: trooth help <command>)
   trooth --help | --version
 
@@ -449,13 +481,21 @@ ${B}Flags${X}
   --bind-record             declare sign: write the record's current version and digest (record_version, record_digest)
   --file <path>, --no-dns   declare check: check a saved file; do not read the _trooth-key TXT pin
   --no-record               declare check: do not ask the record API whether record_version is the version published now
+  --keys <path>             evidence verify, delegation verify: a saved copy of api.trooth.co/public/keys (sends nothing)
+  --online                  evidence verify: also read the reference's public state (issued, redeemed, expired, revoked)
+  --protocol, --reference   evidence verify: the mandate's protocol and reference; exit 9 unless the reference is bound to it
+  --delegation <path>       delegation verify: the delegation document; its digest must be the one the receipt names
+  --log, --log-index N      evidence verify, delegation verify: check the signed commitment to its sha256 in the
+                            public witness log, at the input JSON's log.index or at N
 
 ${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
   0  ok: check listed and witnessed; profile found and printed; lint complete; verify checked; a log, mirror or receipt checks;
-     public-record names an SEC filer or LEI for the domain; guard decide allow (or the tool is not covered)
+     public-record names an SEC filer or LEI for the domain; guard decide allow (or the tool is not covered);
+     evidence verify, delegation verify: it checks
   1  no record or nothing found: check, profile, verify: no published record; lint: nothing to read;
      public-record: no SEC filer or LEI named for the domain; log receipt: no such entry;
-     mcp-tools: no reading of that endpoint; guard cache: a domain has no record; declare check: none published
+     mcp-tools: no reading of that endpoint; guard cache: a domain has no record; declare check: none published;
+     evidence verify --online: Trooth does not know the reference
   2  usage error: a missing argument, an unknown flag or command, not one domain, no record with that slug
   3  service or contract error: Trooth unreachable or too slow, an unexpected status or body;
      also an unexpected failure inside the CLI. Never an answer about a company.
@@ -465,7 +505,9 @@ ${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
   6  check, profile, verify: the record is withheld while a report about it is reviewed
   7  output not delivered: stdout or stderr failed or closed before everything was written
   8  verify, public-record, mcp-tools: the signature does not check, or the key is not trusted;
-     declare check: the signature does not check, or its kid is not one of the keys
+     declare check: the signature does not check, or its kid is not one of the keys;
+     evidence verify, delegation verify: malformed, not EdDSA, kid not on the list or not signed-references,
+     the key not trusted, or the signature does not verify (with --log, also the log commitment's)
   9  verify: signature checks, but the domain, mapping, manifest, counts or log proof do not match
      log checkpoint, log monitor: the checkpoint does not check, the log is not an extension of the
      checkpoint in --state, or fewer pinned witnesses cosigned than --witnesses asks
@@ -473,8 +515,12 @@ ${B}Exit codes${X} ${D}(each command's --help lists its own)${X}
      public-record: the record is not the one its statement names, or its log receipt does not check
      mcp-tools: a hash, the statement or its receipt does not match; with --live, the server lists other tools now
      declare check: another rule fails, or the DNS pin names another key
+     evidence verify, delegation verify: the signature verifies, but typ, format, the claims, the lifetime,
+     the mandate binding or the delegation digest do not hold; --log: no such entry, or its commitment is
+     not to this JWS's sha256
   10 verify: a correction Trooth signed and logged withdraws or replaces the statement
-  11 declare check: the declaration expired
+  11 declare check: the declaration expired; evidence verify: the reference expired
+  12 evidence verify --online: the reference checks, and it was redeemed or revoked
   20 guard decide: hold (route the action to a person)
   21 guard decide: deny (a proof or an absolute rule failed, or the policy chose deny)
   22 guard ci: the change adds a destination host the policy does not list
@@ -995,6 +1041,103 @@ const COMMAND_HELP = {
     ],
     examples: ['trooth declare check trooth.co', 'trooth declare check --file trooth.json --domain acme.com'],
   },
+  evidence: {
+    usage: ['trooth evidence verify <file|-> [--keys <path>] [--online] [--log [--log-index N]] [--protocol <p> --reference <r>] [--json]'],
+    about: [
+      'Action evidence references (docs/ACTION-EVIDENCE.md): the short-lived signed object Trooth issues when a',
+      "workspace's agent is authorized for one action under a delegation. Run trooth evidence verify --help.",
+    ],
+    flags: [],
+    exits: [
+      ['0', 'verify: it checks'], ['1', 'verify --online: Trooth does not know the reference'], ['2', 'usage error'],
+      ['3', 'the key list, the public state or the log entry could not be read'], ['8', 'not trusted'], ['9', 'mismatch'],
+      ['11', 'expired'], ['12', '--online: redeemed or revoked'],
+      SEVEN,
+    ],
+  },
+  'evidence verify': {
+    usage: [
+      'trooth evidence verify <file|-> [--keys <path>] [--online] [--log [--log-index N]] [--json]',
+      'trooth evidence verify <file|-> --protocol <p> --reference <r> [--keys <path>] [--json]',
+    ],
+    about: [
+      'Checks an action evidence reference on this machine: a compact JWS (or the JSON the API answers with,',
+      "whose `evidence` member holds it), read from a file or from stdin with -. The header's alg must be EdDSA,",
+      'its kid on api.trooth.co/public/keys with purpose signed-references and trusted at iat, the Ed25519',
+      'signature must verify over the JWS signing input, typ must be trooth-action-evidence+jwt, format',
+      'trooth.action-evidence.v1, iss https://api.trooth.co, and the lifetime at most 600 seconds. An expired',
+      'reference is reported as expired (exit 11), not as an error. Prints the action, the amount and currency or',
+      'the data class, the target domain, the delegation, the approvals, the boundary version, the counterparty',
+      'reading and the times. A reference is evidence beside a payment mandate: it does not move money and does',
+      'not say a payment will be made.',
+      'With --log it also checks that the reference is in the public witness log. The log holds only a',
+      "commitment (a JWS signed with the same key over the reference's SHA-256), never the reference.",
+    ],
+    flags: [
+      ['--keys <path>', 'a saved copy of https://api.trooth.co/public/keys; with it nothing is sent (unless --online)'],
+      ['--online', "also read the reference's public state, GET https://api.trooth.co/public/action-evidence/<jti>: issued, redeemed, expired or revoked"],
+      ['--protocol <p>', 'with --reference: the protocol of the mandate the reference should be bound to (ap2, acp, visa_tap, mastercard_agent_pay, other)'],
+      ['--reference <r>', "with --protocol: the mandate's reference; exit 9 unless binding.reference_sha256 is SHA-256 of <p>\\n<r>"],
+      ['--log', 'also check the public witness log: read https://api.trooth.co/scan/log/v1/entries/<N> (N from the input JSON\'s log.index), verify the commitment there with the same keys, and check that its kind is action_evidence and its sha256 is the SHA-256 of this JWS'],
+      ['--log-index <N>', 'the log entry to check (implies --log); for a bare JWS, which carries no index'],
+      ['--json', 'one JSON document on stdout (types/evidence.d.ts EvidenceVerifyOutput); diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'it checks: trusted key, valid signature, every claim holds, not expired (and with --online, issued; with --log, logged)'],
+      ['1', '--online: the public state endpoint does not know the reference (HTTP 404)'],
+      ['2', 'usage error: no file, a file not found, input that is not a compact JWS or JSON holding one, --protocol without --reference, --log with no log index'],
+      ['3', `the key list, the public state or the log entry could not be read; ${THREE_INTERNAL}`],
+      ['8', 'not trusted: malformed, alg not EdDSA, kid not on the key list or not purpose signed-references, the key not trusted, or the signature does not verify (with --log, also the log commitment\'s)'],
+      ['9', 'mismatch: the signature verifies, but typ, format, iss, the claims, the lifetime or the mandate binding do not hold; --log: no entry at that index, or its commitment is not to this reference'],
+      ['11', 'expired: it checks in every other way, and its exp has passed (or --online says expired)'],
+      ['12', '--online: it checks, and its public state is redeemed or revoked'],
+      SEVEN,
+    ],
+    examples: ['trooth evidence verify evidence.jws', 'trooth evidence verify authorization.json --keys keys.json --json', 'pbpaste | trooth evidence verify - --online', 'trooth evidence verify authorization.json --log'],
+  },
+  delegation: {
+    usage: ['trooth delegation verify <file|-> [--keys <path>] [--delegation <path>] [--log [--log-index N]] [--json]'],
+    about: [
+      'Delegation receipts (docs/ACTION-EVIDENCE.md): the signed record Trooth hands the person who creates or',
+      'revokes a delegation. Run trooth delegation verify --help.',
+    ],
+    flags: [],
+    exits: [
+      ['0', 'verify: it checks'], ['2', 'usage error'], ['3', 'the key list or the log entry could not be read'], ['8', 'not trusted'], ['9', 'mismatch'],
+      SEVEN,
+    ],
+  },
+  'delegation verify': {
+    usage: ['trooth delegation verify <file|-> [--keys <path>] [--delegation <path>] [--log [--log-index N]] [--json]'],
+    about: [
+      'Checks a delegation receipt on this machine: a compact JWS, or the JSON POST /v1/delegations, POST',
+      '/v1/delegations/<id>/revoke or GET /v1/delegations answers with (its `receipt`), from a file or stdin with -.',
+      'The same key and signature rules as evidence verify; typ must be trooth-delegation-receipt+jwt and format',
+      'trooth.delegation-receipt.v1. Prints the event (created or revoked), the delegation id and digest, the',
+      "agent key's thumbprint, the actions, the target domain, the expiry, and when Trooth recorded it. The receipt",
+      'binds the limit, data class and approval threshold through the digest of the delegation document: when',
+      'the JSON carries that document (the create response does) or --delegation names it, its digest is checked',
+      'and its scope printed. A receipt does not expire; an expired delegation is reported, with exit 0.',
+      "With --log it also checks the signed commitment to the receipt's SHA-256 in the public witness log,",
+      'which holds only that commitment, never the receipt.',
+    ],
+    flags: [
+      ['--keys <path>', 'a saved copy of https://api.trooth.co/public/keys; with it nothing is sent'],
+      ['--delegation <path>', 'the delegation document (JSON); its canonical SHA-256 must be the delegation.sha256 the receipt names'],
+      ['--log', 'also check the public witness log: read https://api.trooth.co/scan/log/v1/entries/<N> (N from the input JSON\'s receipt_log.index or log.index), verify the commitment there with the same keys, and check that its kind is delegation_receipt and its sha256 is the SHA-256 of this receipt'],
+      ['--log-index <N>', 'the log entry to check (implies --log); for a bare JWS, which carries no index'],
+      ['--json', 'one JSON document on stdout (types/evidence.d.ts DelegationVerifyOutput); diagnostics on stderr'],
+    ],
+    exits: [
+      ['0', 'it checks: trusted key, valid signature, every claim holds (and the delegation document, when given, has the digest named; with --log, logged)'],
+      ['2', 'usage error: no file, a file not found, input that is not a compact JWS or JSON holding one, --log with no log index'],
+      ['3', `the key list or the log entry could not be read; ${THREE_INTERNAL}`],
+      ['8', 'not trusted: malformed, alg not EdDSA, kid not on the key list or not purpose signed-references, the key not trusted, or the signature does not verify (with --log, also the log commitment\'s)'],
+      ['9', 'mismatch: the signature verifies, but typ, format, iss, the claims, or the delegation document\'s digest do not hold; --log: no entry at that index, or its commitment is not to this receipt'],
+      SEVEN,
+    ],
+    examples: ['trooth delegation verify delegation.json', 'trooth delegation verify receipt.jws --keys keys.json --json', 'trooth delegation verify delegation.json --log'],
+  },
 };
 
 /** The help for `trooth <key>`: usage, what it does, flags, exit codes, examples. */
@@ -1037,7 +1180,7 @@ function commandHelpText(key) {
 }
 
 /** The commands that take a subcommand, and how each finds it in argv. */
-const SUBCOMMANDS = { log: ['checkpoint', 'monitor', 'receipt'], guard: ['decide', 'hook', 'ci', 'cache'], declare: ['init', 'sign', 'check'] };
+const SUBCOMMANDS = { log: ['checkpoint', 'monitor', 'receipt'], guard: ['decide', 'hook', 'ci', 'cache'], declare: ['init', 'sign', 'check'], evidence: ['verify'], delegation: ['verify'] };
 
 /**
  * Whether argv asks for a command's help (--help or -h anywhere before `--`,
@@ -2477,6 +2620,15 @@ function printPublicRecord(d, sig) {
     const ex = sb.osv?.excluded;
     if (ex && ex.checked) out(`               ${ex.advisories ? `build and test, not delivered: OSV lists ${ex.advisories} advisor${ex.advisories === 1 ? 'y' : 'ies'} across ${ex.components_affected} of ${ex.checked} package versions${ex.affected.length ? ` (${ex.affected.slice(0, 3).map((a) => `${a.purl} ${a.ids.slice(0, 3).join(', ')}`).join('; ')})` : ''}` : `build and test, not delivered: OSV lists no advisory for the ${ex.checked} package versions`}`);
   }
+  if (d.trust_center) {
+    // What the company's trust center page named, never facts Trooth checked (0.22.0).
+    const tc = d.trust_center;
+    const names = { safebase: 'SafeBase', vanta: 'Vanta', drata: 'Drata', conveyor: 'Conveyor', whistic: 'Whistic', trustarc: 'TrustArc', secureframe: 'Secureframe', onetrust: 'OneTrust', own_site: 'the company\'s own site', other: 'another host' };
+    const by = tc.provider_detected_by === 'page' && tc.provider !== 'own_site' && tc.provider !== 'other' ? ' (named by the page)' : '';
+    const from = tc.source === 'company_statement' ? 'stated by the company on trooth.co' : 'linked from the home page';
+    out(`  trust center ${names[tc.provider] || tc.provider}${by} · status ${tc.status || 'no answer'} · ${tc.readable ? (tc.frameworks_named.length ? `names ${tc.frameworks_named.join(', ')}` : 'names no framework Trooth looks for') : warn(`not read: ${tc.reason}`)} ${D}${tc.final_url || tc.url} (${from})${X}`);
+    if (tc.readable) out(`               ${D}${tc.documents_named.length ? `${tc.documents_named.length} document${tc.documents_named.length === 1 ? '' : 's'} named${tc.subprocessors_listed ? ', subprocessors mentioned' : ''}. ` : tc.subprocessors_listed ? 'subprocessors mentioned. ' : ''}What the page names, not facts Trooth checked: Trooth did not read the documents behind it.${X}`);
+  }
   if (d.sam) {
     const regs = d.sam.registrations.map((x) => `${x.legal_name}${x.uei ? ` UEI ${x.uei}` : ''}${x.status ? ` (${x.status}${x.expires ? `, expires ${x.expires}` : ''})` : ''}`);
     out(`  SAM.gov      ${regs.length ? regs.join('; ') : `no registration named ${d.sam.names_checked.join(' or ')}`} ${D}(read ${fmtDate(d.sam.read_at)})${X}`);
@@ -3386,6 +3538,268 @@ async function declareCmd() {
   return isSignatureProblem(r) ? EXIT.NOT_TRUSTED : EXIT.MISMATCH;
 }
 
+/* ------------------------------------------- evidence and delegation ---- */
+
+// docs/ACTION-EVIDENCE.md. Both commands check one Ed25519 compact JWS Trooth
+// signed with its evidence key, against /public/keys (or --keys, which sends
+// nothing), with bin/lib/evidence.mjs. Nothing a payload names is fetched: the
+// key list and the public state are read from API only.
+
+const STATUS_EXIT = { valid: EXIT.OK, expired: EXIT.EXPIRED, not_trusted: EXIT.NOT_TRUSTED, mismatch: EXIT.MISMATCH };
+
+/** The text of <file|->: a file, or stdin for -, bounded. Exits 2 when it cannot be read. */
+async function readInputText(arg, command) {
+  if (!arg) fail(EXIT.USAGE, `missing <file|->. Try: trooth ${command} verify evidence.jws (or - to read stdin)`);
+  const max = 1024 * 1024;
+  if (arg === '-') {
+    const chunks = []; let total = 0;
+    for await (const chunk of process.stdin) {
+      total += chunk.length;
+      if (total > max) fail(EXIT.USAGE, `stdin is over ${max} bytes; a reference is a few kilobytes.`);
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  }
+  if (!existsSync(arg)) fail(EXIT.USAGE, `file not found: ${arg}`);
+  let st;
+  try { st = statSync(arg); } catch (e) { fail(EXIT.USAGE, `could not read ${arg}: ${e && e.code ? e.code : e}`); }
+  if (!st.isFile()) fail(EXIT.USAGE, `not a file: ${arg}`);
+  if (st.size > max) fail(EXIT.USAGE, `${arg} is over ${max} bytes; a reference is a few kilobytes.`);
+  try { return readFileSync(arg, 'utf8'); } catch (e) { fail(EXIT.USAGE, `could not read ${arg}: ${e && e.code ? e.code : e}`); }
+}
+
+/** The key list: --keys <file>, or GET API/public/keys. Returns { keys, source, read_at }. */
+async function readKeyList(flags) {
+  if (flags['--keys']) {
+    const k = readJsonFile(flags['--keys'], 'the key list');
+    const keys = Array.isArray(k) ? k : k && Array.isArray(k.keys) ? k.keys : null;
+    if (!keys) fail(EXIT.USAGE, `${flags['--keys']} has no keys array (expected the JSON of ${API}/public/keys).`);
+    return { keys, source: flags['--keys'], read_at: Array.isArray(k) ? null : (k.list_read_at || null) };
+  }
+  try {
+    const r = await getFrom(API, '/public/keys', MAX_BODY_SMALL);
+    if (r.status !== 200) throw new Upstream(`${API}/public/keys answered HTTP ${r.status}`, { http_status: r.status });
+    const k = parseJsonBody(r);
+    if (!k || !Array.isArray(k.keys)) throw new Upstream(`${API}/public/keys answered with no keys array`);
+    return { keys: k.keys, source: `${API}/public/keys`, read_at: k.list_read_at || new Date().toISOString() };
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, `the key list could not be read: ${e.message}`, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+}
+
+/** The jti's public state, GET API/public/action-evidence/<jti>. Returns { state, ... } or { not_found: true }. */
+async function readEvidenceState(jti) {
+  const path = `/public/action-evidence/${encodeURIComponent(jti)}`;
+  try {
+    const r = await getFrom(API, path, 64 * 1024);
+    if (r.status === 404) return { url: `${API}${path}`, state: null, not_found: true };
+    if (r.status !== 200) throw new Upstream(`${API}${path} answered HTTP ${r.status}`, { http_status: r.status });
+    const b = parseJsonBody(r);
+    if (!b || b.jti !== jti || !PUBLIC_STATES.includes(b.state)) throw new Upstream(`${API}${path} answered with something that is not the state of ${jti}`);
+    return { url: `${API}${path}`, state: b.state, expires_at: typeof b.expires_at === 'string' ? b.expires_at : null, redeemed_at: typeof b.redeemed_at === 'string' ? b.redeemed_at : null, not_found: false };
+  } catch (e) {
+    if (e instanceof Upstream) fail(EXIT.UPSTREAM, `the reference's public state could not be read: ${e.message}`, { state: 'service_error', ...e.extra });
+    throw e;
+  }
+}
+
+function subOf(command) {
+  const { flags, positional } = parseArgs(command);
+  if (positional[0] !== 'verify') fail(EXIT.USAGE, `trooth ${command} takes verify. Try: trooth ${command} verify <file|->, or trooth ${command} --help`);
+  if (positional.length > 2) fail(EXIT.USAGE, `trooth ${command} verify takes one <file|->, got: ${positional.slice(1).join(' ')}`);
+  return { flags, arg: positional[1] };
+}
+
+function relTime(iso, now) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return '';
+  const s = Math.round((t - now) / 1000);
+  const fmt = (x) => (x >= 172800 ? `${Math.round(x / 86400)} days` : x >= 7200 ? `${Math.round(x / 3600)} h` : x >= 120 ? `${Math.round(x / 60)} min` : `${x} s`);
+  return s >= 0 ? `in ${fmt(s)}` : `${fmt(-s)} ago`;
+}
+
+function statusLabel(st) {
+  return st === 'valid' ? `${J}checks${X}` : st === 'expired' ? `${A}expired${X}` : st === 'mismatch' ? `${R}mismatch${X}` : `${R}not trusted${X}`;
+}
+
+function keyLine(r) {
+  if (!r.kid) return `${R}${r.reason}${X}`;
+  const k = r.key ? `${r.key.purpose || 'no purpose'}, ${r.key.state}` : 'not checked';
+  const sig = r.signature === 'valid' ? `${J}valid${X}` : r.signature === 'invalid' ? `${R}invalid${X}` : `${D}not checked${X}`;
+  return `${sig}  ${D}Ed25519, kid ${r.kid} (${k})${X}`;
+}
+
+const approvalText = (a) => (a ? `${a.method === 'identity_provider' ? `the identity provider${a.idp && a.idp.domain ? ` (${a.idp.domain})` : ''}` : 'a fresh sign-in'}, by ${a.approved_by} at ${a.approved_at}` : 'none');
+
+/**
+ * --log (and --log-index N): is the object in the public witness log? Reads
+ * GET API/scan/log/v1/entries/<N>, takes the commitment JWS from the entry's
+ * envelope payload and checks it (verifyLogCommitment): its signature with
+ * the same key list, typ, format, kind, and that its sha256 is the SHA-256 of
+ * the JWS just verified. The log holds only that commitment, never the
+ * object. Returns { status, code, ... } and never exits: an entry that
+ * cannot be read is status 'unreadable', exit 3.
+ */
+async function checkLogPlace(flags, place, jws, keys) {
+  if (!flags['--log'] && flags['--log-index'] === undefined) return null;
+  let index = place && Number.isSafeInteger(place.index) ? place.index : null;
+  let indexSource = index !== null ? 'the input JSON' : null;
+  if (flags['--log-index'] !== undefined) {
+    if (!/^(0|[1-9][0-9]{0,15})$/.test(String(flags['--log-index']))) fail(EXIT.USAGE, `--log-index takes an entry index (a whole number), got: ${flags['--log-index']}`);
+    index = Number(flags['--log-index']);
+    indexSource = '--log-index';
+  }
+  if (index === null) fail(EXIT.USAGE, "--log: the input carries no log index (a compact JWS has none, and the API's `log` is null while the append is pending). Save the API's JSON answer, or pass --log-index N.");
+  const url = `${LOG_BASE}/entries/${index}`;
+  const base = { index, index_source: indexSource, url, status: null, code: null, reason: null, kind: null, committed_sha256: null, committed_at: null, kid: null, signature: 'not_checked', problems: [] };
+  let e;
+  try { e = await getFrom(LOG_BASE, `/entries/${index}`, 64 * 1024); }
+  catch (err) { if (err instanceof Upstream) return { ...base, status: 'unreadable', code: EXIT.UPSTREAM, reason: `the log entry could not be read: ${err.message}` }; throw err; }
+  if (e.status === 404) return { ...base, status: 'mismatch', code: EXIT.MISMATCH, reason: `the log has no entry ${index}`, problems: [`the log has no entry ${index}`] };
+  if (e.status !== 200) return { ...base, status: 'unreadable', code: EXIT.UPSTREAM, reason: `the log entry answered HTTP ${e.status}` };
+  let entry;
+  try { entry = parseJsonBody(e); } catch (err) { if (err instanceof Upstream) return { ...base, status: 'unreadable', code: EXIT.UPSTREAM, reason: err.message }; throw err; }
+  let c;
+  try { c = commitmentFromLogEntry(entry); }
+  catch (err) { if (err instanceof EvidenceInputError) return { ...base, status: 'mismatch', code: EXIT.MISMATCH, reason: `entry ${index}: ${err.message}`, problems: [`entry ${index}: ${err.message}`] }; throw err; }
+  const v = verifyLogCommitment(c.jws, jws, keys);
+  if (v.status === 'valid' && c.kind !== v.kind) v.problems.push(`entry ${index} is logged as ${c.kind}, not ${v.kind}`);
+  const status = v.problems.length && v.status === 'valid' ? 'mismatch' : v.status;
+  return {
+    ...base, status, code: status === 'valid' ? EXIT.OK : status === 'not_trusted' ? EXIT.NOT_TRUSTED : EXIT.MISMATCH,
+    reason: v.problems[0] || null, problems: v.problems, kind: c.kind, statement_id: c.statement_id, logged_at: c.logged_at,
+    committed_sha256: v.committed_sha256, committed_at: v.committed_at, kid: v.kid, key: v.key, signature: v.signature, commitment: c.jws,
+  };
+}
+
+/** The exit with a log check: a failed one (8, 9 or 3) takes the place of 0, 11 or 12. */
+function withLogExit(code, log) {
+  if (!log || log.code === EXIT.OK) return code;
+  return code === EXIT.OK || code === EXIT.EXPIRED || code === EXIT.NOT_REDEEMABLE ? log.code : code;
+}
+
+function logLine(log) {
+  if (!log) return null;
+  if (log.status === 'valid') return `  log          ${J}logged at index ${log.index}${X}  ${D}a commitment to this JWS's sha256, signed by kid ${log.kid}${log.committed_at ? ` at ${log.committed_at}` : ''} (${log.url})${X}`;
+  const what = log.status === 'unreadable' ? `${A}could not be read${X}` : log.status === 'not_trusted' ? `${R}commitment not trusted${X}` : `${R}not logged as this JWS${X}`;
+  return `  log          ${what}: ${log.reason}  ${D}(${log.url})${X}`;
+}
+
+async function evidenceCmd() {
+  const { flags, arg } = subOf('evidence');
+  if (!!flags['--protocol'] !== !!flags['--reference']) fail(EXIT.USAGE, '--protocol and --reference go together: the mandate the reference should be bound to.');
+  const text = await readInputText(arg, 'evidence');
+  let jws, place;
+  try { ({ jws, log: place } = extractJws(text, 'evidence')); }
+  catch (e) { if (e instanceof EvidenceInputError) fail(EXIT.USAGE, `${arg === '-' ? 'stdin' : arg}: ${e.message}`); throw e; }
+  const kl = await readKeyList(flags);
+  const now = Date.now();
+  const binding = flags['--protocol'] ? { protocol: flags['--protocol'], reference: flags['--reference'] } : undefined;
+  const r = verifyEvidence(jws, kl.keys, { now, binding });
+  let code = STATUS_EXIT[r.status];
+  let online = null;
+  if (flags['--online'] && (r.status === 'valid' || r.status === 'expired') && r.jti) {
+    online = await readEvidenceState(r.jti);
+    if (online.not_found) code = EXIT.FINDING;
+    else if (online.state === 'redeemed' || online.state === 'revoked') code = EXIT.NOT_REDEEMABLE;
+    else if (online.state === 'expired') code = EXIT.EXPIRED;
+  }
+  const log = r.status === 'valid' || r.status === 'expired' ? await checkLogPlace(flags, place, jws, kl.keys) : null;
+  code = withLogExit(code, log);
+  const sources = { keys: kl.source, keys_read_at: kl.read_at, state: online ? online.url : null, log: log ? log.url : null };
+  if (asJson) {
+    emitJson({ ok: code === EXIT.OK, exit: code, ...r, online, log, sources });
+    return code;
+  }
+  const s = r.summary;
+  out(`${B}Action evidence reference${X}  ${r.jti || ''}  ${statusLabel(r.status)}`);
+  out(`  signature    ${keyLine(r)}`);
+  for (const p of r.problems) out(`  ${R}problem${X}      ${p}`);
+  if (s) {
+    const what = s.action === 'trooth_payment' ? `${s.verb || 'pay'} ${B}${s.amount ?? '?'} ${s.currency ?? ''}${X}${s.creditor_name ? ` to ${s.creditor_name}` : ''}` : s.action === 'trooth_data_share' ? `${s.verb || 'share'} data of class ${B}${s.data_class ?? '?'}${X}` : (s.action || 'unknown');
+    out(`  action       ${what}  ${D}(${s.action})${X}`);
+    if (s.description) out(`  description  ${s.description}`);
+    for (const l of s.locations) out(`  location     ${l}`);
+    out(`  target       ${s.target_domain ?? 'not named'}`);
+    if (s.delegation) {
+      const lim = s.delegation.limit ? `limit ${s.delegation.limit.amount} ${s.delegation.limit.currency}` : s.delegation.data_class ? `data class up to ${s.delegation.data_class}` : 'no limit named';
+      out(`  delegation   ${s.delegation.id}  ${D}role ${s.delegation.role ?? '?'}, ${lim}, expires ${s.delegation.expires_at ?? '?'}${X}`);
+      out(`  agent key    ${s.delegation.agent_jkt ?? '?'}  ${D}(RFC 7638 thumbprint)${X}`);
+    }
+    if (s.principal) out(`  principal    workspace ${s.principal.workspace}, user ${s.principal.user}`);
+    out(`  approved     delegation: ${approvalText(s.approval.delegation)}`);
+    out(`               action: ${s.approval.action ? approvalText(s.approval.action) : `${D}no separate approval (at or under the delegation's approval threshold)${X}`}`);
+    if (s.binding) out(`  binding      ${s.binding.protocol}  ${D}reference sha256 ${s.binding.reference_sha256}${X}${s.binding.matches_mandate === true ? `  ${J}bound to the mandate given${X}` : s.binding.matches_mandate === false ? `  ${R}not bound to the mandate given${X}` : ''}`);
+    out(`  boundary     ${s.boundary_version ?? 'not named'}`);
+    const c = s.counterparty;
+    out(`  counterparty ${c.status === 'read' ? `${c.domain}: Trooth's signed reading${c.read_at ? ` of ${c.read_at}` : ''}${c.log_index !== null ? `, log index ${c.log_index}` : ''}` : `${c.domain}: ${A}not read${X} (nothing about the counterparty is attested)`}`);
+    if (c.statement_sha256) out(`               ${D}statement sha256 ${c.statement_sha256}${X}`);
+    out(`  issued       ${s.issued_at ?? '?'}`);
+    out(`  expires      ${s.expires_at ?? '?'}  ${D}${relTime(s.expires_at, now)}${X}`);
+  }
+  if (online) out(`  state        ${online.not_found ? `${A}not known to ${API}${X}` : online.state === 'issued' ? `${J}issued${X}` : `${A}${online.state}${X}${online.redeemed_at ? `  ${D}redeemed at ${online.redeemed_at}${X}` : ''}`}  ${D}(online)${X}`);
+  else if (r.state_url && (r.status === 'valid' || r.status === 'expired')) out(`  state        ${D}not asked; --online reads ${API}/public/action-evidence/${r.jti}${X}`);
+  if (log) out(logLine(log));
+  out(`  sha256       ${D}${r.sha256}${X}`);
+  out(`  keys         ${D}${kl.source}${X}`);
+  out(`\n${D}A reference that checks shows that Trooth checked this one action against the delegation and recorded what is above, at the time issued. It does not move money, does not say a payment will be made or settle, and does not establish what the responsibility boundary lists as not established. The payment partner's own mandate and controls govern execution.${X}`);
+  return code;
+}
+
+async function delegationCmd() {
+  const { flags, arg } = subOf('delegation');
+  const text = await readInputText(arg, 'delegation');
+  let jws, delegation, place;
+  try { ({ jws, delegation, log: place } = extractJws(text, 'delegation')); }
+  catch (e) { if (e instanceof EvidenceInputError) fail(EXIT.USAGE, `${arg === '-' ? 'stdin' : arg}: ${e.message}`); throw e; }
+  let delegationSource = delegation ? (arg === '-' ? 'stdin' : arg) : null;
+  if (flags['--delegation']) {
+    const d = readJsonFile(flags['--delegation'], 'the delegation document');
+    delegation = d && typeof d === 'object' && !Array.isArray(d) && d.delegation && typeof d.delegation === 'object' ? d.delegation : d;
+    delegationSource = flags['--delegation'];
+  }
+  const kl = await readKeyList(flags);
+  const now = Date.now();
+  const r = verifyDelegationReceipt(jws, kl.keys, { now, delegation: delegation || undefined });
+  const log = r.status === 'valid' ? await checkLogPlace(flags, place, jws, kl.keys) : null;
+  const code = withLogExit(STATUS_EXIT[r.status] === EXIT.EXPIRED ? EXIT.OK : STATUS_EXIT[r.status], log);
+  const sources = { keys: kl.source, keys_read_at: kl.read_at, delegation: delegationSource, log: log ? log.url : null };
+  if (asJson) {
+    emitJson({ ok: code === EXIT.OK, exit: code, ...r, log, sources });
+    return code;
+  }
+  const s = r.summary;
+  out(`${B}Delegation receipt${X}  ${s ? `${s.event ?? ''} ${s.delegation_id ?? ''}` : ''}  ${statusLabel(r.status)}`);
+  out(`  signature    ${keyLine(r)}`);
+  for (const p of r.problems) out(`  ${R}problem${X}      ${p}`);
+  if (s) {
+    out(`  event        ${s.event === 'revoked' ? `${A}revoked${X}` : s.event}`);
+    out(`  delegation   ${s.delegation_id}  ${D}sha256 ${s.delegation_sha256}${X}`);
+    out(`  agent key    ${s.agent_jkt ?? '?'}  ${D}(RFC 7638 thumbprint)${X}`);
+    if (s.principal) out(`  principal    workspace ${s.principal.workspace}, user ${s.principal.user}`);
+    out(`  actions      ${s.actions.join(', ') || 'none named'}`);
+    out(`  target       ${s.target_domain ?? 'not named'}`);
+    if (s.scope) {
+      out(`  limit        ${s.scope.limit ? `${s.scope.limit.amount} ${s.scope.limit.currency}` : 'none'}`);
+      out(`  data class   ${s.scope.data_class ?? 'none'}`);
+      out(`  approval     above ${s.scope.approval_above ?? 'none'}${s.scope.approval_above ? ` ${s.scope.limit ? s.scope.limit.currency : ''}` : ''}  ${D}(a person approves each action above it)${X}`);
+      if (s.scope.role) out(`  role         ${s.scope.role}`);
+      out(`  ${D}scope        from the delegation document, whose digest is the one the receipt names${X}`);
+    } else {
+      out(`  scope        ${D}limit, data class and approval threshold are bound by delegation.sha256, not carried in the receipt; ${s.scope_source === 'not supplied' ? 'pass --delegation <file> (or the create response, which carries it) to check and print them' : s.scope_source}${X}`);
+    }
+    out(`  expires      ${s.expires_at ?? '?'}${s.delegation_expired ? `  ${A}the delegation has expired${X}` : `  ${D}${relTime(s.expires_at, now)}${X}`}`);
+    out(`  recorded     ${s.recorded_at ?? '?'}${s.by ? `  ${D}by ${s.by}${X}` : ''}`);
+    if (s.approval) out(`  approved     ${approvalText(s.approval)}`);
+  }
+  if (log) out(logLine(log));
+  out(`  sha256       ${D}${r.sha256}${X}`);
+  out(`  keys         ${D}${kl.source}${X}`);
+  out(`\n${D}A receipt that checks shows what Trooth recorded about this delegation, and when. It does not say that any action taken under it is proper.${X}`);
+  return code;
+}
+
 function guardHookUsage(why) { diag(`trooth guard: ${why}`); return 2; }
 
 /** Set for `trooth guard hook`: Claude Code lets the tool run on any exit but 0 and 2. */
@@ -3399,7 +3813,7 @@ async function main() {
     if (!topic.length) { outAlways(helpText()); return EXIT.OK; }
     const [name, sub] = topic;
     if (!Object.prototype.hasOwnProperty.call(COMMAND_HELP, name)) {
-      fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
+      fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation.`);
     }
     outAlways(commandHelpText(sub && (SUBCOMMANDS[name] || []).includes(sub) ? `${name} ${sub}` : name));
     return EXIT.OK;
@@ -3424,12 +3838,14 @@ async function main() {
   if (cmd === 'mcp-tools') return mcpToolsCmd();
   if (cmd === 'guard') return guardCmd();
   if (cmd === 'declare') return declareCmd();
+  if (cmd === 'evidence') return evidenceCmd();
+  if (cmd === 'delegation') return delegationCmd();
   if (Object.prototype.hasOwnProperty.call(RETIRED, cmd)) {
     fail(EXIT.USAGE, `\`trooth ${cmd}\` is retired. ${RETIRED[cmd]} Run \`trooth --help\`.`);
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only
