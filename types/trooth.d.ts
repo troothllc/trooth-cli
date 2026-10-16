@@ -764,7 +764,7 @@ export interface ProfileOutput {
   slug: string | null;
   /** Which record was read, as the projection states it. */
   record: ProfileRecordRef;
-  /** Always false: the profile is not signed. Trooth signs only the witness statement for a reading it took of the company's public surface. */
+  /** Always false: the profile is not signed. What Trooth signs about a company's record is only the witness statement for a reading it took of the company's public surface. */
   signed: false;
   /** The command that checks the one signed object, the witness statement: trooth verify <domain>. */
   verify_with: string;

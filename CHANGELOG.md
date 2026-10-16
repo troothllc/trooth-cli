@@ -2,6 +2,12 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.22.1 (2026-10-16)
+
+### What Trooth signs, said exactly
+
+- `trooth profile` said Trooth "signs one object", the witness statement. Since 0.22.0 Trooth also signs delegation receipts and action evidence references, so the not-signed line now says what Trooth signs about a company's record is the witness statement for a reading it took, and that statement covers the reading, not the profile's facts. The same wording is in `trooth profile --help`, the README, the `signed` description in `schemas/profile-output.v1.schema.json` and the generated TypeScript, Pydantic and Go types. No behaviour, output member or exit code changes.
+
 ## 0.22.0 (2026-10-15)
 
 ### Delegation receipts and action evidence references, checked on your machine

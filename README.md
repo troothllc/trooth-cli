@@ -221,7 +221,7 @@ Trooth   trooth.co   slug trooth
 Trust Profile: https://trooth.co/network/company/trooth
 record updated 2026-10-06T01:08:12.526Z · record version 8 · read 2026-10-09T20:56:41.921Z
 
-This profile is the company's own declared record, as Trooth publishes it; facts Trooth observed are labeled as such. It is not signed: Trooth signs one object, the witness statement for a reading it took of the company's public surface, and that statement covers the reading, not these facts.
+This profile is the company's own declared record, as Trooth publishes it; facts Trooth observed are labeled as such. It is not signed: what Trooth signs about a company's record is the witness statement for a reading it took of the company's public surface, and that statement covers the reading, not these facts.
 Check that statement yourself: trooth verify trooth.co
 
 == Commercial & pricing (pricing) · published · the company (declared)

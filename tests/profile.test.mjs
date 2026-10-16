@@ -78,7 +78,7 @@ test('text: every section in page order, its state and who said it; the not-sign
     assert.match(r.out, /^Trooth {3}trooth\.co {3}slug trooth$/m);
     assert.match(r.out, /record updated 2026-10-06T01:08:12\.526Z · record version 8 · read /);
     assert.match(r.out, /company's own declared record/);
-    assert.match(r.out, /It is not signed: Trooth signs one object, the witness statement/);
+    assert.match(r.out, /It is not signed: what Trooth signs about a company's record is the witness statement/);
     assert.match(r.out, /Check that statement yourself: trooth verify trooth\.co/);
     // The empty section: "not published", never filled in.
     const proof = r.out.slice(r.out.indexOf('== Customer proof'), r.out.indexOf('== People'));

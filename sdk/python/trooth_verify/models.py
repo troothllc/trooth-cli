@@ -603,7 +603,7 @@ class ProfileOutput(BaseModel):
     name: Optional[str] = Field(..., description="The company name as published, or null when no record was found.")
     slug: Optional[str] = Field(..., description="The company's slug on the Network, or null when no record was found.")
     record: ProfileRecordRef = Field(..., description="Which record was read, as the projection states it.")
-    signed: Literal[False] = Field(..., description="Always false: the profile is not signed. Trooth signs only the witness statement for a reading it took of the company's public surface.")
+    signed: Literal[False] = Field(..., description="Always false: the profile is not signed. What Trooth signs about a company's record is only the witness statement for a reading it took of the company's public surface.")
     verify_with: str = Field(..., description="The command that checks the one signed object, the witness statement: trooth verify <domain>.")
     claim_url: Optional[str] = Field(..., description="When no record was found and the projection gives one, the address at which the company can claim its record; otherwise null. Never built by the CLI.")
     requested_sections: Optional[List[str]] = Field(..., description="The section names --section asked for, in page order, or null for every section.")

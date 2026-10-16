@@ -86,7 +86,7 @@
     },
     "signed": {
       "const": false,
-      "description": "Always false: the profile is not signed. Trooth signs only the witness statement for a reading it took of the company's public surface."
+      "description": "Always false: the profile is not signed. What Trooth signs about a company's record is only the witness statement for a reading it took of the company's public surface."
     },
     "verify_with": {
       "type": "string",

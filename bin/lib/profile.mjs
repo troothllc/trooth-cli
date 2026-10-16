@@ -272,7 +272,7 @@ export function buildSections(body) {
   return { sections, profilePresent: !!profile };
 }
 
-export const NOT_SIGNED = 'This profile is the company\'s own declared record, as Trooth publishes it; facts Trooth observed are labeled as such. It is not signed: Trooth signs one object, the witness statement for a reading it took of the company\'s public surface, and that statement covers the reading, not these facts.';
+export const NOT_SIGNED = 'This profile is the company\'s own declared record, as Trooth publishes it; facts Trooth observed are labeled as such. It is not signed: what Trooth signs about a company\'s record is the witness statement for a reading it took of the company\'s public surface, and that statement covers the reading, not these facts.';
 
 /** The date part of a fact, in words: "declared 2026-10-06" or "date unknown". */
 export function dateWords(f) {

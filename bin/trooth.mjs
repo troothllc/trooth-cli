@@ -583,8 +583,9 @@ const COMMAND_HELP = {
       'a date is never borrowed from another field). A section the company left empty prints "not',
       'published". One request, GET https://trooth.co/api/network/profile?q=<domain>&contract=2, the',
       'projection check, the REST API and the MCP connector read. Read-only; no key, no account.',
-      "The profile is the company's own declared record and is not signed: Trooth signs only the witness",
-      'statement for a reading it took, and trooth verify <domain> checks that.',
+      "The profile is the company's own declared record and is not signed: what Trooth signs about a",
+      "company's record is the witness statement for a reading it took, and trooth verify <domain> checks",
+      'that.',
     ],
     flags: [
       ['--section <names>', 'only these sections, comma-separated or repeated: the MCP tool\'s names above; the record\'s fact categories are accepted too (registration -> identity, recovery -> hosting, pricing-add-ons -> pricing, privacy-roles -> privacy, ai-practices -> ai)'],

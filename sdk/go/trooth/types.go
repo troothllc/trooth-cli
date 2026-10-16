@@ -766,7 +766,7 @@ type ProfileOutput struct {
 	Slug *string `json:"slug"`
 	// Which record was read, as the projection states it.
 	Record ProfileRecordRef `json:"record"`
-	// Always false: the profile is not signed. Trooth signs only the witness statement for a reading it took of the company's public surface. One of: false.
+	// Always false: the profile is not signed. What Trooth signs about a company's record is only the witness statement for a reading it took of the company's public surface. One of: false.
 	Signed bool `json:"signed"`
 	// The command that checks the one signed object, the witness statement: trooth verify <domain>.
 	VerifyWith string `json:"verify_with"`
