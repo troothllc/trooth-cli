@@ -27,6 +27,7 @@
 
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign as edSign, verify as edVerify } from 'node:crypto';
 import { canonicalize } from './jcs.mjs';
+import { quotedStrings, stripTrailingSlashes } from './text.mjs';
 
 export const DECLARATION_FORMAT = 'trooth.declaration.v1';
 export const DECLARATION_PATH = '/.well-known/trooth.json';
@@ -413,7 +414,7 @@ export async function readKeyPin(domain, { fetch: f = globalThis.fetch, timeoutM
 
 /** A TXT record's data as DNS JSON gives it ("a" "b" quoted strings) joined into one value. */
 export function txtValue(data) {
-  const parts = [...String(data).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replace(/\\(.)/g, '$1'));
+  const parts = quotedStrings(data);
   return parts.length ? parts.join('') : String(data);
 }
 
@@ -439,7 +440,7 @@ export async function readRecordHead(record, { fetch: f = globalThis.fetch, time
   const slug = recordSlugOf(record);
   const out = { status: 'not_read', url: null, slug, record_version: null, record_digest: null, reason: null, http_status: null };
   if (!slug) return { ...out, reason: `${String(record).slice(0, 120)} is not a Trooth company record URL (${RECORD_PREFIX}<slug>)` };
-  const url = `${String(base).replace(/\/+$/, '')}/api/network/profile?q=${encodeURIComponent(slug)}&contract=2`;
+  const url = `${stripTrailingSlashes(base)}/api/network/profile?q=${encodeURIComponent(slug)}&contract=2`;
   out.url = url;
   let res;
   try {

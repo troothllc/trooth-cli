@@ -6,6 +6,7 @@
 // a bundle and a citation, and never depends on a URL that could move.
 
 import { createHash } from 'node:crypto';
+import { stripTrailingSlashes } from './text.mjs';
 
 /** Each type and the exact form its value takes. */
 export const ID_TYPES = {
@@ -61,7 +62,7 @@ function contactValue(raw) {
     let u;
     try { u = new URL(c); } catch { return c; }
     if (u.username || u.password) return c;
-    return `${u.hostname.toLowerCase()}${u.pathname}`.replace(/\/+$/, '');
+    return stripTrailingSlashes(`${u.hostname.toLowerCase()}${u.pathname}`);
   }
   return c;
 }

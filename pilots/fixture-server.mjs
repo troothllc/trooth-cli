@@ -64,8 +64,11 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/octet-stream', 'content-length': body.length });
     res.end(body);
   } catch (e) {
+    // The reason goes to this process's stderr, not to the client: a thrown
+    // error's message can carry paths and internals (CodeQL js/stack-trace-exposure).
+    console.error('fixture-server:', e);
     res.writeHead(500, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: String(e?.message ?? e) }));
+    res.end('{"error":"the fixture server could not answer this request"}');
   }
 });
 

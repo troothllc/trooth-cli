@@ -2,6 +2,16 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.22.2 (2026-10-17)
+
+### Seven code scanning alerts closed
+
+- GitHub code scanning (CodeQL) flagged three regular expressions that take polynomial time on crafted input: the trailing-slash strip of a base URL in `trooth guard` and in the record head read, and the quoted-string pattern that joins a DNS TXT answer. They are now single-pass loops in new `bin/lib/text.mjs` (`stripTrailingSlashes`, `quotedStrings`), with the same answers; the canonical-host trailing-slash strip in `bin/lib/ids.mjs` uses the same helper.
+- `scripts/guard-results.mjs` escapes backslashes before pipes when it writes a test name into a Markdown table.
+- The guard pilots' loopback fixture server no longer returns a thrown error's message to the client; it logs it to stderr and answers a fixed sentence.
+- Two tests replaced the first `{` with `String.replace`, which code scanning reads as incomplete escaping; they use `replaceFirst`, a literal first-occurrence replace.
+- New tests/text.test.mjs in `npm test`: the helpers give the old answers, and finish in linear time on the inputs that were quadratic. No command, output member or exit code changes.
+
 ## 0.22.1 (2026-10-16)
 
 ### What Trooth signs, said exactly

@@ -61,7 +61,7 @@ Each case is an attack on a pre-execution guardrail, in the style of AgentDojo's
 
 | Result | Case |
 |---|---|
-${adv.cases.map((c) => `| ${c.ok ? 'pass' : 'FAIL'} | ${c.name.replace(/\|/g, '\\|')} |`).join('\n')}
+${adv.cases.map((c) => `| ${c.ok ? 'pass' : 'FAIL'} | ${c.name.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')} |`).join('\n')}
 
 ${adv.pass} of ${adv.tests} cases passed${adv.fail ? `; ${adv.fail} failed` : ''}. These are tasks written by Trooth against its own guard; they are not the AgentDojo benchmark itself, and no outside party has run them.
 

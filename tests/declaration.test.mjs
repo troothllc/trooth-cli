@@ -4,6 +4,7 @@
 // absent) through an injected fetch, and the DNS pin through a loopback DNS-JSON
 // server. Network-free.
 import { test } from 'node:test';
+import { replaceFirst } from '../bin/lib/text.mjs';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { mkdtempSync, readFileSync, writeFileSync, statSync, existsSync } from 'node:fs';
@@ -134,7 +135,7 @@ test('negative: a URL on another host, a bad repository, a bad record, a bad pro
 });
 
 test('negative: oversize and invalid JSON', () => {
-  const big = JSON.stringify(good(), null, 2).replace('{', '{' + ' '.repeat(MAX_DECLARATION_BYTES));
+  const big = replaceFirst(JSON.stringify(good(), null, 2), '{', '{' + ' '.repeat(MAX_DECLARATION_BYTES));
   let r = check(big);
   assert.equal(r.status, 'invalid'); assert.match(r.reason, /over the 65536-byte limit/);
   r = check('{"format": "trooth.declaration.v1",');

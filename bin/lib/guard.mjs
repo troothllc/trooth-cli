@@ -18,6 +18,7 @@ import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { PINNED_LOG_VKEYS, PINNED_WITNESSES } from './log-trust.mjs';
 import { parseVkey } from './tlog.mjs';
+import { stripTrailingSlashes } from './text.mjs';
 import { parseCosignerVkey } from './witness.mjs';
 import { parsePolicy as parsePolicyText, PolicyError, toolCovered, targetHosts, normalizeHost, normalizePolicy, hostOfValue, asText } from './guard-policy.mjs';
 import { decideFrom, validateDecision, GUARD_DECISION_SCHEMA, REASON_CODES } from './guard-decide.mjs';
@@ -62,7 +63,7 @@ export function createGuard(opts = {}) {
   const cache = opts.cache && opts.cache.dir ? { dir: String(opts.cache.dir), maxAgeSeconds: Number.isFinite(opts.cache.maxAgeSeconds) ? Math.max(0, opts.cache.maxAgeSeconds) : 900 } : null;
   const offline = !!opts.offline;
   if (offline && !cache) throw new Error('offline mode reads only cached bundles; pass cache: { dir }.');
-  const strip = (u, d) => String(u ?? d).replace(/\/+$/, '');
+  const strip = (u, d) => stripTrailingSlashes(u ?? d);
   const ctx = {
     fetch: fetchFn, now, cache, offline, vkeys, witnesses,
     api: strip(opts.api, 'https://api.trooth.co'),

@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { createGuard, parsePolicy, PolicyError, decideFrom } from '../bin/lib/guard.mjs';
 import { toolCovered } from '../bin/lib/guard-policy.mjs';
+import { replaceFirst } from '../bin/lib/text.mjs';
 import { TRUSTED, FUTURE_SKEW_MS } from '../bin/lib/guard-decide.mjs';
 import { loadSchemas, makeValidator } from './lib/mini-schema.mjs';
 import { makeWorld, POLICY_YAML, NOW } from './lib/guard-fixtures.mjs';
@@ -268,7 +269,7 @@ test('invariant 1: every malformed or mutated policy is refused with PolicyError
   for (const [text, fmt] of SEED_TEXTS) {
     for (const key of ['__proto__', 'constructor', 'prototype']) {
       if (fmt === 'json') {
-        policyCase(text.replace('{', `{"${key}": {"rules": [], "policy": "x"},`), fmt, 'prototype-key');
+        policyCase(replaceFirst(text, '{', `{"${key}": {"rules": [], "policy": "x"},`), fmt, 'prototype-key');
         policyCase(text.replace('"applies_to": {', `"applies_to": {"${key}": {"tools": ["*"]},`), fmt, 'prototype-key');
       } else {
         policyCase(`${key}:\n  rules: []\n${text}`, fmt, 'prototype-key');
