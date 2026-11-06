@@ -2,6 +2,20 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.23.0 (2026-11-06)
+
+### One binary for Semanto and the Trooth Network, for people and for agents
+
+- `trooth semanto <tool>` runs any Semanto MCP tool, and `semanto <tool>` is the same command through a second name on the same package. `trooth network <tool>` runs a Trooth Network MCP tool. With no tool, each lists the tools. Arguments are `--name value` (or `--args '{json}'`).
+- `trooth api [-X METHOD] <path> [--data JSON] [--jq EXPR]` calls any route, signed in, like `gh api`. `--jq` takes `.path`, `.[]`, `keys`, `length` and pipes.
+- `trooth tools --json` lists every operation with its MCP name, REST route, CLI command and approval class.
+- `trooth login` signs in with the device flow (RFC 8628) when the sign-in server offers it, otherwise in the browser with PKCE and a loopback redirect (RFC 8252); the token goes in the macOS Keychain or the Secret Service, never a plain file. Where neither exists, use `TROOTH_API_KEY`. `trooth logout` removes it.
+- Agent mode: `TROOTH_API_KEY`, `--json` and `--no-input` (or `TROOTH_NO_INPUT`, or `CI`). The new commands exit 0 done, 2 refused with a fix, 3 needs a person's approval, 4 not reachable. The read commands keep their published exit codes, because scripts depend on them.
+- `trooth config list|get|set|unset`, read in the order flags, then environment, then the config file. A key or token is never a setting.
+- `trooth completion bash|zsh|fish|powershell`.
+- A newer version is mentioned at most once a day, on a terminal only, never with `--json`, `--quiet` or in CI (`TROOTH_NO_UPDATE_NOTIFIER=1` turns it off).
+- A spinner shows on a terminal only; diagnostics stay on stderr.
+
 ## 0.22.2 (2026-10-17)
 
 ### Seven code scanning alerts closed

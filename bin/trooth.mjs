@@ -202,6 +202,7 @@ import { ID_TYPES } from './lib/ids.mjs';
 import { SECTION_NAMES, SECTION_OF_CATEGORY, parseSectionArgs, buildSections, renderText, renderMarkdown } from './lib/profile.mjs';
 import { verifyEvidence, verifyDelegationReceipt, verifyLogCommitment, commitmentFromLogEntry, extractJws, EvidenceInputError, PUBLIC_STATES } from './lib/evidence.mjs';
 import { homedir } from 'node:os';
+import { AGENT_COMMANDS, agentMain, updateNotice } from './lib/agent.mjs';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
 // The record projection, GET /api/network/profile, is served by the website:
@@ -417,6 +418,13 @@ ${B}Usage${X}
   trooth declare check <domain> | --file <path>   Check a domain's signed declaration and its DNS pin
   trooth evidence verify <file|-> [--keys <file>] [--online] [--log]   Check an action evidence reference Trooth signed
   trooth delegation verify <file|-> [--keys <file>] [--log]   Check a delegation receipt Trooth signed
+  trooth semanto [<tool>] [--name value]   Run a Semanto MCP tool (no tool: list them). Alias: semanto <tool>
+  trooth network [<tool>] [--name value]   Run a Trooth Network MCP tool (no tool: list them)
+  trooth api [-X METHOD] <path> [--data JSON] [--jq EXPR]   Call any api.trooth.co or trooth.co route
+  trooth tools --json       Every operation: its MCP name, REST route, CLI command and approval class
+  trooth login [--server semanto|network] | trooth logout   Sign in; the token goes in the OS keychain
+  trooth config list | get <key> | set <key> <value> | unset <key>   Flags, then environment, then the file
+  trooth completion bash|zsh|fish|powershell   Shell completion
   trooth <command> --help   A command's usage, flags and exit codes (also: trooth help <command>)
   trooth --help | --version
 
@@ -3829,6 +3837,10 @@ async function main() {
   if (quiet && cmd === 'guard' && argv[1] === 'hook') {
     fail(EXIT.USAGE, '`trooth guard hook` answers Claude Code on stdout, so it does not take --quiet.');
   }
+  // K1 to K9 (0.23.0): the agent commands parse their own arguments (bin/lib/agent.mjs). Agent mode: set
+  // TROOTH_API_KEY, pass --json and --no-input; these commands exit 0 done, 2 refused with a fix, 3 needs a
+  // person's approval, 4 not reachable. The read commands keep their published exit codes.
+  if (AGENT_COMMANDS.has(cmd)) return agentMain(cmd, argv.slice(1), { out, diag, errLine, emitJson, outAlways, asJson, quiet });
   if (cmd === 'check') return check();
   if (cmd === 'profile') return profileCmd();
   if (cmd === 'lint') return lint();
@@ -3846,7 +3858,7 @@ async function main() {
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation, semanto, network, api, tools, login, logout, config, completion.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only
@@ -3863,6 +3875,8 @@ async function dispatch() {
     }
   }
   if (!Number.isInteger(code)) code = EXIT.UPSTREAM;
+  // K8: a newer version is mentioned at most once a day, on a terminal, never with --json, --quiet or in CI.
+  if (!hookMode && cmd !== 'completion') { try { await updateNotice({ asJson, quiet, errLine }, VERSION); } catch { /* never fails a command */ } }
   await drainOutput();
   // The hook never fails open: an unexpected failure, or an ask (or a deny reason)
   // that was not delivered, blocks the tool (exit 2) instead of letting it run.
