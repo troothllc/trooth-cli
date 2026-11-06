@@ -87,8 +87,14 @@ export function readPrivateJwk(input) {
   if (typeof input === 'string') { try { jwk = JSON.parse(input); } catch { throw new DeclarationError('the key file is not JSON'); } }
   if (!jwk || jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || typeof jwk.d !== 'string' || typeof jwk.x !== 'string') throw new DeclarationError('the key file is not a private Ed25519 JWK (kty OKP, crv Ed25519, x and d)');
   let derived;
-  try { derived = createPublicKey(createPrivateKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x, d: jwk.d }, format: 'jwk' })).export({ format: 'jwk' }).x; }
-  catch { throw new DeclarationError('the key file does not hold a usable Ed25519 key'); }
+  // The public half is derived from the private seed alone (PKCS #8, RFC 8410), so a mismatched x reads as
+  // inconsistent on every Node release; Node 24's OpenSSL refuses a JWK whose x and d disagree at import.
+  try {
+    const seed = Buffer.from(jwk.d, 'base64url');
+    if (seed.length !== 32) throw new Error('seed length');
+    const der = Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), seed]);
+    derived = createPublicKey(createPrivateKey({ key: der, format: 'der', type: 'pkcs8' })).export({ format: 'jwk' }).x;
+  } catch { throw new DeclarationError('the key file does not hold a usable Ed25519 key'); }
   if (derived !== jwk.x) throw new DeclarationError('the key file is inconsistent: x is not the public half of d');
   return { kty: 'OKP', crv: 'Ed25519', x: jwk.x, d: jwk.d };
 }

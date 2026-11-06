@@ -2,7 +2,11 @@
 
 Each release of `trooth` on npm, newest first.
 
-## 0.23.0 (2026-11-06)
+## 0.23.1 (2026-11-06)
+
+- A private key file whose public half does not match its private half now reads as inconsistent on Node 24 too: the public half is derived from the private seed alone. 0.23.0 was tagged but never published, because this test failed on the publish job's Node 24.
+
+## 0.23.0 (2026-11-06, not published)
 
 ### One binary for Semanto and the Trooth Network, for people and for agents
 
