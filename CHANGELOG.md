@@ -2,6 +2,10 @@
 
 Each release of `trooth` on npm, newest first.
 
+## Unreleased
+
+- Each published version now carries, on its GitHub release, the exact tarball npm serves, its CycloneDX SBOM, a SHA256SUMS file and a Sigstore bundle for each (cosign keyless, logged in Rekor). docs/RELEASES.md shows how to check them.
+
 ## 0.23.1 (2026-11-06)
 
 - A private key file whose public half does not match its private half now reads as inconsistent on Node 24 too: the public half is derived from the private seed alone. 0.23.0 was tagged but never published, because this test failed on the publish job's Node 24.
