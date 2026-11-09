@@ -572,6 +572,8 @@ Report a vulnerability through the [Vulnerability Disclosure Policy](https://tro
 
 Apache License 2.0. See [LICENSE](LICENSE).
 
+The specification parts of this repository (the format rules in `docs/`, `schemas/`, `spec/` and the conformance suite in `tests/vectors/`) are also published under the Community Specification License 1.0, so anyone may implement the format; see [SPECIFICATION-LICENSE.md](SPECIFICATION-LICENSE.md). Neither license covers the Trooth name; see [TRADEMARKS.md](TRADEMARKS.md).
+
 The same license applies to this repository, to the `trooth` package on npm and to the copyright header in `bin/trooth.mjs`. They are meant to agree. If you find that they do not, that is a defect: please report it at [trooth.co/contact](https://trooth.co/contact).
 
 Trooth signs what it witnessed. It never signs on a company's behalf.
