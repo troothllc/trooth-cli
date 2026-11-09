@@ -30,4 +30,12 @@ t("the reader's check names the identity the job signs under", () => {
   assert.ok(doc.includes('--certificate-oidc-issuer "https://token.actions.githubusercontent.com"'));
   assert.ok(doc.includes("sha256sum -c SHA256SUMS"));
 });
+t("C4a: GitHub's build provenance attestation for every release file, before the release is made", () => {
+  assert.match(wf, /attestations: write/);
+  assert.ok(at("actions/attest-build-provenance@v3") > at("cosign sign-blob"));
+  assert.ok(at("actions/attest-build-provenance@v3") < at('gh release upload "$GITHUB_REF_NAME" release/* --clobber'));
+  assert.match(wf, /subject-path: \|\n\s+release\/trooth-\*\.tgz\n\s+release\/trooth-\*\.cdx\.json\n\s+release\/SHA256SUMS/);
+});
+
 console.log(`\nrelease-signing: ${n} ok`);
+
