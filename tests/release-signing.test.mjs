@@ -11,12 +11,12 @@ const t = (name, fn) => { fn(); n++; console.log("  ok   " + name); };
 const at = (s) => { const i = wf.indexOf(s); assert.ok(i >= 0, `publish.yml lacks: ${s}`); return i; };
 
 t("the tarball is packed once and that file is published", () => {
-  assert.ok(at("npm pack --pack-destination release") < at('npm publish "release/trooth-'));
+  assert.ok(at("npm pack --pack-destination release") < at('npm publish "./release/trooth-'));
   assert.doesNotMatch(wf, /\n\s+run: npm publish --provenance --access public\n/);
-  assert.match(wf, /npm publish "release\/trooth-\$\(node -p "require\('\.\/package\.json'\)\.version"\)\.tgz" --provenance --access public/);
+  assert.match(wf, /npm publish "\.\/release\/trooth-\$\(node -p "require\('\.\/package\.json'\)\.version"\)\.tgz" --provenance --access public/);
 });
 t("an SBOM and SHA256SUMS are written after the publish", () => {
-  assert.ok(at('npm sbom --sbom-format cyclonedx --omit dev > "release/trooth-$V.cdx.json"') > at('npm publish "release/trooth-'));
+  assert.ok(at('npm sbom --sbom-format cyclonedx --omit dev > "release/trooth-$V.cdx.json"') > at('npm publish "./release/trooth-'));
   at('sha256sum "trooth-$V.tgz" "trooth-$V.cdx.json" > SHA256SUMS');
 });
 t("each release file is signed keyless and logged, then attached to the tag's release", () => {

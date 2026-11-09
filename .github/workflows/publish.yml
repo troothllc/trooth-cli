@@ -98,7 +98,7 @@ jobs:
           [ -f "release/trooth-$V.tgz" ] || { echo "::error::npm pack did not write release/trooth-$V.tgz"; exit 1; }
 
       - name: Publish that tarball with provenance
-        run: npm publish "release/trooth-$(node -p "require('./package.json').version").tgz" --provenance --access public
+        run: npm publish "./release/trooth-$(node -p "require('./package.json').version").tgz" --provenance --access public
 
       - name: SBOM and checksums for the release
         run: |
