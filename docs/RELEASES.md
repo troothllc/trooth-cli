@@ -24,6 +24,15 @@ done
 sha256sum -c SHA256SUMS
 ```
 
+## Check where it was built (build provenance)
+
+Each release file also has GitHub's build provenance attestation (SLSA): a signed statement that it was built by
+`.github/workflows/publish.yml` on GitHub's hosted runners at the tagged commit, never on a workstation.
+
+```sh
+gh attestation verify trooth-$V.tgz --repo troothllc/trooth-cli
+```
+
 ## Check that npm serves the same tarball
 
 ```

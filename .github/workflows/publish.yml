@@ -56,6 +56,7 @@ jobs:
     permissions:
       contents: write # the GitHub release for this tag and its files; nothing else in the repository is written
       id-token: write # the OIDC token npm trusted publishing and Sigstore keyless signing exchange; nothing else
+      attestations: write # C4a: GitHub's build provenance attestation for the release files
     steps:
       - uses: actions/checkout@v7
 
@@ -112,6 +113,19 @@ jobs:
           cd release
           for f in trooth-*.tgz trooth-*.cdx.json SHA256SUMS; do cosign sign-blob --yes --bundle "$f.sigstore.json" "$f"; done
           ls -l
+
+      # C4a (tracker, 2026-11-08): SLSA build provenance from a hosted builder. GitHub signs, with Sigstore, a
+      # statement that these exact files were built by this workflow at this commit on GitHub's runners, and keeps it
+      # in the repository's attestations; anyone checks it with: gh attestation verify <file> --repo troothllc/trooth-cli
+      # (SLSA Build L2 needs provenance a hosted platform generates; a workstation build cannot give it).
+      # https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations
+      - name: Build provenance for each release file (SLSA, GitHub artifact attestation)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            release/trooth-*.tgz
+            release/trooth-*.cdx.json
+            release/SHA256SUMS
 
       - name: The GitHub release for this tag, with every file
         env:
