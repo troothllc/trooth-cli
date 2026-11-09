@@ -67,6 +67,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
+    "SPECIFICATION-LICENSE.md",
+    "TRADEMARKS.md",
     "npm-shrinkwrap.json"
   ],
   "engines": {

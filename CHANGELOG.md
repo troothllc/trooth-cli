@@ -4,6 +4,7 @@ Each release of `trooth` on npm, newest first.
 
 ## 0.23.2 (2026-11-09)
 
+- The format's rules, schemas, formal model and conformance suite are also published under the Community Specification License 1.0, so anyone may implement the Trooth record format (SPECIFICATION-LICENSE.md). The Trooth name is covered by neither license; TRADEMARKS.md and trooth.co/trademark-policy say when an issuer may call its statements Trooth records.
 - Each release's files also carry GitHub's build provenance attestation (SLSA): a signed statement that they were built by the publish workflow on GitHub's runners at the tagged commit. `gh attestation verify trooth-0.23.2.tgz --repo troothllc/trooth-cli` checks it; docs/RELEASES.md says how.
 - Each published version now carries, on its GitHub release, the exact tarball npm serves, its CycloneDX SBOM, a SHA256SUMS file and a Sigstore bundle for each (cosign keyless, logged in Rekor). docs/RELEASES.md shows how to check them.
 
