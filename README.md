@@ -422,7 +422,7 @@ There is no API key. The binary asks for no credential of any kind and has no wr
 The same public Network powers Trooth's read-only MCP server, so ChatGPT, Claude, Cursor or any MCP client can ask about a company in plain words:
 
 ```
-https://api.trooth.co/public/mcp
+https://mcp.trooth.co
 ```
 
 Ten read-only tools on public data, no key: `trooth_resolve_company`, `trooth_search_companies`, `trooth_list_companies`, `trooth_public_trust_profile`, `trooth_get_fact`, `trooth_company_changes`, `trooth_ai_data_use_disclosures`, `trooth_outside_in_read`, `trooth_verify` and `trooth_ask`. An eleventh, `trooth_my_company_record`, reads a signed-in company's own record with an OAuth access token from the authorization server the server's protected-resource metadata names; no scope is required, and the workspace is linked when that person signs in to trooth.co once with Continue with enterprise SSO. The pattern is written up at [trooth.co/docs/agents](https://trooth.co/docs/agents).
@@ -521,8 +521,8 @@ Exit 0 when the reading names at least one SEC filer (CIK) or LEI for the domain
 ## `trooth mcp-tools`
 
 ```
-$ trooth mcp-tools https://api.trooth.co/public/mcp --live
-https://api.trooth.co/public/mcp  trooth-mcp 1.4.1, read 2026-10-07
+$ trooth mcp-tools https://mcp.trooth.co --live
+https://mcp.trooth.co  trooth-mcp 1.4.1, read 2026-10-07
   tools      8 · manifest fedd1d2372462de065ba6046e45eac33c97ad628d13c910d3bcc2f8b8054e058
              trooth_ask                   description c4fd0e4105e1… definition aa35823cf04d…
              …
