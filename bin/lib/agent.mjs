@@ -34,8 +34,9 @@ export const AGENT_EXIT = { OK: 0, REFUSED: 2, APPROVAL: 3, UNREACHABLE: 4 };
 const DEFAULTS = {
   api_base: 'https://api.trooth.co',
   site_base: 'https://trooth.co',
-  semanto_mcp: 'https://api.trooth.co/os/semanto/mcp',
-  network_mcp: 'https://api.trooth.co/public/mcp',
+  // OM1 (2026-11-09): one Trooth MCP server for both products; the two old addresses are gone.
+  semanto_mcp: 'https://mcp.trooth.co',
+  network_mcp: 'https://mcp.trooth.co',
   timeout_ms: '20000',
 };
 const ENV = { api_base: 'TROOTH_API_BASE', site_base: 'TROOTH_SITE_BASE', semanto_mcp: 'TROOTH_SEMANTO_MCP', network_mcp: 'TROOTH_NETWORK_MCP', timeout_ms: 'TROOTH_TIMEOUT_MS' };

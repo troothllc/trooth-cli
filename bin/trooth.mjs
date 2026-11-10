@@ -442,7 +442,7 @@ ${B}Examples${X}
   trooth verify trooth.co --save-bundle trooth.co.bundle.json   ${D}# keep every input in one file${X}
   trooth verify --bundle trooth.co.bundle.json                  ${D}# check it later, with no network${X}
   trooth public-record apple.com --timeout 90                   ${D}# a cold reading can take 20 to 40 seconds${X}
-  trooth mcp-tools https://api.trooth.co/public/mcp --live      ${D}# has the server changed its tools since Trooth logged them?${X}
+  trooth mcp-tools https://mcp.trooth.co --live      ${D}# has the server changed its tools since Trooth logged them?${X}
 
 ${B}Flags${X}
   --json                    machine-readable JSON on stdout; diagnostics on stderr
@@ -840,7 +840,7 @@ const COMMAND_HELP = {
       ['9', 'a hash, the statement or its receipt does not match; with --live, the server lists other tools now'],
       SEVEN,
     ],
-    examples: ['trooth mcp-tools', 'trooth mcp-tools https://api.trooth.co/public/mcp --live'],
+    examples: ['trooth mcp-tools', 'trooth mcp-tools https://mcp.trooth.co --live'],
   },
   guard: {
     usage: [
@@ -2769,7 +2769,7 @@ async function checkMcpReading(d, flags) {
 
 async function mcpToolsCmd() {
   const { flags, positional } = parseArgs('mcp-tools');
-  if (positional.length > 1) fail(EXIT.USAGE, 'trooth mcp-tools takes at most one <endpoint>. Try: trooth mcp-tools https://api.trooth.co/public/mcp');
+  if (positional.length > 1) fail(EXIT.USAGE, 'trooth mcp-tools takes at most one <endpoint>. Try: trooth mcp-tools https://mcp.trooth.co');
   try {
     if (!positional.length) {
       if (flags['--live']) fail(EXIT.USAGE, '--live needs an <endpoint>.');

@@ -2,6 +2,10 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.23.4 (2026-11-10)
+
+- One Trooth MCP server: `trooth semanto`, `trooth network`, `trooth tools`, `trooth login` and `trooth mcp-tools` use https://mcp.trooth.co, which serves the Trooth Network and Semanto with one sign-in. The two old addresses (api.trooth.co/public/mcp and /os/semanto/mcp) no longer answer. TROOTH_SEMANTO_MCP and TROOTH_NETWORK_MCP still override it.
+
 ## 0.23.3 (2026-11-09)
 
 - The release job publishes the packed file by its relative path (./release/...). npm read the bare release/... as a GitHub repository, so 0.23.2 was tagged but never published; everything listed under 0.23.2 ships in 0.23.3.
