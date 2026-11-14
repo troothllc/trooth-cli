@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/trooth"><img src="https://img.shields.io/npm/v/trooth?label=npm&color=0B0B0B" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/trooth"><img src="https://img.shields.io/badge/provenance-signed-0B0B0B" alt="npm provenance"></a>
-  <a href="#license"><img src="https://img.shields.io/badge/license-Apache%202.0%20and%20FSL--1.1--ALv2-0B0B0B" alt="License: Apache 2.0, and FSL-1.1-ALv2 for the guard decision engine"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-Apache%202.0-0B0B0B" alt="License: Apache 2.0"></a>
   <a href="https://trooth.co/docs/cli"><img src="https://img.shields.io/badge/docs-trooth.co%2Fdocs%2Fcli-1A73E8" alt="Docs"></a>
 </p>
 
@@ -413,7 +413,7 @@ jobs:
   semanto:
     runs-on: ubuntu-latest
     steps:
-      - uses: troothllc/trooth-cli@v0.25.0
+      - uses: troothllc/trooth-cli@v0.26.0
         with:
           trooth-id: your-trooth-id
           api-key: ${{ secrets.TROOTH_API_KEY }}
@@ -589,17 +589,12 @@ Report a vulnerability through the [Vulnerability Disclosure Policy](https://tro
 
 ## License
 
-Apache License 2.0, except the guard decision engine. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
 
-| Part | License |
-|---|---|
-| The `trooth` command, the verifier (`trooth/verify`, `jcs`, `ids`, `tlog`, `declaration`, `evidence`), the guard adapters in `bin/lib/guard/`, the types and the SDKs in `sdk/` | Apache License 2.0 ([LICENSE](LICENSE)) |
-| The guard decision engine: `bin/lib/guard.mjs`, `guard-decide.mjs`, `guard-policy.mjs`, `guard-evidence.mjs` and `guard-ci.mjs`, from 0.24.0 | Functional Source License 1.1, Apache 2.0 future license ([LICENSE-FSL.md](LICENSE-FSL.md)) |
-
-The guard engine moved to the Functional Source License (FSL-1.1-ALv2), Sentry's Fair Source license, on 2026-11-14. You may use it, read it, change it and run it in your own agents and CI for any purpose except offering a product or service that competes with Trooth's. Each version becomes Apache License 2.0 two years after it is published, and every version up to and including 0.23.4 stays Apache License 2.0. Checking Trooth's statements never needs the engine: the verifier, the rules and the conformance suite stay open.
+Every part of the `trooth` package is Apache-2.0: the command, the verifier (`trooth/verify`, `jcs`, `ids`, `tlog`, `declaration`, `evidence`), the guard and its decision engine, the guard adapters in `bin/lib/guard/`, the types and the SDKs in `sdk/`. The Stripe CLI and Cloudflare's Wrangler are licensed the same way; what Trooth keeps to itself runs on its servers, not in the code you install. Versions 0.24.0 and 0.25.0 published the guard decision engine (`bin/lib/guard.mjs`, `guard-decide.mjs`, `guard-policy.mjs`, `guard-evidence.mjs`, `guard-ci.mjs`) under the Functional Source License 1.1, Apache 2.0 future license; from 0.26.0 it is Apache-2.0 again.
 
 The specification parts of this repository (the format rules in `docs/`, `schemas/`, `spec/` and the conformance suite in `tests/vectors/`) are also published under the Community Specification License 1.0, so anyone may implement the format; see [SPECIFICATION-LICENSE.md](SPECIFICATION-LICENSE.md). Neither license covers the Trooth name; see [TRADEMARKS.md](TRADEMARKS.md).
 
-The same licenses apply to this repository, to the `trooth` package on npm (`Apache-2.0 AND FSL-1.1-ALv2`) and to each file's copyright header. They are meant to agree. If you find that they do not, that is a defect: please report it at [trooth.co/contact](https://trooth.co/contact).
+The same licenses apply to this repository, to the `trooth` package on npm (`Apache-2.0`) and to each file's copyright header. They are meant to agree. If you find that they do not, that is a defect: please report it at [trooth.co/contact](https://trooth.co/contact).
 
 Trooth signs what it witnessed. It never signs on a company's behalf.

@@ -37,8 +37,8 @@ is(d.length <= 250, `description is ${d.length} characters, npm keeps 255`);
 is(!/[—–]/.test(d), 'description has no em or en dash');
 is(/[.!?]$/.test(d), 'description ends on a complete sentence');
 
-console.log('\ntwo licenses, each stated the same way everywhere (MCP27, 2026-11-14)');
-is(pkg.license === 'Apache-2.0 AND FSL-1.1-ALv2', `package.json license is "Apache-2.0 AND FSL-1.1-ALv2" (got "${pkg.license}")`);
+console.log('\none license, Apache-2.0, stated the same way everywhere (MCP27, 2026-11-14; FSL from 0.24.0 to 0.25.0 only)');
+is(pkg.license === 'Apache-2.0', `package.json license is "Apache-2.0" (got "${pkg.license}")`);
 is(existsSync(join(ROOT, 'LICENSE')), 'a LICENSE file exists');
 if (existsSync(join(ROOT, 'LICENSE'))) {
   const lic = read('LICENSE');
@@ -47,28 +47,23 @@ if (existsSync(join(ROOT, 'LICENSE'))) {
 const head = read('bin/trooth.mjs').slice(0, 800);
 is(!/All rights reserved/i.test(head), 'the source header does not say "All rights reserved"');
 is(/Apache License, Version 2\.0/.test(head), 'the source header names Apache-2.0');
-// The guard decision engine is FSL-1.1-ALv2 from 0.24.0; every other source file stays Apache-2.0.
+// The guard decision engine was FSL-1.1-ALv2 in 0.24.0 and 0.25.0; from 0.26.0 every file is Apache-2.0.
 const ENGINE = ['bin/lib/guard.mjs', 'bin/lib/guard-decide.mjs', 'bin/lib/guard-policy.mjs', 'bin/lib/guard-evidence.mjs', 'bin/lib/guard-ci.mjs'];
-is(existsSync(join(ROOT, 'LICENSE-FSL.md')), 'a LICENSE-FSL.md file exists');
-if (existsSync(join(ROOT, 'LICENSE-FSL.md'))) {
-  const fsl = read('LICENSE-FSL.md');
-  is(/^# Functional Source License, Version 1\.1, ALv2 Future License\n/.test(fsl) && /\nFSL-1\.1-ALv2\n/.test(fsl), 'LICENSE-FSL.md is FSL-1.1-ALv2');
-  is(/Copyright 2026 Trooth, LLC/.test(fsl) && !/\$\{/.test(fsl), 'LICENSE-FSL.md names Trooth, LLC and leaves no template field');
-}
 for (const f of ENGINE) {
   const h = read(f).slice(0, 600);
-  is(h.startsWith('// SPDX-License-Identifier: FSL-1.1-ALv2\n') && /Functional Source License/.test(h) && !/Apache License, Version 2\.0\./.test(h), `${f} is marked FSL-1.1-ALv2`);
+  is(h.startsWith('// SPDX-License-Identifier: Apache-2.0\n') && /Apache License, Version 2\.0\./.test(h), `${f} is marked Apache-2.0`);
 }
 const { readdirSync } = await import('node:fs');
-const others = readdirSync(join(ROOT, 'bin/lib')).filter((n) => n.endsWith('.mjs') && !ENGINE.includes(`bin/lib/${n}`)).map((n) => `bin/lib/${n}`)
+const all = readdirSync(join(ROOT, 'bin/lib')).filter((n) => n.endsWith('.mjs')).map((n) => `bin/lib/${n}`)
   .concat(readdirSync(join(ROOT, 'bin/lib/guard')).map((n) => `bin/lib/guard/${n}`));
-for (const f of others) is(!/FSL-1\.1/.test(read(f).slice(0, 600)), `${f} is not marked FSL (it stays Apache-2.0)`);
-is(!/FSL/.test(read('SPECIFICATION-LICENSE.md').split('## The code')[0]), 'the specification (rules, schemas, formal model, vectors) stays open');
-is((pkg.files || []).includes('LICENSE-FSL.md'), 'the published tarball carries LICENSE-FSL.md');
+for (const f of all) is(!/SPDX-License-Identifier: FSL/.test(read(f).slice(0, 600)), `${f} is not marked FSL`);
+is(!existsSync(join(ROOT, 'LICENSE-FSL.md')), 'LICENSE-FSL.md is gone from the package');
+is(!(pkg.files || []).includes('LICENSE-FSL.md'), 'the published tarball carries no LICENSE-FSL.md');
 const readme = read('README.md');
 is(/^## License$/m.test(readme), 'the README has a License section');
 is(/Apache License 2\.0/.test(readme), 'the README names Apache-2.0');
-is(/FSL-1\.1-ALv2/.test(readme) && /LICENSE-FSL\.md/.test(readme), 'the README names FSL-1.1-ALv2 for the guard engine');
+is(/from 0\.26\.0 it is Apache-2\.0 again/.test(readme), 'the README says the engine is Apache-2.0 from 0.26.0');
+is(!/Apache-2\.0 AND FSL/.test(readme + read('package.json') + read('npm-shrinkwrap.json')), 'no file still says Apache-2.0 AND FSL');
 is((pkg.files || []).includes('LICENSE'), 'the published tarball carries the LICENSE');
 
 console.log('\nthe repository this package claims to come from');
