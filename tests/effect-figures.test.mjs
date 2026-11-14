@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EFFECT = [
-  /[0-9]+(?:\.[0-9]+)? ?(?:%|percent)[^.\n]{0,60}(?:fewer|less|lower|reduc|improv|more accura|wrong|hallucinat|mistake)/i,
+  /[0-9]+(?:\.[0-9]+)? ?(?:%|percent)[^.\n]{0,60}(?:fewer|reduc|improv|more accura|wrong|hallucinat|mistake)/i,
   /(?:fewer|reduc|improv|accura|cut|lower)[^.\n]{0,40}[0-9]+(?:\.[0-9]+)? ?(?:%|percent)/i,
   /(?:probability|confidence|chance|likelihood|odds)[^.\n"]{0,50}\b[0-9]{1,3} ?(?:%|percent)/i,
   /\b(?:80 ?[–-] ?85|65 ?[–-] ?70|60 ?[–-] ?70|40 ?[–-] ?60)\b/,
