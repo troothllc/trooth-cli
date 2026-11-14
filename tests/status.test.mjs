@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { statusState, STATUS_SLOW_MS } from '../bin/lib/agent.mjs';
 
 const BIN = new URL('../bin/trooth.mjs', import.meta.url).pathname;
+/** Every regular-expression character escaped, so a name or version is matched as written. */
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const run = (args, env) => new Promise((resolve) => {
   const p = spawn(process.execPath, [BIN, ...args], { env: { PATH: process.env.PATH, TROOTH_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'trooth-')), TROOTH_NO_UPDATE_NOTIFIER: '1', CI: '1', ...env } });
   let out = '', err = '';
@@ -37,7 +39,7 @@ test('WC22: trooth status reads each part and the incident feed, prints one line
     const env = { TROOTH_SITE_BASE: s.url, TROOTH_API_BASE: s.url, TROOTH_SEMANTO_MCP: s.url };
     const r = await run(['status'], env);
     assert.equal(r.code, 0, r.err);
-    for (const name of ['trooth.co', 'API', 'Semanto signed copies', 'MCP server']) assert.match(r.out, new RegExp(`^${name.replace('.', '\\.')}\\s+operational\\s+200`, 'm'));
+    for (const name of ['trooth.co', 'API', 'Semanto signed copies', 'MCP server']) assert.match(r.out, new RegExp(`^${esc(name)}\\s+operational\\s+200`, 'm'));
     assert.match(r.out, /incident\s+API slow in us-east/);
     assert.doesNotMatch(r.out, /Old/);
     const j = JSON.parse((await run(['status', '--json'], env)).out);
@@ -63,6 +65,6 @@ test('RG40: the GitHub Action builds a new version through the API and never sig
   const steps = a.slice(a.indexOf('runs:'));
   assert.doesNotMatch(steps, /\/sign\b|\/publish|semanto_sign/i);
   const v = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-  assert.match(a, new RegExp(`default: "${v.replace(/\./g, '\\.')}"`), 'the action runs the CLI version it ships with');
-  assert.match(a, new RegExp(`troothllc/trooth-cli@v${v.replace(/\./g, '\\.')}`));
+  assert.match(a, new RegExp(`default: "${esc(v)}"`), 'the action runs the CLI version it ships with');
+  assert.match(a, new RegExp(`troothllc/trooth-cli@v${esc(v)}`));
 });

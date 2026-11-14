@@ -1,0 +1,62 @@
+name: Publish trooth-verify to PyPI
+
+# Publishes the Python package in sdk/python (trooth-verify: the record checker and trooth_guard) to PyPI when a
+# tag python-vX.Y.Z is pushed, the way publish.yml publishes `trooth` to npm on vX.Y.Z (DG10, cli12).
+#
+# HOW IT AUTHENTICATES: PyPI trusted publishing (OpenID Connect). No PyPI token is stored or read. GitHub issues a
+# short-lived OIDC token to this job (id-token: write) and PyPI exchanges it for an upload credential that only this
+# workflow file in this repository can obtain. The upload carries PEP 740 attestations (the publish action's default).
+#   https://docs.pypi.org/trusted-publishers/
+#
+# ONE ACT OUTSIDE THIS FILE, free on any PyPI account (no organization or subscription): add a pending publisher at
+# pypi.org/manage/account/publishing/ with exactly
+#   PyPI Project Name   trooth-verify
+#   Owner               troothllc
+#   Repository name     trooth-cli
+#   Workflow name       publish-python.yml
+#   Environment name    (leave empty)
+# The first upload then creates the project on that account.
+
+on:
+  push:
+    tags:
+      - "python-v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-python
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Test, then publish trooth-verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.12"
+      - name: The tag is the package version
+        run: |
+          want="${GITHUB_REF_NAME#python-v}"
+          have="$(python -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          if [ "$want" != "$have" ]; then echo "::error::tag ${GITHUB_REF_NAME} but pyproject.toml says ${have}"; exit 1; fi
+      - name: The tests
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install ".[models]"
+          python -m unittest discover -s tests -v
+      - name: Build the sdist and wheel once
+        run: python -m build
+      - name: Publish with trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdk/python/dist

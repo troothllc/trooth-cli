@@ -152,7 +152,7 @@ test('a delegation receipt checks; with its document, the digest is checked and 
   assert.equal(changed.status, 'mismatch'); assert.equal(changed.summary.scope, null); assert.match(changed.reason, /hashes to/);
   const revoked = verifyDelegationReceipt(receipt({ event: 'revoked', approval: null, at: Date.parse('2026-10-20T10:00:00.123Z') }), KEYS, { now: NOW });
   assert.equal(revoked.status, 'valid', revoked.problems.join('; ')); assert.equal(revoked.summary.event, 'revoked'); assert.equal(revoked.summary.approval, null);
-  assert.equal(verifyDelegationReceipt(receipt(), KEYS, { now: Date.parse('2027-01-01T00:00:00Z') }).summary.delegation_expired, true);
+  assert.equal(verifyDelegationReceipt(receipt(), KEYS, { now: Date.parse('2100-01-01T00:00:00Z') }).summary.delegation_expired, true);
 });
 
 test('a delegation receipt: bad signature, unknown kid, wrong typ, an event outside created and revoked', () => {
@@ -251,7 +251,7 @@ test('trooth delegation verify: the create response checks with its scope; --jso
   const created = file({ ok: true, delegation: D, digest: `sha256:${F.delegationDigestOf(D)}`, receipt: receipt() });
   const r = await run(['delegation', 'verify', created, '--keys', keysFile]);
   assert.equal(r.code, 0, r.err);
-  for (const want of [/created/, new RegExp(`delegation {3}${D.id}`), new RegExp(`agent key {4}${D.agent.jkt}`), /actions {6}trooth_payment/, /target {7}vendor\.example/, /limit {8}500\.00 USD/, /approval {5}above 250\.00 USD/, /expires {6}2026-11-14T12:00:00\.000Z/, /recorded {5}2026-10-15T11:58:00\.000Z/]) assert.match(r.out, want);
+  for (const want of [/created/, new RegExp(`delegation {3}${D.id}`), new RegExp(`agent key {4}${D.agent.jkt}`), /actions {6}trooth_payment/, /target {7}vendor\.example/, /limit {8}500\.00 USD/, /approval {5}above 250\.00 USD/, /expires {6}2099-12-31T00:00:00\.000Z/, /recorded {5}2026-10-15T11:58:00\.000Z/]) assert.match(r.out, want);
   const j = await run(['delegation', 'verify', created, '--keys', keysFile, '--json']);
   const doc = JSON.parse(j.out);
   assert.equal(doc.exit, 0); assert.equal(doc.kind, 'delegation-receipt'); assert.equal(doc.summary.scope.approval_above, '250.00'); assert.equal(doc.sources.delegation, created);
