@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // bin/lib/guard-evidence.mjs - gathering and checking the evidence the guard
 // decides on (docs/GUARD.md section 4): a cached bundle or the network, then
 // every check done locally, reduced to the abstract facts guard-decide.mjs
 // reads.
-// Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
+// Copyright 2026 Trooth, LLC. Licensed under the Functional Source License,
+// Version 1.1, ALv2 Future License (FSL-1.1-ALv2, LICENSE-FSL.md) from trooth 0.24.0;
+// each version becomes Apache-2.0 two years after it is published, and 0.23.4 and
+// earlier stay Apache-2.0.
 //
 // What leaves the machine: requests to Trooth that carry only a domain (the
 // host being checked, or a parent of it) or a statement id. The action, its

@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // bin/lib/guard-decide.mjs - the guard's decision table (docs/GUARD.md
 // section 5) as one pure function over abstract facts, kept apart from how
 // the facts were gathered so it can be checked exhaustively
 // (tests/guard-model.test.mjs, spec/GuardDecision.tla).
-// Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
+// Copyright 2026 Trooth, LLC. Licensed under the Functional Source License,
+// Version 1.1, ALv2 Future License (FSL-1.1-ALv2, LICENSE-FSL.md) from trooth 0.24.0;
+// each version becomes Apache-2.0 two years after it is published, and 0.23.4 and
+// earlier stay Apache-2.0.
 //
 // decideFrom(facts, policy) reads no clock, no network and no prose. The
 // same facts and the same policy always give the same decision.

@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // bin/lib/guard-ci.mjs - CI mode of the guard (trooth guard ci, docs/GUARD.md
 // section 7): find the external hosts a change adds to code and config, and
 // report each one the policy's destinations.allowed does not list.
-// Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
+// Copyright 2026 Trooth, LLC. Licensed under the Functional Source License,
+// Version 1.1, ALv2 Future License (FSL-1.1-ALv2, LICENSE-FSL.md) from trooth 0.24.0;
+// each version becomes Apache-2.0 two years after it is published, and 0.23.4 and
+// earlier stay Apache-2.0.
 //
 // Pure functions over text. It reads no network and sends nothing.
 //

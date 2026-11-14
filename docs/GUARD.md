@@ -1,6 +1,6 @@
 # The Trooth guard
 
-`trooth/guard` (bin/lib/guard.mjs) and `trooth guard` (bin/trooth.mjs). Licensed under the Apache License, Version 2.0, like the rest of this repository.
+`trooth/guard` (bin/lib/guard.mjs) and `trooth guard` (bin/trooth.mjs). The engine (bin/lib/guard.mjs, guard-decide.mjs, guard-policy.mjs, guard-evidence.mjs and guard-ci.mjs) is under the Functional Source License 1.1, Apache 2.0 future license, from 0.24.0 (LICENSE-FSL.md); 0.23.4 and earlier stay Apache-2.0. These rules and the model in spec/ stay open (SPECIFICATION-LICENSE.md).
 
 ## 1. What it is
 
@@ -223,7 +223,7 @@ The brief set three exit conditions for Phase 4: open source under a permissive 
 
 | Condition | Status |
 |---|---|
-| Open source under a permissive license | Done: this repository is under the Apache License, Version 2.0. |
+| Open source under a permissive license | Amended 2026-11-14: the rules, the formal model, the verifier and the adapters stay open (Apache-2.0 and the Community Specification License); the decision engine is source-available under FSL-1.1-ALv2 from 0.24.0 and becomes Apache-2.0 two years after each release. Versions up to 0.23.4 stay Apache-2.0. |
 | In place of an outside security review before launch: an internal review gate | In place: separate internal review passes, property-based fuzzing (tests/guard-fuzz.test.mjs, in `npm test`), GitHub CodeQL on every push and pull request and weekly (GitHub's default code scanning setup), and a threat model with its residual risks (docs/GUARD-THREAT-MODEL.md). |
 | In place of three outside teams in production before launch: Trooth as the first production user | In place: the code-change check (`trooth guard ci`) on every trooth.co change, the Claude Code hook (`trooth guard hook`) in Trooth's own development (.claude/settings.json and .trooth/guard-policy.yaml in this repository), and the pilots run every night against the latest framework releases (.github/workflows/guard-pilots.yml, pilots/). |
 | An outside security review | Moved to the launch phase. No outside party has reviewed the guard. |
