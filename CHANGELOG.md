@@ -2,6 +2,12 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.25.0 (2026-11-14)
+
+- `trooth status` calls trooth.co, the API, Semanto and the MCP server directly and lists the last week's incidents from trooth.co/status/history.json. Each part is operational, degraded (slower than 3 seconds) or down (a 5xx or no answer); `--json` prints one document; exit 4 when a part is down (tracker WC22).
+- A GitHub Action, `troothllc/trooth-cli@v0.25.0` (action.yml): after each push it asks Semanto to read the site again and build a new version, which waits for a person to sign it. Nothing is published from CI (tracker RG40).
+- A test reads every string the CLI prints and fails on the never-words list (tracker UX25).
+
 ## 0.24.1 (2026-11-14)
 
 - `trooth --version` prints the name and the version, `trooth 0.24.1`, as `gh --version` and `vercel --version` print theirs (tracker UX39). A script that read the bare number takes the last word.

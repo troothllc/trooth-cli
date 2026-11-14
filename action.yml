@@ -1,0 +1,42 @@
+# action.yml - Semanto on deploy (RG40, cli7): after each push, Semanto reads the site again and builds a new
+# version, which waits for a person to review and sign it in the dashboard. Nothing is published from CI.
+#
+#   - uses: troothllc/trooth-cli@v0.25.0
+#     with:
+#       trooth-id: your-trooth-id
+#       api-key: ${{ secrets.TROOTH_API_KEY }}
+#
+# The key is an agent key from trooth.co/dashboard/api-keys. Building is an agent's step; signing stays a person's
+# (trooth.co/docs/approvals). The step passes when the build is queued or waits for a person (exit 0 or 3).
+name: Semanto build on deploy
+description: Rebuild the Semanto signed copy after a deploy; the new version waits for a person to sign it.
+author: Trooth
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  trooth-id:
+    description: The company's Trooth ID.
+    required: true
+  api-key:
+    description: A Trooth agent key, kept as a repository secret.
+    required: true
+  version:
+    description: The trooth CLI version to run.
+    required: false
+    default: "0.25.0"
+runs:
+  using: composite
+  steps:
+    - name: Build a new Semanto version
+      shell: bash
+      env:
+        TROOTH_API_KEY: ${{ inputs.api-key }}
+        TROOTH_ID: ${{ inputs.trooth-id }}
+        TROOTH_VERSION: ${{ inputs.version }}
+      run: |
+        set +e
+        npx --yes "trooth@${TROOTH_VERSION}" api -X POST "/os/semanto/${TROOTH_ID}/build"
+        code=$?
+        if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then exit "$code"; fi
+        echo "The new version waits for a person: https://trooth.co/dashboard/semanto"
