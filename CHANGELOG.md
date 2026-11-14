@@ -2,6 +2,10 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.24.1 (2026-11-14)
+
+- `trooth --version` prints the name and the version, `trooth 0.24.1`, as `gh --version` and `vercel --version` print theirs (tracker UX39). A script that read the bare number takes the last word.
+
 ## 0.24.0 (2026-11-14)
 
 - The guard decision engine (bin/lib/guard.mjs, guard-decide.mjs, guard-policy.mjs, guard-evidence.mjs and guard-ci.mjs) is licensed under the Functional Source License 1.1 with the Apache 2.0 future license (FSL-1.1-ALv2, LICENSE-FSL.md), Sentry's Fair Source license. You may use, read, change and run it for any purpose except a product or service that competes with Trooth's, and each version becomes Apache-2.0 two years after it is published. Every published version up to 0.23.4 stays Apache-2.0. The verifier, the adapters, the SDKs, the rules, the formal model and the conformance suite stay open, so checking a Trooth statement never needs the engine. package.json says `Apache-2.0 AND FSL-1.1-ALv2`.

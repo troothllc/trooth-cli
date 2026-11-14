@@ -60,7 +60,7 @@ test('--quiet with --json, and on guard hook, is a usage error', async () => {
 });
 
 test('help and --version print under --quiet', async () => {
-  assert.match((await run(['--version', '-q'])).out, /^\d+\.\d+\.\d+/);
+  assert.match((await run(['--version', '-q'])).out, /^trooth \d+\.\d+\.\d+/);
   assert.match((await run(['--help', '--quiet'])).out, /--quiet, -q/);
   const h = await run(['lint', '--help', '-q']);
   assert.equal(h.code, 0);
