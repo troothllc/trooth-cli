@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // bin/lib/guard.mjs - trooth/guard: the pre-execution guardrail (docs/GUARD.md).
 // Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
-// From trooth 0.26.0 the whole package is Apache-2.0 again, as the Stripe CLI and
-// Wrangler are; 0.24.0 and 0.25.0 published this file under FSL-1.1-ALv2.
+// From trooth 0.26.0 the whole package is Apache-2.0 again; 0.24.0 and 0.25.0
+// published this file under FSL-1.1-ALv2.
 //
 // The guard runs inside the customer's agent. Before a consequential tool
 // call it finds the host the call is about (from typed arguments only),
