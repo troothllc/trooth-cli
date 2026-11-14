@@ -29,7 +29,7 @@ is(pkg.name === 'trooth', `name is "trooth" (got "${pkg.name}")`);
 is(/^\d+\.\d+\.\d+$/.test(pkg.version), `version is a release version (got "${pkg.version}")`);
 
 const reported = execFileSync(process.execPath, [join(ROOT, 'bin/trooth.mjs'), '--version'], { encoding: 'utf8' }).trim();
-is(reported === pkg.version, `trooth --version prints ${pkg.version} (got "${reported}")`);
+is(reported === `trooth ${pkg.version}`, `trooth --version prints the name and ${pkg.version} (got "${reported}")`);
 
 console.log('\ndescription, against what npm actually stores');
 const d = pkg.description;

@@ -3815,7 +3815,7 @@ function guardHookUsage(why) { diag(`trooth guard: ${why}`); return 2; }
 let hookMode = false;
 
 async function main() {
-  if (cmd === '--version' || cmd === '-v' || cmd === 'version') { outAlways(VERSION); return EXIT.OK; }
+  if (cmd === '--version' || cmd === '-v' || cmd === 'version') { outAlways(`trooth ${VERSION}`); return EXIT.OK; } // UX39: the name as text, then the version, as gh and vercel print theirs
   if (!cmd || cmd === '--help' || cmd === '-h' || cmd === 'help') {
     // `trooth help <command> [<subcommand>]` and `trooth --help <command>`.
     const topic = argv.slice(1).filter((a) => !a.startsWith('-'));

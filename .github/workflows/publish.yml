@@ -83,7 +83,7 @@ jobs:
       - name: The version the binary prints is the tag
         run: |
           V="$(node -p "require('./package.json').version")"
-          [ "$(node bin/trooth.mjs --version)" = "$V" ] || { echo "::error::trooth --version does not print $V"; exit 1; }
+          [ "$(node bin/trooth.mjs --version)" = "trooth $V" ] || { echo "::error::trooth --version does not print $V"; exit 1; }
 
       - name: Metadata and the test suite
         run: |
