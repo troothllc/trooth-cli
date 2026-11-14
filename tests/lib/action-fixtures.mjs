@@ -73,7 +73,7 @@ export function delegationDoc(over = {}) {
     agent: { jkt: JKT, label: 'procurement agent' },
     role: 'buyer', target: { domain: 'vendor.example' }, actions: ['trooth_payment'],
     limit: { amount: '500.00', currency: 'USD' }, data_class: null, approval_above: '250.00',
-    expires_at: '2026-11-14T12:00:00.000Z', created_at: '2026-10-15T11:58:00.000Z', approval: APPROVAL,
+    expires_at: '2099-12-31T00:00:00.000Z', created_at: '2026-10-15T11:58:00.000Z', approval: APPROVAL,
     ...over,
   };
 }
