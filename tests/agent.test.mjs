@@ -185,3 +185,17 @@ test('K2: login stores the token in the keychain through the device flow, and lo
   assert.equal(globalThis.__troothKeychain.get(`${s.url}/os/semanto/mcp`), undefined);
   s.close();
 });
+
+test('K3b: a key the server refuses is never printed, in text or in --json', async () => {
+  const key = 'tsk_jWV6P7-3853ywO4IdFGawlLdzzGMW4XsHhk2JohXHqI';
+  const s = await server(() => [401, { error: 'unauthenticated', message: 'This key is not valid.' }]);
+  const env = { TROOTH_SEMANTO_MCP: `${s.url}/os/semanto/mcp`, TROOTH_API_KEY: key };
+  for (const args of [['semanto', 'status', '--trooth-id', 'acme'], ['semanto', 'status', '--trooth-id', 'acme', '--json']]) {
+    const r = await run(args, env);
+    assert.notEqual(r.code, 0);
+    assert.ok(!(r.out + r.err).includes(key), `the key appeared in the output of ${args.join(' ')}`);
+    assert.ok(!(r.out + r.err).includes(key.slice(4, 20)), 'no part of the key appears either');
+  }
+  assert.equal(s.seen.at(-1).auth, `Bearer ${key}`);
+  s.close();
+});
