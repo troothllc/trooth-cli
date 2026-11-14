@@ -6,11 +6,11 @@ name: CI
 # @trooth/cli 0.1.0. This one tests what the repository actually ships.
 
 on:
+  merge_group:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
 
