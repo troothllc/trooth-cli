@@ -2,9 +2,13 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.26.1 (2026-11-14)
+
+- The license notes in the README, the CHANGELOG and the guard engine's file headers say what the license is without comparing Trooth to other companies.
+
 ## 0.26.0 (2026-11-14)
 
-- The whole package is licensed under the Apache License 2.0 again, the guard decision engine included (bin/lib/guard.mjs, guard-decide.mjs, guard-policy.mjs, guard-evidence.mjs and guard-ci.mjs), as the Stripe CLI and Wrangler are: the code a customer installs is open, and what Trooth keeps to itself runs on its servers. 0.24.0 and 0.25.0 published the engine under FSL-1.1-ALv2 and stay as published. package.json says `Apache-2.0`, and LICENSE-FSL.md leaves the package (tracker MCP27).
+- The whole package is licensed under the Apache License 2.0 again, the guard decision engine included (bin/lib/guard.mjs, guard-decide.mjs, guard-policy.mjs, guard-evidence.mjs and guard-ci.mjs): the code a customer installs is open, and what Trooth keeps to itself runs on its servers. 0.24.0 and 0.25.0 published the engine under FSL-1.1-ALv2 and stay as published. package.json says `Apache-2.0`, and LICENSE-FSL.md leaves the package (tracker MCP27).
 - The GitHub Action pins `troothllc/trooth-cli@v0.26.0`.
 
 ## 0.25.0 (2026-11-14)

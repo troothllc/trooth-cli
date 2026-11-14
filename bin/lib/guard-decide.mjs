@@ -4,8 +4,8 @@
 // the facts were gathered so it can be checked exhaustively
 // (tests/guard-model.test.mjs, spec/GuardDecision.tla).
 // Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
-// From trooth 0.26.0 the whole package is Apache-2.0 again, as the Stripe CLI and
-// Wrangler are; 0.24.0 and 0.25.0 published this file under FSL-1.1-ALv2.
+// From trooth 0.26.0 the whole package is Apache-2.0 again; 0.24.0 and 0.25.0
+// published this file under FSL-1.1-ALv2.
 //
 // decideFrom(facts, policy) reads no clock, no network and no prose. The
 // same facts and the same policy always give the same decision.

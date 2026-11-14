@@ -4,8 +4,8 @@
 // every check done locally, reduced to the abstract facts guard-decide.mjs
 // reads.
 // Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
-// From trooth 0.26.0 the whole package is Apache-2.0 again, as the Stripe CLI and
-// Wrangler are; 0.24.0 and 0.25.0 published this file under FSL-1.1-ALv2.
+// From trooth 0.26.0 the whole package is Apache-2.0 again; 0.24.0 and 0.25.0
+// published this file under FSL-1.1-ALv2.
 //
 // What leaves the machine: requests to Trooth that carry only a domain (the
 // host being checked, or a parent of it) or a statement id. The action, its

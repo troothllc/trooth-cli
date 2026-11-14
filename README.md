@@ -413,7 +413,7 @@ jobs:
   semanto:
     runs-on: ubuntu-latest
     steps:
-      - uses: troothllc/trooth-cli@v0.26.0
+      - uses: troothllc/trooth-cli@v0.26.1
         with:
           trooth-id: your-trooth-id
           api-key: ${{ secrets.TROOTH_API_KEY }}
@@ -591,7 +591,7 @@ Report a vulnerability through the [Vulnerability Disclosure Policy](https://tro
 
 Apache License 2.0. See [LICENSE](LICENSE).
 
-Every part of the `trooth` package is Apache-2.0: the command, the verifier (`trooth/verify`, `jcs`, `ids`, `tlog`, `declaration`, `evidence`), the guard and its decision engine, the guard adapters in `bin/lib/guard/`, the types and the SDKs in `sdk/`. The Stripe CLI and Cloudflare's Wrangler are licensed the same way; what Trooth keeps to itself runs on its servers, not in the code you install. Versions 0.24.0 and 0.25.0 published the guard decision engine (`bin/lib/guard.mjs`, `guard-decide.mjs`, `guard-policy.mjs`, `guard-evidence.mjs`, `guard-ci.mjs`) under the Functional Source License 1.1, Apache 2.0 future license; from 0.26.0 it is Apache-2.0 again.
+Every part of the `trooth` package is Apache-2.0: the command, the verifier (`trooth/verify`, `jcs`, `ids`, `tlog`, `declaration`, `evidence`), the guard and its decision engine, the guard adapters in `bin/lib/guard/`, the types and the SDKs in `sdk/`. What Trooth keeps to itself runs on its servers, not in the code you install. Versions 0.24.0 and 0.25.0 published the guard decision engine (`bin/lib/guard.mjs`, `guard-decide.mjs`, `guard-policy.mjs`, `guard-evidence.mjs`, `guard-ci.mjs`) under the Functional Source License 1.1, Apache 2.0 future license; from 0.26.0 it is Apache-2.0 again.
 
 The specification parts of this repository (the format rules in `docs/`, `schemas/`, `spec/` and the conformance suite in `tests/vectors/`) are also published under the Community Specification License 1.0, so anyone may implement the format; see [SPECIFICATION-LICENSE.md](SPECIFICATION-LICENSE.md). Neither license covers the Trooth name; see [TRADEMARKS.md](TRADEMARKS.md).
 

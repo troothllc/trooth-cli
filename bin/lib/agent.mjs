@@ -442,8 +442,7 @@ export function newer(a, b) {
 
 // ------------------------------------------------------------------ status (WC22, cli7)
 
-/** What `trooth status` reads: each public part of Trooth, called directly, as `gh status` and the Stripe CLI
- *  read their own services. A part is operational when it answers below 500 within the time limit; slow past
+/** What `trooth status` reads: each public part of Trooth, called directly. A part is operational when it answers below 500 within the time limit; slow past
  *  SLOW_MS, it is degraded; a 5xx or no answer is down. */
 export const STATUS_SLOW_MS = 3000;
 export function statusParts(cfg) {

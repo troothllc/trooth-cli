@@ -4,8 +4,8 @@
 // it cannot mean, and the interception rules that follow from it (which tool
 // calls are covered and which host a call is about).
 // Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
-// From trooth 0.26.0 the whole package is Apache-2.0 again, as the Stripe CLI and
-// Wrangler are; 0.24.0 and 0.25.0 published this file under FSL-1.1-ALv2.
+// From trooth 0.26.0 the whole package is Apache-2.0 again; 0.24.0 and 0.25.0
+// published this file under FSL-1.1-ALv2.
 //
 // Imports only node: built-ins and this package's own modules.
 

@@ -63,6 +63,7 @@ const readme = read('README.md');
 is(/^## License$/m.test(readme), 'the README has a License section');
 is(/Apache License 2\.0/.test(readme), 'the README names Apache-2.0');
 is(/from 0\.26\.0 it is Apache-2\.0 again/.test(readme), 'the README says the engine is Apache-2.0 from 0.26.0');
+is(!/Stripe|Wrangler|Cloudflare's/.test(readme.split('## License')[1] + read('CHANGELOG.md').split('## 0.25.0')[0] + ENGINE.map(read).map((x) => x.slice(0, 600)).join('')), 'the license notes compare Trooth to no other company');
 is(!/Apache-2\.0 AND FSL/.test(readme + read('package.json') + read('npm-shrinkwrap.json')), 'no file still says Apache-2.0 AND FSL');
 is((pkg.files || []).includes('LICENSE'), 'the published tarball carries the LICENSE');
 
