@@ -11,6 +11,7 @@
 //                                    with PKCE and a loopback redirect (RFC 8252); the token goes in the OS keychain
 //   trooth config list|get|set|unset settings, read in the order flags, then environment, then the config file
 //   trooth completion <shell>        bash, zsh, fish or powershell
+//   trooth status [--json]           whether each public part of Trooth answers, and the last week's incidents (WC22)
 //
 // Agent mode (K3, clig.dev): TROOTH_API_KEY is the credential (an agent key, tra_ or tsk_); --json prints one JSON
 // document; --no-input (or TROOTH_NO_INPUT, or CI) fails instead of prompting. These commands exit 0 on success,
@@ -28,7 +29,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { join } from 'node:path';
 
-export const AGENT_COMMANDS = new Set(['semanto', 'network', 'api', 'tools', 'login', 'logout', 'config', 'completion']);
+export const AGENT_COMMANDS = new Set(['semanto', 'network', 'api', 'tools', 'login', 'logout', 'config', 'completion', 'status']);
 export const AGENT_EXIT = { OK: 0, REFUSED: 2, APPROVAL: 3, UNREACHABLE: 4 };
 
 const DEFAULTS = {
@@ -406,7 +407,7 @@ function configCommand(io, args, env) {
   return AGENT_EXIT.OK;
 }
 
-export const COMMANDS_FOR_COMPLETION = ['check', 'profile', 'lint', 'verify', 'log', 'mirror', 'public-record', 'mcp-tools', 'guard', 'declare', 'evidence', 'delegation', 'semanto', 'network', 'api', 'tools', 'login', 'logout', 'config', 'completion', 'help', 'version'];
+export const COMMANDS_FOR_COMPLETION = ['check', 'profile', 'lint', 'verify', 'log', 'mirror', 'public-record', 'mcp-tools', 'guard', 'declare', 'evidence', 'delegation', 'semanto', 'network', 'api', 'tools', 'status', 'login', 'logout', 'config', 'completion', 'help', 'version'];
 
 export function completionScript(shell) {
   const words = COMMANDS_FOR_COMPLETION.join(' ');
@@ -439,6 +440,69 @@ export function newer(a, b) {
   return false;
 }
 
+// ------------------------------------------------------------------ status (WC22, cli7)
+
+/** What `trooth status` reads: each public part of Trooth, called directly, as `gh status` and the Stripe CLI
+ *  read their own services. A part is operational when it answers below 500 within the time limit; slow past
+ *  SLOW_MS, it is degraded; a 5xx or no answer is down. */
+export const STATUS_SLOW_MS = 3000;
+export function statusParts(cfg) {
+  return [
+    { key: 'website', name: 'trooth.co', url: `${cfg.site_base.value}/` },
+    { key: 'api', name: 'API', url: `${cfg.api_base.value}/health` },
+    { key: 'semanto', name: 'Semanto signed copies', url: `${cfg.api_base.value}/public/semanto/trooth/keys.json` },
+    { key: 'mcp', name: 'MCP server', url: `${cfg.semanto_mcp.value.replace(/\/+$/, '')}/.well-known/oauth-protected-resource` },
+  ];
+}
+export function statusState(httpStatus, ms) {
+  if (!httpStatus || httpStatus >= 500) return 'down';
+  return ms > STATUS_SLOW_MS ? 'degraded' : 'operational';
+}
+
+async function statusCommand(io, args, env) {
+  if (args.includes('--help') || args.includes('-h')) {
+    io.outAlways('usage: trooth status [--json]\n\nCalls trooth.co, the API, Semanto and the MCP server directly and reads the incident feed.\nExit 0 when every part answers; 4 when one is down (a 5xx or no answer).');
+    return AGENT_EXIT.OK;
+  }
+  const { kv } = parse(args);
+  const cfg = resolveConfig(kv, env);
+  const timeoutMs = Number(cfg.timeout_ms.value) || 20000;
+  const probe = async (p) => {
+    const t0 = Date.now();
+    try {
+      const res = await fetch(p.url, { method: 'GET', signal: AbortSignal.timeout(timeoutMs), redirect: 'manual' });
+      try { await res.body?.cancel(); } catch {}
+      const ms = Date.now() - t0;
+      return { key: p.key, name: p.name, url: p.url, http_status: res.status, ms, state: statusState(res.status, ms) };
+    } catch (e) {
+      return { key: p.key, name: p.name, url: p.url, http_status: null, ms: Date.now() - t0, state: 'down', error: e && e.name === 'TimeoutError' ? 'timed out' : 'no answer' };
+    }
+  };
+  const s = spinner(io, 'reading Trooth status');
+  let parts, incidents = null;
+  try {
+    const feed = `${cfg.site_base.value}/status/history.json`;
+    [parts, incidents] = await Promise.all([
+      Promise.all(statusParts(cfg).map(probe)),
+      fetch(feed, { signal: AbortSignal.timeout(timeoutMs) }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+  } finally { s.stop(); }
+  const week = Date.now() - 7 * 24 * 3600 * 1000;
+  const recent = incidents && Array.isArray(incidents.items)
+    ? incidents.items.filter((i) => Date.parse(i.date_modified || i.date_published) >= week).map((i) => ({ title: i.title, updated: i.date_modified || i.date_published }))
+    : null;
+  const page = `${cfg.site_base.value}/status`;
+  if (io.asJson) io.emitJson({ object: 'trooth.status', read_at: new Date().toISOString(), parts, incidents_last_7_days: recent, page });
+  else {
+    for (const p of parts) io.out(`${p.name.padEnd(24)} ${p.state.padEnd(12)} ${p.http_status ?? (p.error || 'no answer')}  ${p.ms} ms`);
+    if (recent === null) io.out('incidents                could not be read');
+    else if (!recent.length) io.out('incidents                none in the last 7 days');
+    else for (const i of recent) io.out(`incident                 ${i.title} (updated ${i.updated})`);
+    io.out(`\nThe full page: ${page}`);
+  }
+  return parts.some((p) => p.state === 'down') ? AGENT_EXIT.UNREACHABLE : AGENT_EXIT.OK;
+}
+
 // ------------------------------------------------------------------ entry
 
 export async function agentMain(cmd, args, io, env = process.env) {
@@ -449,6 +513,7 @@ export async function agentMain(cmd, args, io, env = process.env) {
     if (cmd === 'login') return await loginCommand(io, args, env);
     if (cmd === 'logout') return logoutCommand(io, args, env);
     if (cmd === 'config') return configCommand(io, args, env);
+    if (cmd === 'status') return await statusCommand(io, args, env);
     if (cmd === 'completion') {
       const s = completionScript(args[0]);
       if (!s) { io.errLine('error usage: trooth completion bash|zsh|fish|powershell'); return AGENT_EXIT.REFUSED; }

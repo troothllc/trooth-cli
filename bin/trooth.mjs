@@ -425,6 +425,7 @@ ${B}Usage${X}
   trooth login [--server semanto|network] | trooth logout   Sign in; the token goes in the OS keychain
   trooth config list | get <key> | set <key> <value> | unset <key>   Flags, then environment, then the file
   trooth completion bash|zsh|fish|powershell   Shell completion
+  trooth status [--json]    Whether trooth.co, the API, Semanto and the MCP server answer, and recent incidents
   trooth <command> --help   A command's usage, flags and exit codes (also: trooth help <command>)
   trooth --help | --version
 
@@ -3858,7 +3859,7 @@ async function main() {
   }
   if (cmd.startsWith('-')) fail(EXIT.USAGE, `unknown flag ${cmd}. Run \`trooth --help\`.`);
   diag(helpText());
-  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation, semanto, network, api, tools, login, logout, config, completion.`);
+  fail(EXIT.USAGE, `unknown command: ${cmd}. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation, semanto, network, api, tools, status, login, logout, config, completion.`);
 }
 
 /** The one place the exit status is decided. The command's code stands only

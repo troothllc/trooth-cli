@@ -70,6 +70,7 @@ One dependency, pinned to an exact version and locked in `npm-shrinkwrap.json`: 
 | `trooth evidence verify <file\|->` | Checks an action evidence reference on your machine: the short-lived Ed25519 compact JWS Trooth issues when a workspace's agent is authorized for one action under a delegation. It checks the key on `api.trooth.co/public/keys` (kid known, purpose `signed-references`, trusted at `iat`), the signature over the JWS signing input, `typ`, `format`, `iss` and the ten-minute lifetime, and prints the action, the amount and currency or the data class, the target domain, the delegation, the approvals, the responsibility boundary's version, Trooth's reading of the counterparty, and when it was issued and expires. An expired reference is reported as expired (exit 11). `--keys <file>` sends nothing; `--online` also reads its public state (issued, redeemed, expired, revoked); `--protocol` and `--reference` check the mandate it is bound to; `--log` checks its signed commitment (a digest only) in the public witness log. Accepts the JWS or the API's JSON, from a file or stdin (`-`). Library `trooth/evidence`. Rules in [docs/ACTION-EVIDENCE.md](docs/ACTION-EVIDENCE.md). New in 0.22.0. |
 | `trooth delegation verify <file\|->` | Checks a delegation receipt the same way: the event (created or revoked), the delegation id and digest, the agent key's thumbprint, the actions, the target domain, the expiry and when Trooth recorded it. When the input carries the delegation document (the create response does) or `--delegation <file>` names it, its digest is checked against the receipt and its limit, data class and approval threshold are printed. `--log` checks its commitment in the public witness log. New in 0.22.0. |
 | `trooth lint [path]` | Reads the infrastructure the given directory declares and prints those declarations, a coverage report and an aggregate digest of the counts. Local and offline. `path` defaults to `.`. |
+| `trooth status` | Calls trooth.co, the API, Semanto and the MCP server directly and lists the last week's incidents from trooth.co/status/history.json. Each part is operational, degraded (slower than 3 seconds) or down (a 5xx or no answer); `--json` prints one document; exit 4 when a part is down. New in 0.25.0. |
 | `trooth --help` | Help. Also `-h` and `help`. `trooth <command> --help` (or `-h`, or `trooth help <command>`) prints one command's usage, flags and exit codes, subcommands included (`trooth log monitor --help`), and exits 0. |
 | `trooth --version` | Version. Also `-v` and `version`. |
 
@@ -401,6 +402,24 @@ Run `lint` as an ordinary step. Pin one exact version, so a new release never ch
 ```
 
 `lint` makes no requests, so the step needs no token, no secret and no permission beyond `contents: read` for the checkout. The step's result follows the exit codes above: `--json` writes the fact document for a later step or an artifact, and `--allow-incomplete` keeps a run passing when a file cannot be read.
+
+### Semanto on deploy
+
+After each deploy, ask Semanto to read the site again and build a new version. The version waits for a person to review and sign it in the dashboard; nothing is published from CI ([trooth.co/docs/approvals](https://trooth.co/docs/approvals)).
+
+```yaml
+on: { push: { branches: [main] } }
+jobs:
+  semanto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: troothllc/trooth-cli@v0.25.0
+        with:
+          trooth-id: your-trooth-id
+          api-key: ${{ secrets.TROOTH_API_KEY }}
+```
+
+The key is an agent key from trooth.co/dashboard/api-keys. New in 0.25.0.
 
 ## Environment
 
