@@ -13,7 +13,7 @@ These parts of this repository are the specification, and they are licensed unde
 
 ## The code, and its license
 
-Everything else, the `trooth` command line tool and the software development kits in `sdk/` included, is licensed under the Apache License 2.0 only. See [LICENSE](LICENSE).
+Everything else, the `trooth` command line tool and the software development kits in `sdk/` included, is licensed under the Apache License 2.0 only. See [LICENSE](LICENSE). The one exception is the guard decision engine (`bin/lib/guard.mjs`, `guard-decide.mjs`, `guard-policy.mjs`, `guard-evidence.mjs` and `guard-ci.mjs`), which from 0.24.0 is under the Functional Source License 1.1 with the Apache 2.0 future license ([LICENSE-FSL.md](LICENSE-FSL.md)). The formal model of the guard decision in `spec/` and the rules in `docs/GUARD.md` stay under the licenses above, so anyone may build their own engine to the same model.
 
 ## The name is not licensed by either
 

@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // bin/lib/guard-policy.mjs - the customer's guard policy (docs/GUARD.md
 // section 3, schemas/guard-policy.v1.schema.json): reading it, refusing what
 // it cannot mean, and the interception rules that follow from it (which tool
 // calls are covered and which host a call is about).
-// Copyright 2026 Trooth, LLC. Licensed under the Apache License, Version 2.0.
+// Copyright 2026 Trooth, LLC. Licensed under the Functional Source License,
+// Version 1.1, ALv2 Future License (FSL-1.1-ALv2, LICENSE-FSL.md) from trooth 0.24.0;
+// each version becomes Apache-2.0 two years after it is published, and 0.23.4 and
+// earlier stay Apache-2.0.
 //
 // Imports only node: built-ins and this package's own modules.
 

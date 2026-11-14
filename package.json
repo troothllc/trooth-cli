@@ -1,6 +1,6 @@
 {
   "name": "trooth",
-  "version": "0.23.4",
+  "version": "0.24.0",
   "description": "Read any company's record on the Trooth Network from your terminal: each fact with who said it and when, and Trooth's signed witness statement checked on your machine. No key, no account. Claim your company's record free at trooth.co.",
   "type": "module",
   "bin": {
@@ -67,6 +67,7 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
+    "LICENSE-FSL.md",
     "SPECIFICATION-LICENSE.md",
     "TRADEMARKS.md",
     "npm-shrinkwrap.json"
@@ -81,7 +82,7 @@
     "types": "node scripts/gen-types.mjs",
     "guard:results": "node scripts/guard-results.mjs"
   },
-  "license": "Apache-2.0",
+  "license": "Apache-2.0 AND FSL-1.1-ALv2",
   "author": "Trooth, LLC",
   "homepage": "https://trooth.co",
   "repository": {
