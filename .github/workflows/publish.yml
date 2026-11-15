@@ -120,7 +120,7 @@ jobs:
       # (SLSA Build L2 needs provenance a hosted platform generates; a workstation build cannot give it).
       # https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations
       - name: Build provenance for each release file (SLSA, GitHub artifact attestation)
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             release/trooth-*.tgz
