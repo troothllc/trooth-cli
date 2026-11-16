@@ -815,7 +815,7 @@ const COMMAND_HELP = {
       ['9', 'the reading is not the one its statement names, or its log receipt does not check'],
       SEVEN,
     ],
-    note: 'A reading that carries no signature (the signature line says why) does not change the exit code.',
+    note: 'A reading that carries no signature (the signature line says why) does not change the exit code. A proof line ties the domain to its company by a DNS TXT record, a code to admin, administrator, webmaster, hostmaster or postmaster at the domain (it counts for 398 days), or single sign-on for an organization whose administrator confirmed the domain. No other mailbox, no personal mail domain and no Google Workspace or Microsoft sign-in proves a domain.',
     examples: ['trooth public-record apple.com', 'trooth public-record trooth.co --json', 'trooth public-record example.com --cik 320193 --timeout 90'],
   },
   'mcp-tools': {
