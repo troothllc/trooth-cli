@@ -2,6 +2,11 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.26.2 (2026-11-16)
+
+- docs/EVIDENCE.md, the public-record schema, the TypeScript, Python and Go types and `trooth public-record --help` say how a domain is proved since 2026-11-16: `domain_email_code` is a code to admin, administrator, webmaster, hostmaster or postmaster at the domain and counts for 398 days; a personal mail provider's domain is refused for every method; `identity_provider_sign_in` is single sign-on for an organization whose administrator confirmed the domain, and a Google Workspace or Microsoft sign-in proves nothing.
+- The GitHub Action pins `troothllc/trooth-cli@v0.26.2`.
+
 ## 0.26.1 (2026-11-14)
 
 - The license notes in the README, the CHANGELOG and the guard engine's file headers say what the license is without comparing Trooth to other companies.

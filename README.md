@@ -413,7 +413,7 @@ jobs:
   semanto:
     runs-on: ubuntu-latest
     steps:
-      - uses: troothllc/trooth-cli@v0.26.1
+      - uses: troothllc/trooth-cli@v0.26.2
         with:
           trooth-id: your-trooth-id
           api-key: ${{ secrets.TROOTH_API_KEY }}
