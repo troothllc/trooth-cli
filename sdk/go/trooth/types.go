@@ -258,6 +258,8 @@ type DomainDeclaration struct {
 	RecordDigest *string `json:"record_digest,omitempty"`
 	// The company's own public keys, one to eight; more than one during a key rotation. Never a private key.
 	Keys []DeclarationKey `json:"keys"`
+	// The keys the domain signed with before and no longer does, each with the time it was retired; an empty list states that none has been. Added in trooth 0.27.0.
+	RetiredKeys []RetiredDeclarationKey `json:"retired_keys,omitempty"`
 	// Products the domain's owner names. Each url is on the domain or a subdomain of it.
 	Products []DeclaredProduct `json:"products,omitempty"`
 	// APIs the domain's owner names, each with an optional MCP server and the SHA-256 of its tool manifest.
@@ -316,6 +318,14 @@ type DeclarationSignature struct {
 	Canonicalization string `json:"canonicalization"`
 	// ed25519: and the 64-byte signature in base64.
 	Value string `json:"value"`
+}
+
+// RetiredDeclarationKey: A key the domain signed with before and no longer does.
+type RetiredDeclarationKey struct {
+	// <domain>#<RFC 7638 thumbprint> of the retired key; never one of keys.
+	Kid string `json:"kid"`
+	// When the key stopped signing, in UTC; not after issued_at.
+	RetiredAt string `json:"retired_at"`
 }
 
 // DelegationReceiptPayload: The decoded payload of a delegation receipt (format trooth.delegation-receipt.v1): what api.trooth.co recorded when a person in a workspace created or revoked a delegation to an agent, and when. It travels as an Ed25519 compact JWS with the header {"alg":"EdDSA","typ":"trooth-delegation-receipt+jwt","kid":"trooth-evidence-2026-10"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It says what Trooth recorded, not that any action under the delegation is proper. The limit, data class and approval threshold are bound through delegation.sha256. docs/ACTION-EVIDENCE.md; built by delegationReceiptPayload in trooth-os-worker-f src/action-authz.ts.

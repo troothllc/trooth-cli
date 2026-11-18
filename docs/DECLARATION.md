@@ -27,6 +27,7 @@ https://<domain>/.well-known/trooth.json
   "record_version": 12,
   "record_digest": "sha-256=<64 hex>",
   "keys": [ { "kid": "acme.com#<thumbprint>", "kty": "OKP", "crv": "Ed25519", "x": "<base64url>" } ],
+  "retired_keys": [],
   "products": [ { "id": "widget", "name": "Widget", "url": "https://acme.com/widget" } ],
   "apis": [ { "base_url": "https://api.acme.com", "mcp": { "url": "https://api.acme.com/mcp", "manifest_sha256": "<64 hex>" } } ],
   "repositories": [ "https://github.com/acme" ],
@@ -42,6 +43,7 @@ A declaration checks when every rule below holds. `trooth declare check` and `ch
 4. `issued_at` and `expires_at` are ISO 8601 times in UTC; `expires_at` is after `issued_at` and at most 400 days after it; `issued_at` is not more than five minutes in the future.
 5. `record`, when present, is `https://trooth.co/network/company/<slug>`: the company's Trooth record, and the one URL not on the domain. `record_version` (a whole number of 1 or more) and `record_digest` (`sha-256=` and 64 lowercase hex) are present together or not at all, and only when `record` is (section 2.1).
 6. `keys` holds one to eight Ed25519 public keys as JWKs (RFC 8037), each with exactly `kid`, `kty` (`OKP`), `crv` (`Ed25519`) and `x` (32 bytes, base64url). A key with `d`, a private key, fails. Each `kid` is `<domain>#<thumbprint>`, where the thumbprint is the RFC 7638 JWK thumbprint: SHA-256 over `{"crv":"Ed25519","kty":"OKP","x":"<x>"}`, base64url without padding. No `kid` repeats.
+6a. `retired_keys`, when present (trooth 0.27.0 writes it always), lists the keys the domain signed with before and no longer does, each `{kid, retired_at}`: `kid` is `<domain>#<thumbprint>` as in rule 6, `retired_at` an ISO 8601 UTC time not after `issued_at`. A retired `kid` is never one of `keys` and never repeats. An empty list states that no key has been retired.
 7. Every URL in `products` and `apis` (including `mcp.url`) is `https`, with no user name, password, port or fragment, on the domain or a subdomain of it. `products[].id` matches `^[a-z0-9][a-z0-9-]{0,62}$` and is unique; `name` is 1 to 200 characters. `mcp.manifest_sha256` is 64 lowercase hex characters (the manifest hash of [EVIDENCE.md](EVIDENCE.md) section 9). At most 100 entries in each list.
 8. `repositories` are organizations or users on github.com, gitlab.com, bitbucket.org or codeberg.org: `https://<host>/<owner>`.
 9. `signature.alg` is `Ed25519`, `canonicalization` is `RFC8785`, `kid` is one of `keys`, and `value` (`ed25519:` and base64) is a valid Ed25519 signature by that key over the RFC 8785 canonical bytes of the document with the `signature` member removed.
@@ -96,7 +98,7 @@ What Trooth adds is continuity. Each reading of the declaration is signed and lo
 
 1. `trooth declare init --domain acme.com --key ~/.trooth/declaration-key/acme.com.next.jwk` makes the new key.
 2. Sign with the current key and list the new one beside it: `trooth declare sign ... --key <current> --add-key <new key file> --out trooth.json` (`--add-key` reads only the public half). Publish it. Readers now see both keys.
-3. When ready, sign with the new key alone and publish that. If you use the DNS pin, change the TXT record to the new thumbprint at the same time.
+3. When ready, sign with the new key alone, list the old one with `--retired-key <domain>#<old thumbprint>@<time>`, and publish that. If you use the DNS pin, change the TXT record to the new thumbprint at the same time. Every later declaration keeps the old key in `retired_keys`, so a reader holding an old signature can see when its key stopped signing.
 4. Destroy the old key file.
 
 Each step is a change Trooth's readings record as `declaration_key_changed`. A key that is lost or exposed is replaced the same way, without step 2: publish a declaration signed by a new key, and change the pin.

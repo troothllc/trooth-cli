@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process';
 import {
   jwkThumbprint, generateDeclarationKey, buildDeclaration, signDeclaration, checkDeclaration, fetchDeclaration,
   readKeyPin, pinStatus, pinLine, txtValue, isSignatureProblem, readPrivateJwk, keyIdFor, MAX_DECLARATION_BYTES,
-  readRecordHead, recordBindingState, recordSlugOf,
+  readRecordHead, recordBindingState, recordSlugOf, publicJwkOf,
 } from '../bin/lib/declaration.mjs';
 
 const cli = new URL('../bin/trooth.mjs', import.meta.url).pathname;
@@ -490,4 +490,26 @@ test('CLI: sign --bind-record writes the record head the API names; check report
     assert.equal(r.code, 3, r.err); assert.match(r.err, /HTTP 503/); assert.ok(!existsSync(join(home, 'x.json')));
     assert.equal((await run(['declare', 'check', '--file', out, '--bind-record'], { home, env })).code, 2, '--bind-record is a sign flag');
   } finally { srv.close(); }
+});
+
+// DG9 (0.27.0): retired_keys, always written; a retired key is the domain's, never an active one, never repeats,
+// never retired after issued_at; --retired-key fills it.
+test('0.27.0: retired_keys is written, checked and refused when it is wrong', async () => {
+  const { privateJwk: k } = generateDeclarationKey();
+  const { privateJwk: old } = generateDeclarationKey();
+  const oldKid = keyIdFor('acme.com', publicJwkOf(old));
+  const d0 = buildDeclaration({ domain: 'acme.com', privateJwk: k });
+  assert.deepEqual(d0.retired_keys, []);
+  assert.equal(checkDeclaration(d0, { domain: 'acme.com' }).status, 'checked');
+  const d1 = buildDeclaration({ domain: 'acme.com', privateJwk: k, retiredKeys: [{ kid: oldKid, retired_at: '2026-11-01T00:00:00Z' }] });
+  assert.deepEqual(checkDeclaration(d1, { domain: 'acme.com' }).retired_keys, [{ kid: oldKid, retired_at: '2026-11-01T00:00:00Z' }]);
+  const tp = oldKid.split('#')[1];
+  const bad = [
+    [{ kid: `evil.com#${tp}`, retired_at: '2026-11-01T00:00:00Z' }, /is not acme\.com#/],
+    [{ kid: oldKid, retired_at: '2099-01-01T00:00:00Z' }, /after issued_at/],
+    [{ kid: keyIdFor('acme.com', publicJwkOf(k)), retired_at: '2026-11-01T00:00:00Z' }, /also one of keys/],
+    [{ kid: oldKid, retired_at: 'yesterday' }, /ISO 8601/],
+  ];
+  for (const [r, re] of bad) assert.throws(() => buildDeclaration({ domain: 'acme.com', privateJwk: k, retiredKeys: [r] }), re);
+  assert.throws(() => buildDeclaration({ domain: 'acme.com', privateJwk: k, retiredKeys: [{ kid: oldKid, retired_at: '2026-11-01T00:00:00Z' }, { kid: oldKid, retired_at: '2026-11-02T00:00:00Z' }] }), /repeats/);
 });
