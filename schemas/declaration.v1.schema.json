@@ -14,8 +14,14 @@
   ],
   "additionalProperties": false,
   "dependentRequired": {
-    "record_version": ["record", "record_digest"],
-    "record_digest": ["record", "record_version"]
+    "record_version": [
+      "record",
+      "record_digest"
+    ],
+    "record_digest": [
+      "record",
+      "record_version"
+    ]
   },
   "properties": {
     "format": {
@@ -60,6 +66,14 @@
       "maxItems": 8,
       "items": {
         "$ref": "#/$defs/DeclarationKey"
+      }
+    },
+    "retired_keys": {
+      "type": "array",
+      "description": "The keys the domain signed with before and no longer does, each with the time it was retired; an empty list states that none has been. Added in trooth 0.27.0.",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/RetiredKey"
       }
     },
     "products": {
@@ -227,6 +241,28 @@
           "pattern": "^ed25519:[A-Za-z0-9+/]+={0,2}$"
         }
       }
+    },
+    "RetiredKey": {
+      "title": "RetiredDeclarationKey",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kid",
+        "retired_at"
+      ],
+      "properties": {
+        "kid": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]+#[A-Za-z0-9_-]{43}$",
+          "description": "<domain>#<RFC 7638 thumbprint> of the retired key; never one of keys."
+        },
+        "retired_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$",
+          "description": "When the key stopped signing, in UTC; not after issued_at."
+        }
+      },
+      "description": "A key the domain signed with before and no longer does."
     }
   }
 }

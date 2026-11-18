@@ -345,7 +345,7 @@ const FLAGS = {
   mirror: { bool: ['--json', '--check'], value: ['--from', '--log-vkey'] },
   'public-record': { bool: ['--json'], value: ['--cik', '--lei', '--ticker', '--log-vkey', '--timeout'] },
   'mcp-tools': { bool: ['--json', '--live'], value: ['--log-vkey'] },
-  declare: { bool: ['--json', '--no-dns', '--no-record', '--bind-record'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key'] },
+  declare: { bool: ['--json', '--no-dns', '--no-record', '--bind-record'], value: ['--domain', '--key', '--record', '--days', '--out', '--file'], multi: ['--product', '--api', '--repo', '--add-key', '--retired-key'] },
   guard: { bool: ['--json', '--offline'], value: ['--policy', '--tool', '--host', '--args', '--cache', '--max-age', '--base', '--log-vkey', '--timeout-ms'], multi: ['--witness'] },
   evidence: { bool: ['--json', '--online', '--log'], value: ['--keys', '--protocol', '--reference', '--log-index'] },
   delegation: { bool: ['--json', '--log'], value: ['--keys', '--delegation', '--log-index'] },
@@ -485,7 +485,8 @@ ${B}Flags${X}
   --timeout-ms <ms>         guard: the deadline for each request (default 10000)
   --domain, --key           declare: the domain, and the private JWK (init default ~/.trooth/declaration-key/<domain>.jwk)
   --product id=name=url     declare sign: a product (repeatable); --api base_url[,mcp_url,manifest_sha256],
-                            --repo <url>, --add-key <jwk> (a second key, for rotation) repeat too
+                            --repo <url>, --add-key <jwk> (a second key, for rotation) repeat too;
+                            --retired-key <kid>@<time> lists a key no longer used, with when it was retired
   --record <url>, --days N  declare sign: the company's Trooth record; validity in days (default 365, at most 400)
   --bind-record             declare sign: write the record's current version and digest (record_version, record_digest)
   --file <path>, --no-dns   declare check: check a saved file; do not read the _trooth-key TXT pin
@@ -993,7 +994,7 @@ const COMMAND_HELP = {
     usage: [
       'trooth declare sign --domain <domain> --key <path> --out <file> [--record <url> [--bind-record]] [--days <n>]',
       '                    [--product id=name=url]... [--api base_url[,mcp_url,manifest_sha256]]...',
-      '                    [--repo <url>]... [--add-key <jwk>]... [--json]',
+      '                    [--repo <url>]... [--add-key <jwk>]... [--retired-key <kid>@<time>]... [--json]',
     ],
     about: [
       'Writes the signed declaration you publish at https://<domain>/.well-known/trooth.json, checked against every rule before it is written, and prints the optional _trooth-key TXT pin.',
@@ -1014,6 +1015,7 @@ const COMMAND_HELP = {
       ['--api <spec>', 'an API: base_url, or base_url,mcp_url,manifest_sha256 (repeatable)'],
       ['--repo <url>', 'a code repository (repeatable)'],
       ['--add-key <jwk>', 'a second public key, for rotation (repeatable)'],
+      ['--retired-key <kid>@<time>', 'a key the domain no longer signs with and when it was retired, as <domain>#<thumbprint>@<ISO 8601 UTC> (repeatable); with none, retired_keys is an empty list'],
       ['--json', 'one JSON document on stdout; diagnostics on stderr'],
     ],
     exits: [['0', 'the declaration was written'], ['2', 'usage error, including a refusal to overwrite and a document that would not check'], SEVEN],
@@ -3363,6 +3365,12 @@ function readKeyFile(path) {
   try { return readPrivateJwk(text); } catch (e) { fail(EXIT.USAGE, `${path}: ${e.message}`); }
 }
 
+// DG9 (cli40): --retired-key <domain>#<thumbprint>@<ISO 8601 UTC time>.
+function parseRetiredKey(spec) {
+  const at = String(spec).lastIndexOf('@');
+  if (at < 1) fail(EXIT.USAGE, `--retired-key: ${spec} is not <kid>@<time>.`);
+  return { kid: spec.slice(0, at), retired_at: spec.slice(at + 1) };
+}
 function readPublicJwkFile(path) {
   if (!existsSync(path)) fail(EXIT.USAGE, `--add-key: file not found: ${path}`);
   let j;
@@ -3390,7 +3398,7 @@ async function declareCmd() {
   const sub = positional[0];
   const rest = positional.slice(1);
   if (!['init', 'sign', 'check'].includes(sub)) fail(EXIT.USAGE, 'trooth declare takes init, sign or check. Try: trooth declare init --domain acme.com, or trooth declare --help');
-  const allowed = { init: ['--json', '--domain', '--key'], sign: ['--json', '--domain', '--key', '--record', '--bind-record', '--days', '--out', '--product', '--api', '--repo', '--add-key'], check: ['--json', '--domain', '--file', '--no-dns', '--no-record'] }[sub];
+  const allowed = { init: ['--json', '--domain', '--key'], sign: ['--json', '--domain', '--key', '--record', '--bind-record', '--days', '--out', '--product', '--api', '--repo', '--add-key', '--retired-key'], check: ['--json', '--domain', '--file', '--no-dns', '--no-record'] }[sub];
   for (const f of Object.keys(flags)) if (!allowed.includes(f)) fail(EXIT.USAGE, `${f} is not a flag of \`trooth declare ${sub}\`. Its flags: ${allowed.join(', ')}. Run \`trooth declare ${sub} --help\`.`);
 
   if (sub === 'init') {
@@ -3452,6 +3460,7 @@ async function declareCmd() {
         apis: (flags['--api'] || []).map(parseApi),
         repositories: flags['--repo'] || [],
         extraKeys: (flags['--add-key'] || []).map(readPublicJwkFile),
+        retiredKeys: (flags['--retired-key'] || []).map(parseRetiredKey),
       });
     } catch (e) {
       if (e instanceof DeclarationError) fail(EXIT.USAGE, `the declaration would not check: ${e.message}`);

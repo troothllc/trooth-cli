@@ -208,6 +208,7 @@ class DomainDeclaration(BaseModel):
     record_version: Optional[int] = Field(None, description="Optional, with record_digest and only when `record` is present: the version of the company's Trooth record that the signer names as the version it published, as the record API's Trooth-Record-Version header gave it when this declaration was signed (`trooth declare sign --bind-record`). The company, with its own key, says: this is the record I published. Trooth still does not sign the record; the binding is the company's statement, and it goes stale when the company publishes again until it signs a new declaration. Added in trooth 0.21.0.")
     record_digest: Optional[str] = Field(None, description="Optional, with record_version and only when `record` is present: the digest of that version of the company's Trooth record, as the record API's Trooth-Record-Digest header gave it when this declaration was signed. Added in trooth 0.21.0.")
     keys: List[DeclarationKey] = Field(..., description="The company's own public keys, one to eight; more than one during a key rotation. Never a private key.")
+    retired_keys: Optional[List[RetiredDeclarationKey]] = Field(None, description="The keys the domain signed with before and no longer does, each with the time it was retired; an empty list states that none has been. Added in trooth 0.27.0.")
     products: Optional[List[DeclaredProduct]] = Field(None, description="Products the domain's owner names. Each url is on the domain or a subdomain of it.")
     apis: Optional[List[DeclaredApi]] = Field(None, description="APIs the domain's owner names, each with an optional MCP server and the SHA-256 of its tool manifest.")
     repositories: Optional[List[str]] = Field(None, description="Organizations or users on a code host (github.com, gitlab.com, bitbucket.org, codeberg.org) the domain's owner names.")
@@ -257,6 +258,14 @@ class DeclarationSignature(BaseModel):
     alg: Literal["Ed25519"] = Field(..., description="The algorithm.")
     canonicalization: Literal["RFC8785"] = Field(..., description="The canonicalization of the signed bytes.")
     value: str = Field(..., description="ed25519: and the 64-byte signature in base64.")
+
+class RetiredDeclarationKey(BaseModel):
+    "A key the domain signed with before and no longer does."
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    kid: str = Field(..., description="<domain>#<RFC 7638 thumbprint> of the retired key; never one of keys.")
+    retired_at: str = Field(..., description="When the key stopped signing, in UTC; not after issued_at.")
 
 class DelegationReceiptPayload(BaseModel):
     "The decoded payload of a delegation receipt (format trooth.delegation-receipt.v1): what api.trooth.co recorded when a person in a workspace created or revoked a delegation to an agent, and when. It travels as an Ed25519 compact JWS with the header {\"alg\":\"EdDSA\",\"typ\":\"trooth-delegation-receipt+jwt\",\"kid\":\"trooth-evidence-2026-10\"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It says what Trooth recorded, not that any action under the delegation is proper. The limit, data class and approval threshold are bound through delegation.sha256. docs/ACTION-EVIDENCE.md; built by delegationReceiptPayload in trooth-os-worker-f src/action-authz.ts."
@@ -1562,6 +1571,7 @@ DeclaredProduct.model_rebuild()
 DeclaredMcp.model_rebuild()
 DeclaredApi.model_rebuild()
 DeclarationSignature.model_rebuild()
+RetiredDeclarationKey.model_rebuild()
 DelegationReceiptPayload.model_rebuild()
 DelegationReceiptDelegation.model_rebuild()
 DelegationReceiptVerify.model_rebuild()

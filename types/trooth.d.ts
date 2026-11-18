@@ -256,6 +256,8 @@ export interface DomainDeclaration {
   record_digest?: string;
   /** The company's own public keys, one to eight; more than one during a key rotation. Never a private key. */
   keys: DeclarationKey[];
+  /** The keys the domain signed with before and no longer does, each with the time it was retired; an empty list states that none has been. Added in trooth 0.27.0. */
+  retired_keys?: RetiredDeclarationKey[];
   /** Products the domain's owner names. Each url is on the domain or a subdomain of it. */
   products?: DeclaredProduct[];
   /** APIs the domain's owner names, each with an optional MCP server and the SHA-256 of its tool manifest. */
@@ -314,6 +316,14 @@ export interface DeclarationSignature {
   canonicalization: "RFC8785";
   /** ed25519: and the 64-byte signature in base64. */
   value: string;
+}
+
+/** A key the domain signed with before and no longer does. */
+export interface RetiredDeclarationKey {
+  /** <domain>#<RFC 7638 thumbprint> of the retired key; never one of keys. */
+  kid: string;
+  /** When the key stopped signing, in UTC; not after issued_at. */
+  retired_at: string;
 }
 
 /** The decoded payload of a delegation receipt (format trooth.delegation-receipt.v1): what api.trooth.co recorded when a person in a workspace created or revoked a delegation to an agent, and when. It travels as an Ed25519 compact JWS with the header {"alg":"EdDSA","typ":"trooth-delegation-receipt+jwt","kid":"trooth-evidence-2026-10"}, the payload being these members as canonical JSON (sorted keys, no spaces), signed with the key /public/keys publishes with purpose signed-references. It says what Trooth recorded, not that any action under the delegation is proper. The limit, data class and approval threshold are bound through delegation.sha256. docs/ACTION-EVIDENCE.md; built by delegationReceiptPayload in trooth-os-worker-f src/action-authz.ts. */

@@ -43,7 +43,7 @@ const DAY = 86400000;
 const CLOCK_SKEW_MS = 5 * 60000;
 const MAX_KEYS = 8;
 const MAX_ITEMS = 100;
-const TOP_LEVEL = ['format', 'domain', 'issued_at', 'expires_at', 'record', 'record_version', 'record_digest', 'keys', 'products', 'apis', 'repositories', 'signature'];
+const TOP_LEVEL = ['format', 'domain', 'issued_at', 'expires_at', 'record', 'record_version', 'record_digest', 'keys', 'retired_keys', 'products', 'apis', 'repositories', 'signature'];
 const DOMAIN_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const PRODUCT_ID_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
@@ -132,7 +132,7 @@ export function isoSeconds(ms) { return new Date(ms).toISOString().replace(/\.\d
  * listed after it, for a key rotation. Throws DeclarationError when the result
  * would not check.
  */
-export function buildDeclaration({ domain, privateJwk, now = Date.now(), days = DEFAULT_VALIDITY_DAYS, record = null, recordVersion = null, recordDigest = null, products = [], apis = [], repositories = [], extraKeys = [] }) {
+export function buildDeclaration({ domain, privateJwk, now = Date.now(), days = DEFAULT_VALIDITY_DAYS, record = null, recordVersion = null, recordDigest = null, products = [], apis = [], repositories = [], extraKeys = [], retiredKeys = [] }) {
   if (!Number.isInteger(days) || days < 1 || days > MAX_VALIDITY_DAYS) throw new DeclarationError(`the validity is 1 to ${MAX_VALIDITY_DAYS} days`);
   if ((recordVersion === null) !== (recordDigest === null)) throw new DeclarationError('record_version and record_digest go together');
   if (recordVersion !== null && !record) throw new DeclarationError('record_version and record_digest need record');
@@ -147,6 +147,9 @@ export function buildDeclaration({ domain, privateJwk, now = Date.now(), days = 
     ...(record ? { record } : {}),
     ...(recordVersion !== null ? { record_version: recordVersion, record_digest: recordDigest } : {}),
     keys: [pub, ...extraKeys.map(publicJwkOf)].map((k) => ({ kid: keyIdFor(domain, k), ...k })),
+    // DG9 (cli40): the keys this domain signed with before and no longer does, each with the time it was retired.
+    // Always listed, so an empty list states that no key has been retired.
+    retired_keys: retiredKeys.map((r) => ({ kid: r.kid, retired_at: r.retired_at })),
     products,
     apis,
     repositories,
@@ -195,7 +198,7 @@ const sha256Hex = (b) => createHash('sha256').update(b).digest('hex');
  */
 export function checkDeclaration(input, { domain = null, now = Date.now() } = {}) {
   const problems = [];
-  const res = { status: 'invalid', reason: null, problems, signature: 'not_checked', sha256: null, domain: null, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], record: null, record_version: null, record_digest: null, products: [], apis: [], repositories: [], host_checked: domain !== null };
+  const res = { status: 'invalid', reason: null, problems, signature: 'not_checked', sha256: null, domain: null, issued_at: null, expires_at: null, kid: null, keys: [], thumbprints: [], retired_keys: [], record: null, record_version: null, record_digest: null, products: [], apis: [], repositories: [], host_checked: domain !== null };
   const done = (status, reason) => { res.status = status; res.reason = reason; if (status !== 'checked') { res.products = []; res.apis = []; res.repositories = []; res.record = null; res.record_version = null; res.record_digest = null; } return res; };
   let doc = input;
   if (typeof input === 'string' || Buffer.isBuffer(input) || input instanceof Uint8Array) {
@@ -265,6 +268,25 @@ export function checkDeclaration(input, { domain = null, now = Date.now() } = {}
   }
   res.keys = keys.map((k) => k.kid);
   res.thumbprints = keys.map((k) => k.thumbprint);
+
+  // Retired keys (optional; DG9, trooth 0.27.0): kids the domain signed with before, each with the time it was retired.
+  const retired = [];
+  if (doc.retired_keys !== undefined) {
+    if (!Array.isArray(doc.retired_keys) || doc.retired_keys.length > MAX_ITEMS) problems.push(`retired_keys is not an array of at most ${MAX_ITEMS}`);
+    else {
+      for (const [i, r] of doc.retired_keys.entries()) {
+        if (!r || typeof r !== 'object' || Array.isArray(r) || Object.keys(r).some((m) => !['kid', 'retired_at'].includes(m))) { problems.push(`retired_keys[${i}] is not {kid, retired_at}`); continue; }
+        const [kd, tp] = typeof r.kid === 'string' ? r.kid.split('#') : [];
+        if (!dom || kd !== dom || !THUMBPRINT_RE.test(tp ?? '')) { problems.push(`retired_keys[${i}].kid is not ${dom ?? '<domain>'}#<RFC 7638 thumbprint>`); continue; }
+        if (typeof r.retired_at !== 'string' || !TIME_RE.test(r.retired_at) || !Number.isFinite(Date.parse(r.retired_at))) { problems.push(`retired_keys[${i}].retired_at is not an ISO 8601 UTC time`); continue; }
+        if (Number.isFinite(Date.parse(doc.issued_at)) && Date.parse(r.retired_at) > Date.parse(doc.issued_at)) { problems.push(`retired_keys[${i}].retired_at is after issued_at`); continue; }
+        if (keys.some((k) => k.kid === r.kid)) { problems.push(`retired_keys[${i}] is also one of keys`); continue; }
+        if (retired.some((x) => x.kid === r.kid)) { problems.push(`retired_keys[${i}] repeats ${r.kid}`); continue; }
+        retired.push({ kid: r.kid, retired_at: r.retired_at });
+      }
+    }
+  }
+  res.retired_keys = retired;
 
   // Products.
   const products = [];

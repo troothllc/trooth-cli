@@ -2,6 +2,11 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.27.0 (2026-11-18)
+
+- A declaration lists the domain's retired keys: `retired_keys`, each `{kid, retired_at}`, written by `trooth declare sign` always (an empty list states that no key has been retired) and filled with `--retired-key <domain>#<thumbprint>@<time>` (repeatable) after a rotation. `trooth declare check` refuses a retired key that is also one of `keys`, belongs to another domain, repeats, or was retired after `issued_at`. A declaration without the member still checks. docs/DECLARATION.md rule 6a and section 6, and declaration.v1.schema.json (tracker DG9).
+- The GitHub Action pins `troothllc/trooth-cli@v0.27.0`.
+
 ## 0.26.2 (2026-11-16)
 
 - docs/EVIDENCE.md, the public-record schema, the TypeScript, Python and Go types and `trooth public-record --help` say how a domain is proved since 2026-11-16: `domain_email_code` is a code to admin, administrator, webmaster, hostmaster or postmaster at the domain and counts for 398 days; a personal mail provider's domain is refused for every method; `identity_provider_sign_in` is single sign-on for an organization whose administrator confirmed the domain, and a Google Workspace or Microsoft sign-in proves nothing.
