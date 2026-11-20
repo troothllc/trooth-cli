@@ -28,14 +28,14 @@ jobs:
     name: The log only grew
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: Install from the lock, scripts off
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: The last checkpoint seen
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .log-state
           key: log-state-${{ github.run_id }}
@@ -46,7 +46,7 @@ jobs:
           node bin/trooth.mjs log monitor --state .log-state/state.json
       - name: Keep the new checkpoint
         if: success()
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .log-state
           key: log-state-${{ github.run_id }}
