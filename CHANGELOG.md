@@ -2,6 +2,12 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.27.1 (2026-11-24)
+
+- `trooth login` reaches the sign-in server again. It asked for the address `https://mcp.trooth.co/.well-known/oauth-protected-resource/`, with a trailing slash, which answers 404, so sign-in stopped before the browser opened; it now asks for the address RFC 9728 gives a server address with no path, without the slash.
+- When a sign-in ends, the CLI says so. Trooth ends a connected app's sign-in when the account's password or two-step authentication changes or every session is signed out; the next command that needed it now says the sign-in ended and to run `trooth login`, and removes the stored token, so `trooth status` no longer shows it.
+- The GitHub Action pins `troothllc/trooth-cli@v0.27.1`.
+
 ## 0.27.0 (2026-11-18)
 
 - A declaration lists the domain's retired keys: `retired_keys`, each `{kid, retired_at}`, written by `trooth declare sign` always (an empty list states that no key has been retired) and filled with `--retired-key <domain>#<thumbprint>@<time>` (repeatable) after a rotation. `trooth declare check` refuses a retired key that is also one of `keys`, belongs to another domain, repeats, or was retired after `issued_at`. A declaration without the member still checks. docs/DECLARATION.md rule 6a and section 6, and declaration.v1.schema.json (tracker DG9).
