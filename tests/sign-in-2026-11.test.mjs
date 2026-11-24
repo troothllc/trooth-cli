@@ -29,6 +29,8 @@ test('the metadata address follows RFC 9728: no trailing slash for a resource wi
   assert.equal(prmUrl('https://mcp.trooth.co'), 'https://mcp.trooth.co/.well-known/oauth-protected-resource');
   assert.equal(prmUrl('https://mcp.trooth.co/'), 'https://mcp.trooth.co/.well-known/oauth-protected-resource');
   assert.equal(prmUrl('https://api.example.test/os/semanto/mcp'), 'https://api.example.test/.well-known/oauth-protected-resource/os/semanto/mcp');
+  assert.equal(prmUrl('https://a.test/p/'), 'https://a.test/.well-known/oauth-protected-resource/p/');
+  assert.equal(prmUrl('https://a.test/p?x=1'), 'https://a.test/.well-known/oauth-protected-resource/p?x=1');
 });
 
 test('login reaches the sign-in server when the resource has no path, as mcp.trooth.co does', async () => {
@@ -66,4 +68,19 @@ test('a refused refresh says the sign-in ended and removes the dead token', asyn
   assert.equal(globalThis.__troothKeychain.get(resource), undefined, 'the dead token is gone');
   assert.ok(!s.seen.some((x) => x.auth === 'Bearer old'), 'the expired token is never sent');
   s.close();
+});
+
+test('any other refusal of the refresh keeps the stored token', async () => {
+  for (const [status, body] of [[400, { error: 'invalid_request' }], [401, { error: 'invalid_client' }], [400, {}], [401, { message: 'blocked by a proxy' }]]) {
+    const s = await server((req) => (req.url === '/token' ? [status, body] : [401, { error: 'unauthenticated' }]));
+    const resource = `${s.url}/os/semanto/mcp`;
+    const stored = JSON.stringify({ access_token: 'old', refresh_token: 'rt-old', expires_at: Date.now() - 60_000, client_id: 'c', token_endpoint: `${s.url}/token` });
+    globalThis.__troothKeychain.set(resource, stored);
+    const err = [];
+    await agentMain('semanto', ['status', '--trooth-id', 'acme'], quietIo(err), { TROOTH_SEMANTO_MCP: resource, TROOTH_NETWORK_MCP: resource, TROOTH_KEYCHAIN: 'memory' });
+    assert.equal(globalThis.__troothKeychain.get(resource), stored, `${status} ${JSON.stringify(body)} kept the token`);
+    assert.ok(!err.join('\n').includes('sign-in to'), 'no ended-sign-in message');
+    globalThis.__troothKeychain.delete(resource);
+    s.close();
+  }
 });

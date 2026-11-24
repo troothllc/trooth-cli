@@ -191,7 +191,9 @@ async function credentialFor(io, resource, cfg, env) {
   if (!res.ok) {
     // A refused refresh means the sign-in ended: Trooth ends a connected app when the password or two-step changes or
     // every session is signed out. The dead token is removed, so status shows signed out and nothing sends it again.
-    if (res.status === 400 || res.status === 401) {
+    // RFC 6749 5.2: only invalid_grant says the refresh token itself is no longer valid; any other refusal keeps it.
+    const err = await res.json().then((x) => x && x.error).catch(() => null);
+    if ((res.status === 400 || res.status === 401) && err === 'invalid_grant') {
       keychain(env)?.del(resource);
       io.errLine(`Your sign-in to ${new URL(resource).host} ended: the password or two-step changed, or every session was signed out. Run \`trooth login\` to sign in again.`);
     }
@@ -542,6 +544,7 @@ export const _test = { parse, coerce, toolName, existsSync };
 /** RFC 9728 3.1: the protected resource metadata address; a resource with no path has no trailing slash. */
 export function prmUrl(resource) {
   const u = new URL(resource);
-  const path = u.pathname === '/' ? '' : u.pathname.replace(/\/+$/, '');
-  return `${u.origin}/.well-known/oauth-protected-resource${path}`;
+  // Only the slash right after the host is dropped; a path keeps its own trailing slash, and the query follows it.
+  const path = u.pathname === '/' ? '' : u.pathname;
+  return `${u.origin}/.well-known/oauth-protected-resource${path}${u.search}`;
 }
