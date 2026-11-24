@@ -188,7 +188,17 @@ async function credentialFor(io, resource, cfg, env) {
   if (t.expires_at && Date.now() < t.expires_at - 30_000) return t.access_token;
   if (!t.refresh_token || !t.token_endpoint) return t.access_token;
   const res = await http(io, t.token_endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: t.refresh_token, client_id: t.client_id, resource }) }, Number(cfg.timeout_ms.value));
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // A refused refresh means the sign-in ended: Trooth ends a connected app when the password or two-step changes or
+    // every session is signed out. The dead token is removed, so status shows signed out and nothing sends it again.
+    // RFC 6749 5.2: only invalid_grant says the refresh token itself is no longer valid; any other refusal keeps it.
+    const err = await res.json().then((x) => x && x.error).catch(() => null);
+    if ((res.status === 400 || res.status === 401) && err === 'invalid_grant') {
+      keychain(env)?.del(resource);
+      io.errLine(`Your sign-in to ${new URL(resource).host} ended: the password or two-step changed, or every session was signed out. Run \`trooth login\` to sign in again.`);
+    }
+    return null;
+  }
   const j = await res.json();
   const next = { ...t, access_token: j.access_token, refresh_token: j.refresh_token ?? t.refresh_token, expires_at: j.expires_in ? Date.now() + j.expires_in * 1000 : null };
   keychain(env)?.set(resource, JSON.stringify(next));
@@ -312,7 +322,9 @@ async function loginCommand(io, args, env) {
   if (!kc) { io.errLine('error no OS keychain was found (macOS Keychain or Secret Service), and Trooth never writes a token to a plain file. Set TROOTH_API_KEY to an agent key instead.'); return AGENT_EXIT.REFUSED; }
   const t = Number(cfg.timeout_ms.value);
   const u = new URL(resource);
-  const prm = await (await http(io, `${u.origin}/.well-known/oauth-protected-resource${u.pathname}`, { method: 'GET' }, t)).json().catch(() => null);
+  // RFC 9728 3.1: a resource with no path (https://mcp.trooth.co) is described at the well-known address itself, with no
+  // trailing slash; the slashed address answers 404 there, so sign-in stopped before it began.
+  const prm = await (await http(io, prmUrl(resource), { method: 'GET' }, t)).json().catch(() => null);
   const issuer = prm && prm.authorization_servers && prm.authorization_servers[0];
   if (!issuer) { io.errLine(`error ${u.host} does not name a sign-in server. Use TROOTH_API_KEY.`); return AGENT_EXIT.REFUSED; }
   const as = await (await http(io, `${issuer.replace(/\/$/, '')}/.well-known/oauth-authorization-server`, { method: 'GET' }, t)).json().catch(() => null);
@@ -527,3 +539,12 @@ export async function agentMain(cmd, args, io, env = process.env) {
 }
 
 export const _test = { parse, coerce, toolName, existsSync };
+
+
+/** RFC 9728 3.1: the protected resource metadata address; a resource with no path has no trailing slash. */
+export function prmUrl(resource) {
+  const u = new URL(resource);
+  // Only the slash right after the host is dropped; a path keeps its own trailing slash, and the query follows it.
+  const path = u.pathname === '/' ? '' : u.pathname;
+  return `${u.origin}/.well-known/oauth-protected-resource${path}${u.search}`;
+}
