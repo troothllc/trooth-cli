@@ -30,7 +30,7 @@ import { homedir, platform } from 'node:os';
 import { join } from 'node:path';
 
 export const AGENT_COMMANDS = new Set(['semanto', 'network', 'api', 'tools', 'login', 'logout', 'config', 'completion', 'status']);
-export const AGENT_EXIT = { OK: 0, REFUSED: 2, APPROVAL: 3, UNREACHABLE: 4 };
+export const AGENT_EXIT = { OK: 0, REFUSED: 2, APPROVAL: 3, UNREACHABLE: 4, MISMATCH: 9 };
 
 const DEFAULTS = {
   api_base: 'https://api.trooth.co',
@@ -228,11 +228,25 @@ export function toolExit(result) {
   const status = sc && typeof sc === 'object' ? sc.status : undefined;
   if (['human_action_required', 'approval_required', 'input_required'].includes(status)) return AGENT_EXIT.APPROVAL;
   if (['upstream_unavailable', 'session_unavailable'].includes(status)) return AGENT_EXIT.UNREACHABLE;
+  // cli61: a page checked against its signed copy holds only when it matches; differs, not_served, unknown_url and the
+  // rest exit 9, as `trooth verify` does for a check that does not hold, so one command can gate a script.
+  if (sc && sc.object === 'semanto.verify' && typeof sc.url === 'string' && status !== 'matches') return AGENT_EXIT.MISMATCH;
   if (result && result.isError) return AGENT_EXIT.REFUSED;
   return AGENT_EXIT.OK;
 }
 
 const toolName = (prefix, cmd) => (cmd.startsWith(`${prefix}_`) ? cmd : `${prefix}_${cmd.replace(/-/g, '_')}`);
+
+/** The tool a command names, read against the names the server lists (cli61): the listing prints each tool with its
+ *  server prefix taken off and dashes for underscores, so the same words must lead back to that tool, whatever its
+ *  prefix (the one server lists trooth_* tools under `trooth semanto`, and call_tool, search_tools and enable_toolset
+ *  with no prefix). With no list to read, the server prefix is added as before. */
+export function resolveToolName(prefix, cmd, listed = []) {
+  const n = cmd.replace(/-/g, '_');
+  const names = new Set(listed);
+  for (const t of [n, `${prefix}_${n}`, `trooth_${n}`, `semanto_${n}`]) if (names.has(t)) return t;
+  return toolName(prefix, cmd);
+}
 
 async function toolCommand(io, which, args, env) {
   const { flags, pos, kv } = parse(args);
@@ -246,7 +260,9 @@ async function toolCommand(io, which, args, env) {
     else for (const t of tools) io.out(`${t.command.padEnd(52)} ${t.title || ''}`);
     return AGENT_EXIT.OK;
   }
-  const name = toolName(prefix, pos[0]);
+  let listed = [];
+  try { listed = ((await mcp(io, `${server}${server.includes('?') ? '&' : '?'}tools=all`, 'tools/list', {}, cfg, env)).tools || []).map((t) => t.name); } catch (e) { if (!(e instanceof Stop)) throw e; }
+  const name = resolveToolName(prefix, pos[0], listed);
   let args2 = {};
   if (kv.args) { try { args2 = JSON.parse(kv.args); } catch { io.errLine('error --args must be one JSON object.'); return AGENT_EXIT.REFUSED; } delete kv.args; }
   for (const [k, v] of Object.entries(kv)) args2[k.replace(/-/g, '_')] = coerce(v);

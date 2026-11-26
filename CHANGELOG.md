@@ -2,6 +2,12 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.27.2 (2026-11-26)
+
+- `trooth semanto <tool>` and `trooth network <tool>` run the tool the list names. The one Trooth MCP server lists its tools as `trooth_*`, and `call_tool`, `search_tools` and `enable_toolset` with no prefix, so the list printed `trooth semanto trooth-verify` while the command asked for `semanto_trooth_verify` and was refused. A command is now read against the names the server lists.
+- A page checked against its signed copy (`trooth semanto trooth-verify --url <page>`) exits 9 unless it matches: `differs`, `not_served`, `unknown_url` and every other answer that is not `matches` fail the command, as `trooth verify` does.
+- The GitHub Action pins `troothllc/trooth-cli@v0.27.2`.
+
 ## 0.27.1 (2026-11-24)
 
 - `trooth login` reaches the sign-in server again. It asked for the address `https://mcp.trooth.co/.well-known/oauth-protected-resource/`, with a trailing slash, which answers 404, so sign-in stopped before the browser opened; it now asks for the address RFC 9728 gives a server address with no path, without the slash.
