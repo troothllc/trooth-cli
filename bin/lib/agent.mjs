@@ -134,6 +134,7 @@ function parse(args) {
   const flags = {}; const pos = []; const kv = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+    if (a === '--') { pos.push(...args.slice(i + 1)); break; } // everything after -- is an argument, never a flag
     if (a === '--json' || a === '--no-input' || a === '--all') { flags[a.slice(2)] = true; continue; }
     if (a === '-X' || a === '--method') { flags.method = args[++i]; continue; }
     if (a.startsWith('--') && a.includes('=')) { const [k, ...v] = a.slice(2).split('='); kv[k] = v.join('='); continue; }
@@ -463,7 +464,8 @@ export function completionScript(shell) {
 
 /** At most once a day, on a terminal, never with --json, --quiet or in CI: a newer trooth on npm. */
 export async function updateNotice(io, version, env = process.env, now = Date.now(), fetcher = fetch) {
-  if (io.asJson || io.quiet || !process.stderr.isTTY || env.CI || env.TROOTH_NO_UPDATE_NOTIFIER) return null;
+  // CA-D-007 (cli62 review): help is offline, so asking for it never checks for an update.
+  if (io.help || io.asJson || io.quiet || !process.stderr.isTTY || env.CI || env.TROOTH_NO_UPDATE_NOTIFIER) return null;
   const file = join(configDir(env), 'update-check.json');
   let last = {};
   try { last = JSON.parse(readFileSync(file, 'utf8')); } catch { /* first check */ }
@@ -559,7 +561,7 @@ export const AGENT_HELP = {
   status: 'usage: trooth status [--json]\n\nCalls trooth.co, the API, Semanto and the MCP server directly and reads the incident feed.\nExit 0 when every part answers; 4 when one is down (a 5xx or no answer).',
   completion: `usage: trooth completion bash|zsh|fish|powershell\n\nPrints a completion script for the shell named.\nExit codes: 0 printed; 2 no shell or an unknown one.`,
 };
-const helpAsked = (args) => { for (const a of args) { if (a === '--') return false; if (a === '--help' || a === '-h') return true; } return false; };
+export const helpAsked = (args) => { for (const a of args) { if (a === '--') return false; if (a === '--help' || a === '-h') return true; } return false; };
 
 export async function agentMain(cmd, args, io, env = process.env) {
   if (helpAsked(args) && AGENT_HELP[cmd]) { io.outAlways(AGENT_HELP[cmd]); return AGENT_EXIT.OK; }

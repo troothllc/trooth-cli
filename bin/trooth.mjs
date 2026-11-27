@@ -202,7 +202,7 @@ import { ID_TYPES } from './lib/ids.mjs';
 import { SECTION_NAMES, SECTION_OF_CATEGORY, parseSectionArgs, buildSections, renderText, renderMarkdown } from './lib/profile.mjs';
 import { verifyEvidence, verifyDelegationReceipt, verifyLogCommitment, commitmentFromLogEntry, extractJws, EvidenceInputError, PUBLIC_STATES } from './lib/evidence.mjs';
 import { homedir } from 'node:os';
-import { AGENT_COMMANDS, AGENT_HELP, agentMain, updateNotice } from './lib/agent.mjs';
+import { AGENT_COMMANDS, AGENT_HELP, agentMain, helpAsked, updateNotice } from './lib/agent.mjs';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
 // The record projection, GET /api/network/profile, is served by the website:
@@ -3887,7 +3887,8 @@ async function dispatch() {
   }
   if (!Number.isInteger(code)) code = EXIT.UPSTREAM;
   // K8: a newer version is mentioned at most once a day, on a terminal, never with --json, --quiet or in CI.
-  if (!hookMode && cmd !== 'completion') { try { await updateNotice({ asJson, quiet, errLine }, VERSION); } catch { /* never fails a command */ } }
+  const askedHelp = !cmd || cmd === 'help' || cmd === '--help' || cmd === '-h' || helpAsked(argv.slice(1));
+  if (!hookMode && cmd !== 'completion') { try { await updateNotice({ asJson, quiet, errLine, help: askedHelp }, VERSION); } catch { /* never fails a command */ } }
   await drainOutput();
   // The hook never fails open: an unexpected failure, or an ask (or a deny reason)
   // that was not delivered, blocks the tool (exit 2) instead of letting it run.

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { AGENT_HELP, commandWords, resolveToolName } from '../bin/lib/agent.mjs';
+import { AGENT_HELP, commandWords, resolveToolName, updateNotice, _test } from '../bin/lib/agent.mjs';
 
 const bin = fileURLToPath(new URL('../bin/trooth.mjs', import.meta.url));
 // Any network call fails fast here: a closed local port for every server and the API.
@@ -29,4 +29,19 @@ assert.equal(commandWords('semanto', 'semanto_page'), 'page');
 assert.equal(commandWords('network', 'trooth_profile_get'), 'profile-get');
 assert.equal(resolveToolName('semanto', 'status', ['trooth_semanto_status', 'trooth_status']), 'trooth_semanto_status');
 assert.equal(resolveToolName('network', 'profile-get', ['trooth_profile_get']), 'trooth_profile_get');
+// Help never checks for an update, even on a terminal (the check is the only call a help run could make).
+{
+  let called = 0;
+  const spy = async () => { called++; return { json: async () => ({ version: '99.0.0' }) }; };
+  const tty = process.stderr.isTTY; Object.defineProperty(process.stderr, 'isTTY', { value: true, configurable: true });
+  try {
+    const r = await updateNotice({ help: true, asJson: false, quiet: false, errLine: () => {} }, '0.0.1', { TROOTH_CONFIG_DIR: '/nonexistent' }, Date.now(), spy);
+    assert.equal(r, null); assert.equal(called, 0, 'help made no update request');
+  } finally { Object.defineProperty(process.stderr, 'isTTY', { value: tty, configurable: true }); }
+}
+// After --, every word is an argument: no empty-named flag reaches a tool.
+{
+  const p = _test.parse(['sign', '--', '--help', 'x']);
+  assert.deepEqual(p.pos, ['sign', '--help', 'x']); assert.equal(Object.prototype.hasOwnProperty.call(p.kv, ''), false);
+}
 console.log('help-2026-11: ok');
