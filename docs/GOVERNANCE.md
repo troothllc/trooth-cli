@@ -28,7 +28,7 @@ Trooth acknowledges each RFC within 5 business days and labels it `rfc:proposed`
 ## 3. Review and decision
 
 - **Comment period.** A change that existing checkers would read differently stays open for comment for at least 30 days. An addition that changes no existing result stays open for at least 14 days.
-- **Decision.** Trooth decides, and writes its reasons on the issue whether it accepts, revises or declines. The issue is labelled `rfc:accepted`, `rfc:revised` or `rfc:declined`.
+- **Decision.** Trooth decides, and writes its reasons on the issue whether it accepts, revises or declines. The issue is labeled `rfc:accepted`, `rfc:revised` or `rfc:declined`.
 - **Credit.** An accepted change names its author in the changelog and in the spec's revision note.
 - **Change control.** Trooth, LLC holds change control today. If a format is later moved to a neutral standards body, that body's process replaces this one for that format.
 

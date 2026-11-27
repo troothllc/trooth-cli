@@ -257,7 +257,7 @@ const cases = [
   ["unsupported contract", () => ({ status: 400, body: { error: "unsupported contract" } }), [], 3, (d) => assert.equal(d.exit, 3)],
   ["rate limit no fallback", () => ({ status: 429, body: { error: "slow down" } }), [], 3, (d) => assert.equal(d.http_status, 429)],
   ["unreachable no fallback", () => ({ destroy: true }), ["--no-fallback"], 3, (d) => assert.equal(d.state, "service_error")],
-  ["unreachable labelled fallback", () => ({ destroy: true }), [], 1, (d) => { assert.equal(d.source.surface, "directory_fallback"); assert.equal(d.source.fallback, true); }],
+  ["unreachable labeled fallback", () => ({ destroy: true }), [], 1, (d) => { assert.equal(d.source.surface, "directory_fallback"); assert.equal(d.source.fallback, true); }],
 ];
 for (const [name, answer, extra, code, check] of cases) {
   await t(`${name}: exit ${code}, one whole JSON document`, async () => {

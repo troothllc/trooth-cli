@@ -1,0 +1,27 @@
+{
+  "name": "semanto",
+  "version": "0.2.0",
+  "description": "Semanto by Trooth: the semanto command. Installs the trooth command line tool and runs trooth semanto.",
+  "license": "Apache-2.0",
+  "author": "Trooth, LLC",
+  "homepage": "https://trooth.co/docs/semanto",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troothllc/trooth-cli.git",
+    "directory": "packages/semanto"
+  },
+  "type": "module",
+  "bin": {
+    "semanto": "bin.mjs"
+  },
+  "files": [
+    "bin.mjs",
+    "README.md"
+  ],
+  "dependencies": {
+    "trooth": "^0.27.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

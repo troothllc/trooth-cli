@@ -174,7 +174,7 @@ const api = `http://127.0.0.1:${server.address().port}`;
 const json = (res, status, body) => { res.statusCode = status; res.setHeader("content-type", "application/json"); res.end(JSON.stringify(body)); };
 const check = (args, env = {}) => new Promise((resolve) => {
   // TROOTH_WEB is a closed port, so these lookup cases exercise the directory
-  // route as the labelled fallback it has been since 0.6.0. The projection
+  // route as the labeled fallback it has been since 0.6.0. The projection
   // read itself is held in tests/check-projection.test.mjs.
   const p = spawn(process.execPath, [BIN, "check", ...args], { env: { ...process.env, TROOTH_WEB: "http://127.0.0.1:9", TROOTH_API: api, ...env } });
   let stdout = "", stderr = "";

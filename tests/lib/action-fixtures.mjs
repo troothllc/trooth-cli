@@ -110,7 +110,7 @@ function boundary(d, actionApproval, reading) {
       `Delegation ${d.id}: its agent, role, counterparty, actions, limit and expiry, approved by ${d.approval.approved_by} through ${d.approval.method === 'identity_provider' ? "the workspace's identity provider" : 'a fresh sign-in'} at ${d.approval.approved_at}.`,
       ...(actionApproval ? [`This action, approved by ${actionApproval.approved_by} through the workspace's identity provider at ${actionApproval.approved_at}.`] : []),
     ],
-    vendor_represented: [`What ${d.target.domain} publishes about itself, including any signed declaration, is its own representation, labelled as such in its public record.`],
+    vendor_represented: [`What ${d.target.domain} publishes about itself, including any signed declaration, is its own representation, labeled as such in its public record.`],
     not_established: [
       'That the goods or services will be delivered, or are as described.',
       'That a payment will be made, will settle, or that funds are available.',

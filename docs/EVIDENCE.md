@@ -6,7 +6,7 @@ A company publishes about itself in three places: its own website and DNS, the r
 
 ## 1. Who said it
 
-Every fact Trooth carries is labelled with one of these, and they are never merged:
+Every fact Trooth carries is labeled with one of these, and they are never merged:
 
 | Class | Meaning | Examples |
 |---|---|---|
@@ -114,7 +114,7 @@ Status: `corroborated` when evidence that ties it is present; otherwise `contrad
 - **Sources.** data.sec.gov and www.sec.gov with a named agent and contact address, as the SEC's fair-access rules ask; api.gleif.org; DNS over HTTPS; api.certspotter.com; the OFAC SDN list (read at most once a day); api.sam.gov, api.uspto.gov and api.ftc.gov with Trooth's keys; data.ny.gov, data.colorado.gov, data.ct.gov and data.oregon.gov; rdap.org; the company's home page and its terms, legal and privacy pages, until a legal name is found, and its `/.well-known/security.txt`.
 - **Safety.** Every request goes through the same guarded fetch as the witness reading: public addresses only, at most five redirects, bodies capped at 2 MB, of a filing only its first 256 KB. Pages are read as text with patterns; nothing in them runs. A site whose robots.txt names Trooth-Witness with `Disallow: /` is not read; the registries still are, because they are not the company's servers.
 - **Limits.** An answer is cached for a day; `?cached=only` answers from the cache or 404 and never starts a reading. Uncached readings: 3 a minute from one address, and the scan's per-domain cap of 3 an hour and 10 a day. Each source is given 8 seconds and the whole reading 11; a source that does not answer in time is listed in `sources` with status 0 and in `not_read`, never filled in.
-- **Readings and observations.** A domain with a published Trooth Network record gets a reading: signed, and logged at most once per UTC day (section 5). Any other domain gets an observation: the same record shape, unsigned and never logged, labelled in `signed.problem`, `note` and the `X-Trooth-Reading: observation` header. A domain whose name does not exist is not read at all: 404, remembered for an hour. Once an hour Trooth also reads up to three Network companies whose cached reading is missing, so their Trust Profiles can show one.
+- **Readings and observations.** A domain with a published Trooth Network record gets a reading: signed, and logged at most once per UTC day (section 5). Any other domain gets an observation: the same record shape, unsigned and never logged, labeled in `signed.problem`, `note` and the `X-Trooth-Reading: observation` header. A domain whose name does not exist is not read at all: 404, remembered for an hour. Once an hour Trooth also reads up to three Network companies whose cached reading is missing, so their Trust Profiles can show one.
 - **Replay.** Every response read is listed in `sources` with its URL, status, the SHA-256 of the bytes read and whether the whole document was read. Trooth keeps those bytes under that hash, so a disputed fact can be replayed from what Trooth actually received.
 - **Absence.** Every source that was not read, or did not answer, is listed in `not_read` with the reason. A source not read is never filled in.
 - **Names.** SAM.gov, the USPTO, the state registries and the FTC are searched by the legal names the SEC and the LEI record hold (the site's own copyright name only when no registry names the company). A match is reported as a name match beside its source; it is not an identification.

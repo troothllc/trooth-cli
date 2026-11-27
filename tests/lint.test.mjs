@@ -8,7 +8,7 @@
 // `check` here runs its FALLBACK path: since 0.6.0 it reads the record
 // projection (/api/network/profile, held in tests/check-projection.test.mjs),
 // and reads the directory route only when that projection cannot be reached.
-// TROOTH_WEB points at a closed port, so every check below is a labelled
+// TROOTH_WEB points at a closed port, so every check below is a labeled
 // fallback read against a local HTTP server standing in for the directory feed.
 // That server answers as the directory worker in two versions: "current" serves the one-record
 // route /directory/api/vendors/<domain>, and "legacy" answers that route with a

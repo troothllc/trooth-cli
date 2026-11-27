@@ -202,13 +202,13 @@ import { ID_TYPES } from './lib/ids.mjs';
 import { SECTION_NAMES, SECTION_OF_CATEGORY, parseSectionArgs, buildSections, renderText, renderMarkdown } from './lib/profile.mjs';
 import { verifyEvidence, verifyDelegationReceipt, verifyLogCommitment, commitmentFromLogEntry, extractJws, EvidenceInputError, PUBLIC_STATES } from './lib/evidence.mjs';
 import { homedir } from 'node:os';
-import { AGENT_COMMANDS, agentMain, updateNotice } from './lib/agent.mjs';
+import { AGENT_COMMANDS, AGENT_HELP, agentMain, updateNotice } from './lib/agent.mjs';
 import { join, relative, extname, basename, dirname } from 'node:path';
 
 // The record projection, GET /api/network/profile, is served by the website:
 // the same route the web page's machine twin, the REST API, the MCP connector
 // and the llms.txt twin read. The directory route on api.trooth.co is read only
-// as a labelled fallback when the projection cannot be reached.
+// as a labeled fallback when the projection cannot be reached.
 const WEB = (process.env.TROOTH_WEB || 'https://trooth.co').replace(/\/+$/, '');
 const API = (process.env.TROOTH_API || 'https://api.trooth.co').replace(/\/+$/, '');
 /** The /api/network/profile contract this CLI is written to, pinned in every
@@ -454,7 +454,7 @@ ${B}Flags${X}
   --section <names>         profile: only these sections (comma-separated; trooth profile --help lists them)
   --markdown                profile: the profile as Markdown
   --no-fallback             check: exit 3 when the record projection cannot be reached,
-                            instead of reading the directory feed as a labelled fallback
+                            instead of reading the directory feed as a labeled fallback
   --file <path>             verify: a saved profile, statement, or {statement, manifest}
   --keys <path>             verify: a saved copy of api.trooth.co/public/keys
   --mapping <path>          verify: the exact check mapping document the statement names
@@ -468,7 +468,7 @@ ${B}Flags${X}
                             against this log key, not the pinned one
   --state <path>            log monitor: the last checkpoint seen; written when the log only grew
   --witnesses <n>           log checkpoint, log monitor: exit 9 unless n pinned witnesses cosigned.
-                            No witness follows the log yet, so any n above 0 exits 9 today.
+                            The pinned witnesses are staging services and do not cosign every checkpoint, so n above 0 can exit 9.
   --out <path>              log receipt: write the COSE receipt bytes to a new file
   --from <url|dir>          mirror: copy from another mirror instead of the live log
   --check <dir|url>         mirror: check a mirror instead of writing one
@@ -569,7 +569,7 @@ const COMMAND_HELP = {
       'signature: trooth verify does.',
     ],
     flags: [
-      ['--no-fallback', "exit 3 when the record projection cannot be reached, instead of reading api.trooth.co's directory feed as a labelled fallback"],
+      ['--no-fallback', "exit 3 when the record projection cannot be reached, instead of reading api.trooth.co's directory feed as a labeled fallback"],
       ['--json', 'one JSON document on stdout; diagnostics on stderr'],
     ],
     exits: [
@@ -703,7 +703,7 @@ const COMMAND_HELP = {
       'witnesses cosigned it.',
     ],
     flags: [
-      ['--witnesses <n>', 'exit 9 unless at least n of the pinned witnesses cosigned. No witness follows the log yet, so today any n above 0 exits 9 (docs/LOG.md section 7)'],
+      ['--witnesses <n>', 'exit 9 unless at least n of the pinned witnesses cosigned. The pinned witnesses are staging services and do not cosign every checkpoint, so n above 0 can exit 9 (docs/LOG.md section 7)'],
       ['--log-vkey <key>', 'check the checkpoint against this key, not the pinned one'],
       ['--json', 'one JSON document on stdout; diagnostics on stderr'],
     ],
@@ -725,7 +725,7 @@ const COMMAND_HELP = {
     ],
     flags: [
       ['--state <file>', 'where the last checkpoint seen is kept (required)'],
-      ['--witnesses <n>', 'exit 9 unless at least n of the pinned witnesses cosigned. No witness follows the log yet, so today any n above 0 exits 9'],
+      ['--witnesses <n>', 'exit 9 unless at least n of the pinned witnesses cosigned. The pinned witnesses are staging services and do not cosign every checkpoint, so n above 0 can exit 9'],
       ['--log-vkey <key>', 'check checkpoints against this key, not the pinned one'],
       ['--json', 'one JSON document on stdout; diagnostics on stderr'],
     ],
@@ -1524,7 +1524,7 @@ async function readDirectory(domain) {
  *   200 found:false                           no published record (exit 1)
  *   200 found:false, ambiguous:true           not possible for a domain; a
  *                                             contract error (exit 3)
- *   5xx, a connection failure, the deadline   unreachable: the labelled
+ *   5xx, a connection failure, the deadline   unreachable: the labeled
  *                                             fallback to the directory route,
  *                                             unless --no-fallback (exit 3)
  *   any other status or body                  a contract error (exit 3)
@@ -1703,7 +1703,7 @@ function printProjection(rec) {
   // of who stated or observed it: the same rows the record page renders.
   const facts = Array.isArray(p.facts) ? p.facts : [];
   if (facts.length) {
-    out(`\n${B}Facts published: ${facts.length}${X}${D}, each labelled with who stated or observed it${X}`);
+    out(`\n${B}Facts published: ${facts.length}${X}${D}, each labeled with who stated or observed it${X}`);
     let cat = null;
     for (const f of facts) {
       if (f.category !== cat) { cat = f.category; out(`${B}${cat}${X}`); }
@@ -1800,7 +1800,7 @@ async function check() {
     return code;
   }
 
-  // The labelled fallback: the directory route, which carries no record version.
+  // The labeled fallback: the directory route, which carries no record version.
   const source = {
     surface: 'directory_fallback',
     fallback: true,
@@ -2628,7 +2628,7 @@ function printPublicRecord(d, sig) {
     out(`  SBOM         ${sb.format}${sb.describes ? ` for ${sb.describes}` : ''}, ${sb.components} component${sb.components === 1 ? '' : 's'}${sb.excluded ? ` (${sb.excluded} used to build or test, not delivered)` : ''} published by the site ${D}${sb.url}${X}`);
     if (!sb.osv) out(`               OSV was not read for it on this reading`);
     else if (!sb.osv.advisories) out(`               OSV lists no advisory for the ${sb.checked}${sb.truncated ? ' (first)' : ''} ${sb.excluded ? 'delivered ' : ''}package version${sb.checked === 1 ? '' : 's'} asked ${D}(read ${fmtDate(sb.osv.read_at)})${X}`);
-    else out(`               ${warn(`OSV lists ${sb.osv.advisories} advisor${sb.osv.advisories === 1 ? 'y' : 'ies'} across ${sb.osv.components_affected} of the ${sb.checked} ${sb.excluded ? 'delivered ' : ''}package versions asked${sb.osv.affected.length ? `, among them ${sb.osv.affected.slice(0, 3).map((a) => `${a.purl} (${a.ids.slice(0, 3).join(', ')}${a.ids.length > 3 ? ', ...' : ''})`).join('; ')}` : ''}.`)} An advisory for a package version does not show that the product is affected. ${D}(read ${fmtDate(sb.osv.read_at)})${X}`);
+    else out(`               ${warn(`OSV lists ${sb.osv.advisories} advisor${sb.osv.advisories === 1 ? 'y' : 'ies'} across ${sb.osv.components_affected} of the ${sb.checked} ${sb.excluded ? 'delivered ' : ''}package versions asked${sb.osv.affected.length ? `, among them ${sb.osv.affected.slice(0, 3).map((a) => `${a.purl} (${a.ids.slice(0, 3).join(', ')}${a.ids.length > 3 ? ` and ${a.ids.length - 3} more` : ''})`).join('; ')}` : ''}.`)} An advisory for a package version does not show that the product is affected. ${D}(read ${fmtDate(sb.osv.read_at)})${X}`);
     const ex = sb.osv?.excluded;
     if (ex && ex.checked) out(`               ${ex.advisories ? `build and test, not delivered: OSV lists ${ex.advisories} advisor${ex.advisories === 1 ? 'y' : 'ies'} across ${ex.components_affected} of ${ex.checked} package versions${ex.affected.length ? ` (${ex.affected.slice(0, 3).map((a) => `${a.purl} ${a.ids.slice(0, 3).join(', ')}`).join('; ')})` : ''}` : `build and test, not delivered: OSV lists no advisory for the ${ex.checked} package versions`}`);
   }
@@ -2676,7 +2676,7 @@ function printPublicRecord(d, sig) {
     out(`  declaration  ${label} ${dc.url} ${D}${parts.length ? `(${parts.join('; ')})` : ''}${X}`);
   }
   // The owner-signed record (0.21.0): the company's statement of which record
-  // version it published, against the record API's head. Labelled as the
+  // version it published, against the record API's head. Labeled as the
   // company's; reported, never graded.
   if (d.owner_signed_record && typeof d.owner_signed_record === 'object') {
     const o = d.owner_signed_record;
@@ -2781,7 +2781,7 @@ async function mcpToolsCmd() {
       const d = parseJsonBody(r);
       if (asJson) { emitJson(d); return EXIT.OK; }
       out(`${B}MCP servers whose tool lists Trooth logs${X}`);
-      for (const e of d.endpoints || []) out(`  ${e.endpoint}  ${e.manifest_sha256 ? `${e.tools} tools · manifest ${e.manifest_sha256.slice(0, 16)}… · read ${fmtDate(e.read_at)}${e.log_index !== null ? ` · log entry ${e.log_index}` : ''}` : `${A}not read yet${X}`}`);
+      for (const e of d.endpoints || []) out(`  ${e.endpoint}  ${e.manifest_sha256 ? `${e.tools} tools · manifest ${e.manifest_sha256.slice(0, 16)} · read ${fmtDate(e.read_at)}${e.log_index !== null ? ` · log entry ${e.log_index}` : ''}` : `${A}not read yet${X}`}`);
       out(`\n${D}Check one, and compare it with what the server lists now: trooth mcp-tools <endpoint> --live${X}`);
       return EXIT.OK;
     }
@@ -2809,7 +2809,7 @@ async function mcpToolsCmd() {
       const ok = (t) => `${J}${t}${X}`, bad = (t) => `${R}${t}${X}`, warn = (t) => `${A}${t}${X}`;
       out(`${B}${d.endpoint}${X}  ${D}${d.server.name || 'MCP server'}${d.server.version ? ` ${d.server.version}` : ''}, read ${fmtDate(d.read_at)}${d.last_checked ? `, unchanged when last checked ${fmtDate(d.last_checked)}` : ''}${X}`);
       out(`  tools      ${d.tools.length} · manifest ${d.manifest_sha256}`);
-      for (const t of d.tools.slice(0, 40)) out(`             ${t.name.padEnd(28)} ${D}description ${t.description_sha256.slice(0, 12)}… definition ${t.definition_sha256.slice(0, 12)}…${X}`);
+      for (const t of d.tools.slice(0, 40)) out(`             ${t.name.padEnd(28)} ${D}description ${t.description_sha256.slice(0, 12)} definition ${t.definition_sha256.slice(0, 12)}${X}`);
       if (d.tools.length > 40) out(`             ${D}and ${d.tools.length - 40} more (--json for all)${X}`);
       if (d.changed) out(`  since      ${d.previous ? `${fmtDate(d.previous.read_at)}: ` : ''}${[d.changed.added.length ? `added ${d.changed.added.join(', ')}` : '', d.changed.removed.length ? `removed ${d.changed.removed.join(', ')}` : '', d.changed.changed.length ? `changed ${d.changed.changed.join(', ')}` : ''].filter(Boolean).join('; ') || 'no change'}`);
       out(`  signature  ${sig.status === 'signed' ? ok(sig.reason) : sig.status === 'unsigned' ? warn(sig.reason) : bad(sig.reason)}${sig.log?.vkey_source ? ` ${D}(log key ${sig.log.vkey_source})${X}` : ''}`);
@@ -3831,6 +3831,7 @@ async function main() {
     const topic = argv.slice(1).filter((a) => !a.startsWith('-'));
     if (!topic.length) { outAlways(helpText()); return EXIT.OK; }
     const [name, sub] = topic;
+    if (Object.prototype.hasOwnProperty.call(AGENT_HELP, name)) { outAlways(AGENT_HELP[name]); return EXIT.OK; } // CA-D-008
     if (!Object.prototype.hasOwnProperty.call(COMMAND_HELP, name)) {
       fail(EXIT.USAGE, `no help for ${name}: not a command. Commands: check, profile, lint, verify, log, mirror, public-record, mcp-tools, guard, declare, evidence, delegation.`);
     }
