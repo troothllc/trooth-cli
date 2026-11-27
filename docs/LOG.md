@@ -110,7 +110,7 @@ time <timestamp>
 
 A checker MUST ignore lines by keys it does not hold, MUST NOT count a cosignature with a zero time, and SHOULD NOT count one dated more than an hour after its own clock. `trooth` 0.11.0 and later carry the three keys above in `bin/lib/log-trust.mjs`; `trooth log checkpoint` and `trooth log monitor` report which of them cosigned, and `--witnesses <n>` makes either command exit 9 when fewer than n did.
 
-As of trooth 0.16.3 (2026-10-09) no witness follows the log yet: each witness answers 404, so every checkpoint carries no cosignature, and `trooth log checkpoint --witnesses 2` (or any value above 0) exits 9 every time. The flag is kept for when the witness network follows the log. Until then a job that must pass leaves it out or passes `--witnesses 0`; the log monitor in this repository does not pass it.
+The three pinned witnesses (Geomys, Mullvad VPN AB, TrustFabric) are staging services. They cosign some checkpoints and not others: on 2026-11-27 one read showed 3 of 3 and a later read showed none. So `trooth log checkpoint --witnesses 2` (or any value above 0) can exit 9 on a sound log. A job that must pass leaves the flag out or passes `--witnesses 0`; the log monitor in this repository does not pass it.
 
 The log records a witness that answers with a larger tree of this log than the log holds (`witness_ahead`), or refuses a consistency proof (`proof_refused`), and reports it as an error: either is evidence of a split view or of lost entries.
 
@@ -137,7 +137,7 @@ Anyone can check that the log only grows:
 trooth log monitor --state trooth-log-state.json
 ```
 
-The first run records the signed checkpoint. Each later run fetches the new checkpoint, verifies its signature, and asks for a consistency proof from the saved size. If the log shrank, shows two roots for one size, or cannot prove the new tree extends the saved one, the command exits 9 and leaves the saved state untouched. It also records which pinned witnesses cosigned (none yet; section 7). A checkpoint that does not check is also exit 9; a log that cannot be read is exit 3; a missing `--state`, or a state file this command did not write, is exit 2. The trooth-cli repository runs this every hour in GitHub Actions (`.github/workflows/log-monitor.yml`) and keeps its state between runs.
+The first run records the signed checkpoint. Each later run fetches the new checkpoint, verifies its signature, and asks for a consistency proof from the saved size. If the log shrank, shows two roots for one size, or cannot prove the new tree extends the saved one, the command exits 9 and leaves the saved state untouched. It also records which pinned witnesses cosigned (section 7). A checkpoint that does not check is also exit 9; a log that cannot be read is exit 3; a missing `--state`, or a state file this command did not write, is exit 2. The trooth-cli repository runs this every hour in GitHub Actions (`.github/workflows/log-monitor.yml`) and keeps its state between runs.
 
 Monitors and witnesses protect against different failures: a monitor that keeps checkpoints detects a rewritten history after the fact; witnesses refuse to cosign one, so a reader who requires cosignatures never accepts it.
 

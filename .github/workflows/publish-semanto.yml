@@ -1,0 +1,55 @@
+name: Publish semanto to npm
+
+# Publishes the `semanto` npm package (packages/semanto) when a tag semanto-vX.Y.Z is pushed, with npm provenance,
+# the way publish.yml publishes `trooth` on vX.Y.Z (CA-D-001, cli62). The package only installs `trooth` and runs
+# `trooth semanto`; until cli62 its source was in no repository and it was published by hand without provenance.
+#
+# HOW IT AUTHENTICATES: npm trusted publishing (OpenID Connect); no npm token is stored or read. ONE ACT OUTSIDE
+# THIS FILE: a maintainer of `semanto` on npmjs.com registers the trusted publisher (package Settings > Trusted
+# Publisher > GitHub Actions): organization troothllc, repository trooth-cli, workflow filename publish-semanto.yml,
+# environment empty. Until then `npm publish` here fails with an authentication error and nothing is published.
+
+on:
+  push:
+    tags:
+      - "semanto-v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-semanto-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish semanto ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the OIDC token npm trusted publishing exchanges; nothing else
+    defaults:
+      run:
+        working-directory: packages/semanto
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: npm 11.5.1 or later (trusted publishing needs it)
+        run: npm install -g npm@11.5.1
+
+      - name: The tag is the package version, and the trooth it installs is published
+        run: |
+          V="$(node -p "require('./package.json').version")"
+          [ "semanto-v$V" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME does not match packages/semanto version $V"; exit 1; }
+          R="$(node -p "require('./package.json').dependencies.trooth")"
+          npm view "trooth@$R" version > /dev/null || { echo "::error::no published trooth matches $R"; exit 1; }
+
+      - name: Publish with provenance
+        run: npm publish --provenance --access public

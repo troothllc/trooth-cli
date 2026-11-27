@@ -188,8 +188,8 @@ await t("a 4xx (a refused contract pin, a rate limit) is an error, not a reason 
   }
 });
 
-console.log("the fallback, only when the projection is unreachable, and labelled");
-await t("a 5xx from the projection (after one retry) falls back to the directory route, labelled in every mode", async () => {
+console.log("the fallback, only when the projection is unreachable, and labeled");
+await t("a 5xx from the projection (after one retry) falls back to the directory route, labeled in every mode", async () => {
   web = (req, res) => sendJson(res, 503, { error: "witnessed_record_unavailable" }, { "retry-after": "30" });
   const r = await check(["acme.example", "--json"]);
   assert.equal(r.status, 0, r.stderr);

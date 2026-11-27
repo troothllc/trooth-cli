@@ -134,6 +134,7 @@ function parse(args) {
   const flags = {}; const pos = []; const kv = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+    if (a === '--') { pos.push(...args.slice(i + 1)); break; } // everything after -- is an argument, never a flag
     if (a === '--json' || a === '--no-input' || a === '--all') { flags[a.slice(2)] = true; continue; }
     if (a === '-X' || a === '--method') { flags.method = args[++i]; continue; }
     if (a.startsWith('--') && a.includes('=')) { const [k, ...v] = a.slice(2).split('='); kv[k] = v.join('='); continue; }
@@ -244,8 +245,16 @@ const toolName = (prefix, cmd) => (cmd.startsWith(`${prefix}_`) ? cmd : `${prefi
 export function resolveToolName(prefix, cmd, listed = []) {
   const n = cmd.replace(/-/g, '_');
   const names = new Set(listed);
-  for (const t of [n, `${prefix}_${n}`, `trooth_${n}`, `semanto_${n}`]) if (names.has(t)) return t;
+  // CA-D-034: the one server names Semanto tools trooth_semanto_*, so `trooth semanto status` must reach it.
+  for (const t of [n, `${prefix}_${n}`, `trooth_${prefix}_${n}`, `trooth_${n}`, `semanto_${n}`]) if (names.has(t)) return t;
   return toolName(prefix, cmd);
+}
+
+/** The words after `trooth semanto` or `trooth network` for one listed tool (CA-D-034): the server prefix comes off,
+ *  whichever of trooth_semanto_, semanto_ or trooth_ the tool carries, and underscores become dashes. */
+export function commandWords(which, name) {
+  const pre = which === 'semanto' ? /^(trooth_semanto_|semanto_|trooth_)/ : /^trooth_/;
+  return name.replace(pre, '').replace(/_/g, '-');
 }
 
 async function toolCommand(io, which, args, env) {
@@ -255,7 +264,7 @@ async function toolCommand(io, which, args, env) {
   const prefix = which === 'semanto' ? 'semanto' : 'trooth';
   if (!pos.length) {
     const r = await mcp(io, `${server}${server.includes('?') ? '&' : '?'}tools=all`, 'tools/list', {}, cfg, env);
-    const tools = (r.tools || []).map((t) => ({ name: t.name, command: `trooth ${which} ${t.name.replace(new RegExp(`^${prefix}_`), '').replace(/_/g, '-')}`, title: t.title, read_only: !!(t.annotations && t.annotations.readOnlyHint) }));
+    const tools = (r.tools || []).map((t) => ({ name: t.name, command: `trooth ${which} ${commandWords(which, t.name)}`, title: t.title, read_only: !!(t.annotations && t.annotations.readOnlyHint) }));
     if (io.asJson) io.emitJson({ server, tools });
     else for (const t of tools) io.out(`${t.command.padEnd(52)} ${t.title || ''}`);
     return AGENT_EXIT.OK;
@@ -305,16 +314,21 @@ async function apiCommand(io, args, env) {
 async function toolsCommand(io, args, env) {
   const cfg = resolveConfig({}, env);
   const rows = [];
+  const seen = new Set();
   for (const [which, prefix, server] of [['semanto', 'semanto', cfg.semanto_mcp.value], ['network', 'trooth', cfg.network_mcp.value]]) {
+    // CA-D-034: both settings point at the one server by default; read it once and print each tool once.
+    if (seen.has(server)) continue;
+    seen.add(server);
     let list = [];
     try { list = (await mcp(io, `${server}?tools=all`, 'tools/list', {}, cfg, env)).tools || []; } catch (e) { if (!(e instanceof Stop)) throw e; continue; }
     for (const t of list) {
+      const which2 = cfg.semanto_mcp.value === cfg.network_mcp.value ? (/^(trooth_semanto_|semanto_)/.test(t.name) ? 'semanto' : 'network') : which;
       const a = t.annotations || {};
       const meta = t._meta || {};
       rows.push({
         mcp: { server, name: t.name },
         rest: typeof meta['co.trooth/route'] === 'string' ? meta['co.trooth/route'] : null,
-        cli: meta['co.trooth/cli'] || `trooth ${which} ${t.name.replace(new RegExp(`^${prefix}_`), '').replace(/_/g, '-')}`,
+        cli: meta['co.trooth/cli'] || `trooth ${which2} ${commandWords(which2, t.name)}`,
         approval: a.readOnlyHint ? 'read: runs alone' : a.destructiveHint ? 'destructive: asks first' : 'write: asks first in most clients',
         access: meta['co.trooth/access'] ?? null,
       });
@@ -450,7 +464,8 @@ export function completionScript(shell) {
 
 /** At most once a day, on a terminal, never with --json, --quiet or in CI: a newer trooth on npm. */
 export async function updateNotice(io, version, env = process.env, now = Date.now(), fetcher = fetch) {
-  if (io.asJson || io.quiet || !process.stderr.isTTY || env.CI || env.TROOTH_NO_UPDATE_NOTIFIER) return null;
+  // CA-D-007 (cli62 review): help is offline, so asking for it never checks for an update.
+  if (io.help || io.asJson || io.quiet || !process.stderr.isTTY || env.CI || env.TROOTH_NO_UPDATE_NOTIFIER) return null;
   const file = join(configDir(env), 'update-check.json');
   let last = {};
   try { last = JSON.parse(readFileSync(file, 'utf8')); } catch { /* first check */ }
@@ -532,7 +547,24 @@ async function statusCommand(io, args, env) {
 
 // ------------------------------------------------------------------ entry
 
+/** Usage for the agent commands. `--help` prints it and exits 0 before anything is read, written or sent (CA-D-007,
+ *  CA-D-039): `logout --help` used to sign out and `semanto --help` used to call the server. */
+const EXIT_LINES = 'Exit codes: 0 done; 2 refused, with the fix on stderr; 3 a person must approve; 4 Trooth could not be reached.';
+export const AGENT_HELP = {
+  semanto: `usage: trooth semanto [<tool>] [--name value] [--json] [--no-input]\n\nWith no tool, lists the Semanto tools on the Trooth MCP server. With a tool, runs it with the flags as its arguments.\n${EXIT_LINES} 9 a page does not match.`,
+  network: `usage: trooth network [<tool>] [--name value] [--json] [--no-input]\n\nWith no tool, lists the Trooth Network tools on the Trooth MCP server. With a tool, runs it with the flags as its arguments.\n${EXIT_LINES}`,
+  api: `usage: trooth api [-X METHOD] <path> [--data JSON] [--jq EXPR] [--json]\n\nCalls one route. Paths under /os and /public go to api.trooth.co; /api goes to trooth.co. Uses the stored sign-in or TROOTH_API_KEY.\n${EXIT_LINES}`,
+  tools: `usage: trooth tools [--json]\n\nEvery operation once: its MCP name, REST route, CLI command and whether it asks before acting.\n${EXIT_LINES}`,
+  login: `usage: trooth login [--server semanto|network]\n\nSigns in through the browser; the token goes in the OS keychain and never in a file. With no keychain, set TROOTH_API_KEY.\n${EXIT_LINES}`,
+  logout: `usage: trooth logout\n\nRemoves the stored sign-in from the OS keychain.\nExit codes: 0 done (also when nothing was stored).`,
+  config: `usage: trooth config list | get <key> | set <key> <value> | unset <key>\n\nSettings, read from flags, then the environment, then the config file. Keys: api_base, site_base, semanto_mcp, network_mcp, timeout_ms.\nExit codes: 0 done; 2 an unknown key or a missing value.`,
+  status: 'usage: trooth status [--json]\n\nCalls trooth.co, the API, Semanto and the MCP server directly and reads the incident feed.\nExit 0 when every part answers; 4 when one is down (a 5xx or no answer).',
+  completion: `usage: trooth completion bash|zsh|fish|powershell\n\nPrints a completion script for the shell named.\nExit codes: 0 printed; 2 no shell or an unknown one.`,
+};
+export const helpAsked = (args) => { for (const a of args) { if (a === '--') return false; if (a === '--help' || a === '-h') return true; } return false; };
+
 export async function agentMain(cmd, args, io, env = process.env) {
+  if (helpAsked(args) && AGENT_HELP[cmd]) { io.outAlways(AGENT_HELP[cmd]); return AGENT_EXIT.OK; }
   try {
     if (cmd === 'semanto' || cmd === 'network') return await toolCommand(io, cmd, args, env);
     if (cmd === 'api') return await apiCommand(io, args, env);

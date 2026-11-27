@@ -77,7 +77,7 @@ test('the index lists the servers Trooth reads', async () => {
   try {
     const r = await run(['mcp-tools'], s.api.address().port);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /2 tools · manifest [0-9a-f]{16}… · read .* · log entry 7/);
+    assert.match(r.out, /2 tools · manifest [0-9a-f]{16} · read .* · log entry 7/);
   } finally { s.close(); }
 });
 

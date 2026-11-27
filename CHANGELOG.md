@@ -2,6 +2,16 @@
 
 Each release of `trooth` on npm, newest first.
 
+## 0.27.3 (2026-11-27)
+
+- `--help` and `-h` on every command print that command's usage and its exit codes and exit 0, and do nothing else. `trooth logout --help` used to sign out, `trooth login --help` started a sign-in, `trooth semanto --help`, `trooth network --help` and `trooth tools --help` called the MCP server, and `trooth api --help` and `trooth completion --help` exited 2. `trooth help <command>` now covers these commands too.
+- `trooth semanto <tool>` reaches the server's `trooth_semanto_*` tools, the list prints them as `trooth semanto status` (not `trooth semanto trooth-semanto-status`), and `trooth tools` reads the one server once and prints each operation once (it printed 84 rows for 42 tools).
+- The `--witnesses` help and docs/LOG.md say what the pinned witnesses do today: they are staging services and cosign some checkpoints, so a value above 0 can exit 9 on a sound log.
+- Output prints whole short hashes with no ellipsis, and "labeled" is spelled the American way throughout.
+- The `semanto` npm package's source is in this repository (packages/semanto) and is published from it with provenance; it installs this release.
+- trooth-verify (Python) 0.4.1 reports its installed version (it said 0.2.0).
+- The GitHub Action pins `troothllc/trooth-cli@v0.27.3`.
+
 ## 0.27.2 (2026-11-26)
 
 - `trooth semanto <tool>` and `trooth network <tool>` run the tool the list names. The one Trooth MCP server lists its tools as `trooth_*`, and `call_tool`, `search_tools` and `enable_toolset` with no prefix, so the list printed `trooth semanto trooth-verify` while the command asked for `semanto_trooth_verify` and was refused. A command is now read against the names the server lists.

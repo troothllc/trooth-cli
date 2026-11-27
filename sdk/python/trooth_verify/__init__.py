@@ -28,7 +28,15 @@ from .verify import (
     verify_statement,
 )
 
-__version__ = "0.2.0"
+# CA-D-005: the version installed, from the package metadata, so it never drifts from pyproject.toml.
+try:
+    from importlib.metadata import version as _dist_version, PackageNotFoundError as _NotFound
+    try:
+        __version__ = _dist_version("trooth-verify")
+    except _NotFound:
+        __version__ = "0.4.1"
+except ImportError:  # pragma: no cover
+    __version__ = "0.4.1"
 
 __all__ = [
     "ASSURANCE", "JCS_LABEL", "REASONS", "VERIFICATION_BUNDLE_V1", "WITNESS_STATEMENT_V1",
